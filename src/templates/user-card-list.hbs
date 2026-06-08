@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Users — {{totalCount}} cards</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a; color: #e2e8f0; min-height: 100vh; padding: 2rem;
+    }
+    header { display: flex; align-items: baseline; gap: 0.75rem; margin-bottom: 2rem; }
+    h1 { font-size: 1.5rem; font-weight: 700; color: #f8fafc; }
+    .count { font-size: 0.85rem; background: #1e293b; color: #94a3b8; border: 1px solid #334155; padding: 0.2rem 0.6rem; border-radius: 999px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.25rem; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 1rem; overflow: hidden; transition: border-color 0.15s; }
+    .card:hover { border-color: #475569; }
+    .card-top { padding: 1.25rem 1.25rem 0.75rem; display: flex; align-items: center; justify-content: space-between; }
+    .avatar {
+      width: 48px; height: 48px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .card-id { font-size: 0.7rem; color: #475569; font-weight: 600; letter-spacing: 0.05em; }
+    .card-body { padding: 0.75rem 1.25rem 1.25rem; }
+    .name { font-size: 1rem; font-weight: 700; color: #f1f5f9; }
+    .username { font-size: 0.8rem; color: #64748b; margin-bottom: 0.75rem; }
+    .info { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.35rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .info a { color: #38bdf8; text-decoration: none; }
+    .info-icon { font-size: 0.75rem; flex-shrink: 0; }
+    .divider { border-top: 1px solid #334155; margin: 0.75rem 0; }
+    .company { font-size: 0.8rem; font-weight: 600; color: #cbd5e1; }
+    .city { font-size: 0.75rem; color: #64748b; margin-top: 0.2rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Users</h1>
+    <span class="count">{{totalCount}} total</span>
+  </header>
+
+  <div class="grid">
+    {{#each users}}
+    <div class="card">
+      <div class="card-top" style="background: linear-gradient(135deg, {{this.colorLight}} 0%, #1e293b 100%);">
+        <div class="avatar" style="background: {{this.color}};">{{this.initials}}</div>
+        <div class="card-id">#{{this.id}}</div>
+      </div>
+      <div class="card-body">
+        <div class="name">{{this.name}}</div>
+        <div class="username">@{{this.username}}</div>
+        <div class="info">
+          <span class="info-icon">✉</span>
+          <a href="mailto:{{this.email}}">{{this.email}}</a>
+        </div>
+        <div class="info">
+          <span class="info-icon">☎</span>
+          <span>{{this.phone}}</span>
+        </div>
+        <div class="info">
+          <span class="info-icon">🌐</span>
+          <a href="https://{{this.website}}" target="_blank">{{this.website}}</a>
+        </div>
+        <div class="divider"></div>
+        <div class="company">{{this.company.name}}</div>
+        <div class="city">{{this.address.city}}</div>
+      </div>
+    </div>
+    {{/each}}
+  </div>
+</body>
+</html>

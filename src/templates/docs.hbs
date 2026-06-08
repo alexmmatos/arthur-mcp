@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{serverName}} — API Docs</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a; color: #e2e8f0; min-height: 100vh;
+      display: flex; flex-direction: column;
+    }
+
+    /* ── top bar ── */
+    .topbar {
+      background: #020817; border-bottom: 1px solid #1e293b;
+      padding: 1rem 2rem; display: flex; align-items: center; gap: 1rem;
+      position: sticky; top: 0; z-index: 10;
+    }
+    .topbar h1 { font-size: 1.1rem; font-weight: 700; color: #f8fafc; }
+    .topbar .version {
+      background: #1e293b; color: #94a3b8; font-size: 0.75rem;
+      padding: 0.2rem 0.55rem; border-radius: 999px; border: 1px solid #334155;
+    }
+    .topbar .endpoint {
+      margin-left: auto; font-size: 0.8rem; color: #64748b;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .topbar .endpoint code {
+      background: #1e293b; color: #38bdf8; padding: 0.2rem 0.5rem; border-radius: 0.3rem;
+    }
+
+    /* ── layout ── */
+    .layout { display: flex; flex: 1; }
+    .sidebar {
+      width: 220px; flex-shrink: 0; background: #020817;
+      border-right: 1px solid #1e293b; padding: 1.5rem 1rem;
+      position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto;
+    }
+    .sidebar-section { margin-bottom: 1.5rem; }
+    .sidebar-title {
+      font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em;
+      color: #475569; text-transform: uppercase; margin-bottom: 0.6rem; padding-left: 0.5rem;
+    }
+    .sidebar a {
+      display: block; padding: 0.35rem 0.5rem; border-radius: 0.4rem;
+      font-size: 0.8rem; color: #94a3b8; text-decoration: none;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .sidebar a:hover { background: #1e293b; color: #e2e8f0; }
+
+    /* ── main content ── */
+    main { flex: 1; padding: 2rem; max-width: 900px; }
+
+    /* ── info block ── */
+    .info-block {
+      background: #1e293b; border: 1px solid #334155; border-radius: 1rem;
+      padding: 1.5rem; margin-bottom: 2rem;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;
+    }
+    .info-stat .label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+    .info-stat .value { font-size: 1.4rem; font-weight: 700; color: #38bdf8; margin-top: 0.15rem; }
+    .info-stat .value.sm { font-size: 0.9rem; font-family: monospace; margin-top: 0.4rem; }
+
+    /* ── auth notice ── */
+    .auth-notice {
+      background: #1c2a1c; border: 1px solid #166534; border-radius: 0.75rem;
+      padding: 1rem 1.25rem; margin-bottom: 2rem;
+      display: flex; align-items: flex-start; gap: 0.75rem;
+    }
+    .auth-notice .icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 0.05rem; }
+    .auth-notice p { font-size: 0.85rem; color: #86efac; line-height: 1.6; }
+    .auth-notice code { background: #14532d; padding: 0.1rem 0.4rem; border-radius: 0.3rem; font-size: 0.8rem; }
+
+    /* ── section headings ── */
+    .section-heading {
+      font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: #475569;
+      border-bottom: 1px solid #1e293b; padding-bottom: 0.5rem; margin-bottom: 1.25rem;
+    }
+
+    /* ── tool card ── */
+    .tool-card {
+      background: #1e293b; border: 1px solid #334155; border-radius: 0.75rem;
+      margin-bottom: 1rem; overflow: hidden;
+    }
+    .tool-header {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.9rem 1.25rem; cursor: pointer;
+    }
+    .method-badge {
+      background: #1d4ed8; color: #bfdbfe;
+      font-size: 0.65rem; font-weight: 700; padding: 0.25rem 0.55rem;
+      border-radius: 0.3rem; text-transform: uppercase; letter-spacing: 0.05em;
+      flex-shrink: 0;
+    }
+    .tool-name { font-size: 0.95rem; font-weight: 600; color: #f1f5f9; font-family: monospace; }
+    .tool-desc { font-size: 0.8rem; color: #64748b; margin-left: auto; max-width: 340px; text-align: right; }
+
+    .tool-body { border-top: 1px solid #334155; padding: 1.25rem; }
+    .tool-desc-full { font-size: 0.875rem; color: #94a3b8; margin-bottom: 1.25rem; line-height: 1.6; }
+
+    /* ── params table ── */
+    .params-title { font-size: 0.7rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.6rem; }
+    .no-params { font-size: 0.8rem; color: #475569; font-style: italic; margin-bottom: 1rem; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 1.25rem; font-size: 0.82rem; }
+    th { background: #0f172a; color: #64748b; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.5rem 0.75rem; text-align: left; }
+    td { padding: 0.6rem 0.75rem; border-top: 1px solid #1e293b; color: #cbd5e1; vertical-align: top; }
+    .type-badge {
+      display: inline-block; font-size: 0.7rem; font-family: monospace;
+      background: #0f172a; color: #a78bfa; padding: 0.1rem 0.4rem; border-radius: 0.3rem;
+    }
+    .req-badge {
+      display: inline-block; font-size: 0.65rem; font-weight: 700;
+      background: #7f1d1d; color: #fca5a5; padding: 0.1rem 0.4rem; border-radius: 0.3rem;
+    }
+    .opt-badge {
+      display: inline-block; font-size: 0.65rem; font-weight: 700;
+      background: #1e293b; color: #64748b; padding: 0.1rem 0.4rem; border-radius: 0.3rem; border: 1px solid #334155;
+    }
+
+    /* ── curl block ── */
+    .curl-title { font-size: 0.7rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.6rem; }
+    pre {
+      background: #020817; border: 1px solid #1e293b; border-radius: 0.5rem;
+      padding: 1rem; font-size: 0.78rem; color: #94a3b8; overflow-x: auto; white-space: pre;
+      font-family: 'Fira Mono', 'Cascadia Code', monospace; line-height: 1.6;
+    }
+
+    /* ── resource list ── */
+    .resource-item {
+      background: #1e293b; border: 1px solid #334155; border-radius: 0.75rem;
+      padding: 1rem 1.25rem; margin-bottom: 0.75rem;
+      display: grid; grid-template-columns: 1fr auto; gap: 0.5rem;
+    }
+    .resource-uri { font-family: monospace; font-size: 0.9rem; color: #38bdf8; }
+    .resource-name { font-size: 0.8rem; font-weight: 600; color: #e2e8f0; }
+    .resource-desc { font-size: 0.8rem; color: #64748b; margin-top: 0.25rem; }
+    .mime-badge {
+      font-size: 0.7rem; background: #1e3a5f; color: #7dd3fc;
+      padding: 0.2rem 0.5rem; border-radius: 0.3rem; align-self: start;
+    }
+    .type-static   { background: #1d4ed8; color: #bfdbfe; }
+    .type-template { background: #7c3aed; color: #ede9fe; }
+    .rtype-badge {
+      font-size: 0.65rem; padding: 0.15rem 0.45rem; border-radius: 999px; font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <h1>{{serverName}}</h1>
+    <span class="version">v{{version}}</span>
+    <div class="endpoint">
+      Endpoint
+      <code>POST {{endpoint}}</code>
+    </div>
+  </div>
+
+  <div class="layout">
+
+    <nav class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-title">Tools ({{toolCount}})</div>
+        {{#each tools}}
+        <a href="#tool-{{this.name}}">{{this.name}}</a>
+        {{/each}}
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-title">Resources ({{resourceCount}})</div>
+        {{#each resources}}
+        <a href="#res-{{this.name}}">{{this.uri}}</a>
+        {{/each}}
+      </div>
+      {{#if resourceTemplates.length}}
+      <div class="sidebar-section">
+        <div class="sidebar-title">Templates ({{templateCount}})</div>
+        {{#each resourceTemplates}}
+        <a href="#tpl-{{this.name}}">{{this.uriTemplate}}</a>
+        {{/each}}
+      </div>
+      {{/if}}
+    </nav>
+
+    <main>
+
+      <div class="info-block">
+        <div class="info-stat">
+          <div class="label">Tools</div>
+          <div class="value">{{toolCount}}</div>
+        </div>
+        <div class="info-stat">
+          <div class="label">Resources</div>
+          <div class="value">{{resourceCount}}</div>
+        </div>
+        <div class="info-stat">
+          <div class="label">Templates</div>
+          <div class="value">{{templateCount}}</div>
+        </div>
+        <div class="info-stat">
+          <div class="label">Endpoint</div>
+          <div class="value sm">{{endpoint}}</div>
+        </div>
+        <div class="info-stat">
+          <div class="label">Protocol</div>
+          <div class="value sm">JSON-RPC 2.0 / MCP</div>
+        </div>
+      </div>
+
+      <div class="auth-notice">
+        <div class="icon">🔐</div>
+        <p>
+          All requests require the header <code>x-api-key: &lt;MCP_API_KEY&gt;</code>.
+          Requests without a valid key are rejected with HTTP <code>401</code> and a JSON-RPC error body.
+          Additionally, set <code>Accept: application/json, text/event-stream</code>.
+        </p>
+      </div>
+
+      <!-- ── Tools ── -->
+      <div class="section-heading">Tools</div>
+
+      {{#each tools}}
+      <div class="tool-card" id="tool-{{this.name}}">
+        <div class="tool-header">
+          <span class="method-badge">TOOL</span>
+          <span class="tool-name">{{this.name}}</span>
+          <span class="tool-desc">{{this.description}}</span>
+        </div>
+        <div class="tool-body">
+          <p class="tool-desc-full">{{this.description}}</p>
+
+          <div class="params-title">Parameters</div>
+          {{#if this.hasParams}}
+          <table>
+            <thead>
+              <tr><th>Name</th><th>Type</th><th>Required</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+              {{#each this.params}}
+              <tr>
+                <td><code>{{this.name}}</code></td>
+                <td><span class="type-badge">{{this.type}}</span></td>
+                <td>
+                  {{#if this.required}}
+                  <span class="req-badge">required</span>
+                  {{else}}
+                  <span class="opt-badge">optional</span>
+                  {{/if}}
+                </td>
+                <td>{{this.description}}</td>
+              </tr>
+              {{/each}}
+            </tbody>
+          </table>
+          {{else}}
+          <p class="no-params">No parameters required.</p>
+          {{/if}}
+
+          <div class="curl-title">Example Request</div>
+          <pre>{{this.curlExample}}</pre>
+        </div>
+      </div>
+      {{/each}}
+
+      <!-- ── Resources ── -->
+      <div class="section-heading" style="margin-top:2rem;">Resources</div>
+
+      {{#each resources}}
+      <div class="resource-item" id="res-{{this.name}}">
+        <div>
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem;">
+            <span class="rtype-badge type-static">Static</span>
+            <span class="resource-uri">{{this.uri}}</span>
+          </div>
+          <div class="resource-name">{{this.name}}</div>
+          <div class="resource-desc">{{this.description}}</div>
+        </div>
+        <span class="mime-badge">{{this.mimeType}}</span>
+      </div>
+      {{/each}}
+
+      <!-- ── Resource Templates ── -->
+      {{#if resourceTemplates.length}}
+      <div class="section-heading" style="margin-top:2rem;">Resource Templates</div>
+
+      {{#each resourceTemplates}}
+      <div class="resource-item" id="tpl-{{this.name}}">
+        <div>
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem;">
+            <span class="rtype-badge type-template">Template</span>
+            <span class="resource-uri">{{this.uriTemplate}}</span>
+          </div>
+          <div class="resource-name">{{this.name}}</div>
+          <div class="resource-desc">{{this.description}}</div>
+        </div>
+        <span class="mime-badge">{{this.mimeType}}</span>
+      </div>
+      {{/each}}
+      {{/if}}
+
+    </main>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,58 @@
+import {
+  MiddlewareConsumer,
+  Module,
+  NestModule,
+  RequestMethod,
+} from '@nestjs/common';
+import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { ConfigModule } from '@nestjs/config';
+import { McpModule, McpTransportType } from '@rekog/mcp-nest';
+
+import { validateEnv } from './config/env.validation';
+import { AuthModule } from './auth/auth.module';
+import { ApiKeyMiddleware } from './auth/api-key.middleware';
+import { ApiAdapterModule } from './api-adapter/api-adapter.module';
+import { ToolsModule } from './tools/tools.module';
+import { ResourcesModule } from './resources/resources.module';
+import { LoggingModule } from './logging/logging.module';
+import { HealthModule } from './health/health.module';
+import { McpLoggingInterceptor } from './logging/mcp-logging.interceptor';
+import { McpExceptionFilter } from './common/filters/mcp-exception.filter';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
+    McpModule.forRoot({
+      name: 'rest-api-mcp-wrapper',
+      version: '1.0.0',
+      transport: McpTransportType.STREAMABLE_HTTP,
+      streamableHttp: {
+        statelessMode: true,
+        enableJsonResponse: true,
+      },
+    }),
+    AuthModule,
+    ApiAdapterModule,
+    ToolsModule,
+    ResourcesModule,
+    LoggingModule,
+    HealthModule,
+  ],
+  providers: [
+    {
+      provide: APP_FILTER,
+      useClass: McpExceptionFilter,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: McpLoggingInterceptor,
+    },
+  ],
+})
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer
+      .apply(ApiKeyMiddleware)
+      .forRoutes({ path: 'mcp', method: RequestMethod.ALL });
+  }
+}

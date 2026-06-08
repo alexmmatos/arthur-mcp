@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Profile — {{user.name}}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem;
+    }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 1rem; width: 100%; max-width: 480px; overflow: hidden; }
+    .card-header {
+      background: linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%);
+      padding: 2rem; display: flex; align-items: center; gap: 1.25rem; border-bottom: 1px solid #334155;
+    }
+    .avatar {
+      width: 64px; height: 64px; border-radius: 50%;
+      background: {{avatarColor}};
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem; font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .name { font-size: 1.3rem; font-weight: 700; color: #f8fafc; }
+    .username { font-size: 0.85rem; color: #94a3b8; margin-top: 0.2rem; }
+    .id-badge { display: inline-block; background: #0f172a; color: #64748b; font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 999px; margin-top: 0.5rem; }
+    .body { padding: 1.5rem; }
+    .field { margin-bottom: 1rem; }
+    .field:last-child { margin-bottom: 0; }
+    .field-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; font-weight: 600; margin-bottom: 0.3rem; }
+    .field-value { font-size: 0.9rem; color: #cbd5e1; }
+    .field-value a { color: #38bdf8; text-decoration: none; }
+    .divider { border: none; border-top: 1px solid #334155; margin: 1.25rem 0; }
+    .company-name { font-weight: 600; color: #e2e8f0; }
+    .company-bs { font-size: 0.8rem; color: #94a3b8; margin-top: 0.2rem; font-style: italic; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="card-header">
+      <div class="avatar">{{initials}}</div>
+      <div>
+        <div class="name">{{user.name}}</div>
+        <div class="username">@{{user.username}}</div>
+        <span class="id-badge">ID #{{user.id}}</span>
+      </div>
+    </div>
+    <div class="body">
+      <div class="field">
+        <div class="field-label">Email</div>
+        <div class="field-value"><a href="mailto:{{user.email}}">{{user.email}}</a></div>
+      </div>
+      <div class="field">
+        <div class="field-label">Phone</div>
+        <div class="field-value">{{user.phone}}</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Website</div>
+        <div class="field-value"><a href="https://{{user.website}}" target="_blank">{{user.website}}</a></div>
+      </div>
+      <hr class="divider" />
+      <div class="field">
+        <div class="field-label">Address</div>
+        <div class="field-value">
+          {{user.address.street}}, {{user.address.suite}}<br>
+          {{user.address.city}} · {{user.address.zipcode}}
+        </div>
+      </div>
+      <hr class="divider" />
+      <div class="field">
+        <div class="field-label">Company</div>
+        <div class="field-value">
+          <div class="company-name">{{user.company.name}}</div>
+          <div class="company-bs">"{{user.company.catchPhrase}}"</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
