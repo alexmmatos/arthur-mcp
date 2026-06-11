@@ -6,10 +6,14 @@ import {
 } from '@nestjs/common';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { MongooseModule } from '@nestjs/mongoose';
 import { McpModule, McpTransportType } from '@rekog/mcp-nest';
 
+import { config } from './config/configuration';
 import { validateEnv } from './config/env.validation';
 import { AuthModule } from './auth/auth.module';
+import { SwaggerModule } from './swagger/swagger.module';
+import { DynamicMcpModule } from './dynamic-mcp/dynamic-mcp.module';
 import { ApiKeyMiddleware } from './auth/api-key.middleware';
 import { ApiAdapterModule } from './api-adapter/api-adapter.module';
 import { ToolsModule } from './tools/tools.module';
@@ -22,6 +26,9 @@ import { McpExceptionFilter } from './common/filters/mcp-exception.filter';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
+    MongooseModule.forRootAsync({
+      useFactory: () => ({ uri: config.mongoUri }),
+    }),
     McpModule.forRoot({
       name: 'rest-api-mcp-wrapper',
       version: '1.0.0',
@@ -32,6 +39,8 @@ import { McpExceptionFilter } from './common/filters/mcp-exception.filter';
       },
     }),
     AuthModule,
+    SwaggerModule,
+    DynamicMcpModule,
     ApiAdapterModule,
     ToolsModule,
     ResourcesModule,

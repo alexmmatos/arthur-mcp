@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { McpModule } from '@rekog/mcp-nest';
 import { ApiAdapterModule } from '../api-adapter/api-adapter.module';
+import { AuthModule } from '../auth/auth.module';
 import { LoggingModule } from '../logging/logging.module';
 import { UsersResource } from './users.resource';
 import { HtmlResource } from './html.resource';
@@ -11,6 +12,7 @@ import { DocsController } from './docs.controller';
 @Module({
   imports: [
     ApiAdapterModule,
+    AuthModule,
     LoggingModule,
     McpModule.forFeature([UsersResource, HtmlResource], 'rest-api-mcp-wrapper'),
   ],

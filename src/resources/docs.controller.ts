@@ -1,7 +1,8 @@
-import { Controller, Get, Res } from '@nestjs/common';
+import { Controller, Get, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
-import { McpDocsService } from './mcp-docs.service';
+import { McpDocsService, DocsData } from './mcp-docs.service';
 import { HtmlTemplateService } from './html-template.service';
+import { JwtAuthGuard } from '../auth/jwt.guard';
 
 @Controller('mcp-docs')
 export class DocsController {
@@ -15,5 +16,11 @@ export class DocsController {
     const html = this.templates.docs(this.mcpDocs.build());
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(html);
+  }
+
+  @Get('json')
+  @UseGuards(JwtAuthGuard)
+  getJson(): DocsData {
+    return this.mcpDocs.build();
   }
 }

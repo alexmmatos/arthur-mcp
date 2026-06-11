@@ -1,0 +1,77 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mcp-dashboard
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - MCP_API_KEY=${MCP_API_KEY:-super-secret-key}
+      - EXTERNAL_API_BASE_URL=${EXTERNAL_API_BASE_URL:-https://jsonplaceholder.typicode.com}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-mcp}:${POSTGRES_PASSWORD:-mcp_password}@postgres:5432/${POSTGRES_DB:-mcp_db}
+      - MONGODB_URI=mongodb://${MONGO_USER:-mcp}:${MONGO_PASSWORD:-mcp_password}@mongo:27017/${MONGO_DB:-mcp_db}?authSource=admin
+      - DASHBOARD_USER=${DASHBOARD_USER:-admin}
+      - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD:-admin123}
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production-secret}
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # Frontend dev (ativa com: docker compose --profile dev up)
+  frontend:
+    image: node:20-alpine
+    container_name: mcp-frontend-dev
+    working_dir: /app/client
+    volumes:
+      - ./client:/app/client:delegated
+      - /app/client/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    command: sh -c "npm install && npm run dev"
+    profiles:
+      - dev
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7-jammy
+    container_name: mcp-mongo
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER:-mcp}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD:-mcp_password}
+      - MONGO_INITDB_DATABASE=${MONGO_DB:-mcp_db}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Opcional: Nginx como reverse proxy
+  # nginx:
+  #   image: nginx:latest
+  #   ports:
+  #     - "80:80"
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/nginx.conf
+  #   depends_on:
+  #     - app
+
+volumes:
+  mongo_data:
