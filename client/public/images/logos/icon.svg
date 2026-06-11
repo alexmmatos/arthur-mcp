@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#29B6F6"/>
+      <stop offset="100%" stop-color="#7C4DFF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Arthur A -->
+  <path d="M95 395 L256 95 L417 395"
+        fill="none"
+        stroke="#0A1929"
+        stroke-width="56"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+
+  <!-- Connections -->
+  <line x1="256" y1="135" x2="170" y2="315" stroke="url(#grad)" stroke-width="18"/>
+  <line x1="256" y1="135" x2="342" y2="315" stroke="url(#grad)" stroke-width="18"/>
+  <line x1="170" y1="315" x2="342" y2="315" stroke="url(#grad)" stroke-width="18"/>
+
+  <!-- Nodes -->
+  <circle cx="256" cy="135" r="42" fill="#1976D2"/>
+  <circle cx="170" cy="315" r="42" fill="#29B6F6"/>
+  <circle cx="342" cy="315" r="42" fill="#7C4DFF"/>
+</svg>

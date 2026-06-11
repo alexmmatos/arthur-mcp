@@ -26,6 +26,8 @@ import { ExecutionLogsModule } from './execution-logs/execution-logs.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { SettingsModule } from './settings/settings.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { ShareModule } from './share/share.module';
+import { EmailFeaturesModule } from './email/email-features.module';
 
 @Module({
   imports: [
@@ -54,6 +56,8 @@ import { DashboardModule } from './dashboard/dashboard.module';
     AuditLogsModule,
     SettingsModule,
     DashboardModule,
+    ShareModule,
+    EmailFeaturesModule,
   ],
   providers: [
     {

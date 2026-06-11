@@ -55,11 +55,18 @@ import AssessmentIcon from '@mui/icons-material/Assessment'
 import SpeedIcon from '@mui/icons-material/Speed'
 import VpnKeyIcon from '@mui/icons-material/VpnKey'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
+import PauseIcon from '@mui/icons-material/Pause'
+import ShareIcon from '@mui/icons-material/Share'
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive'
+import AccessTimeIcon from '@mui/icons-material/AccessTime'
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
+import QrCode2Icon from '@mui/icons-material/QrCode2'
 import TuneIcon from '@mui/icons-material/Tune'
 import SearchIcon from '@mui/icons-material/Search'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import Swal from 'sweetalert2'
+import { QRCodeSVG } from 'qrcode.react'
 import api from '../api'
 import HelpButton from '../components/HelpButton'
 import { McpDocsContent } from './McpDocs'
@@ -89,12 +96,20 @@ interface JsonSchema {
   enum?: unknown[]
 }
 
+interface ToolComment {
+  id: string
+  text: string
+  author: string
+  createdAt: string
+}
+
 interface GeneratedTool {
   name: string
   description?: string
   inputSchema: JsonSchema
   endpointRef: EndpointRef
   enabled?: boolean
+  comments?: ToolComment[]
 }
 
 interface McpApiKeyEntry {
@@ -111,8 +126,12 @@ interface Project {
   description?: string
   version?: string
   status: string
+  isPaused?: boolean
+  maintenanceMode?: { enabled: boolean; message: string }
+  availabilityWindow?: { enabled: boolean; startHour: number; endHour: number; timezone: string }
+  alertConfig?: { enabled: boolean; errorThresholdPct: number; notifyEmail: string }
   tools: GeneratedTool[]
-  mcpApiKey?: string       // legacy
+  mcpApiKey?: string
   mcpApiKeys?: McpApiKeyEntry[]
   rateLimit?: { enabled: boolean; requestsPerMinute: number }
   auth?: AuthConfig
@@ -366,31 +385,43 @@ function BaseUrlPanel({ projectId, initialValue, onChange }: {
 
 function McpEndpointBar({ projectId, hasKeys }: { projectId: string; hasKeys: boolean }) {
   const [copied, setCopied] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
+  const [shareLink, setShareLink] = useState('')
+  const [shareLinkCopied, setShareLinkCopied] = useState(false)
+  const [shareLoading, setShareLoading] = useState(false)
   const url = `${window.location.origin}/api/mcp/project/${projectId}`
+
+  const handleShareOpen = async () => {
+    setShareOpen(true)
+    if (shareLink) return
+    setShareLoading(true)
+    try {
+      const { data } = await api.post<{ url: string }>(`/swagger/projects/${projectId}/share-link`)
+      setShareLink(data.url)
+    } catch { setShareLink('') } finally { setShareLoading(false) }
+  }
+
+  const fullShareLink = shareLink ? `${window.location.origin}${shareLink}` : ''
 
   return (
     <Paper variant="outlined" sx={{ p: 2.5, mb: 2 }}>
       <Box display="flex" alignItems="center" gap={1} mb={1.5}>
         <HttpIcon color="primary" fontSize="small" />
         <Typography variant="subtitle1" fontWeight={700} flexGrow={1}>MCP Endpoint</Typography>
+        <Tooltip title="Share setup instructions with a client">
+          <Button size="small" variant="outlined" startIcon={<ShareIcon fontSize="small" />} onClick={handleShareOpen}>
+            Share with client
+          </Button>
+        </Tooltip>
         <HelpButton title="MCP Endpoint">
           <Typography variant="body2" gutterBottom>
-            The URL that MCP clients (Claude Desktop, Cursor, or any compatible client) use to connect to <em>this specific project's</em> tools. Copy it and paste it into your client's MCP server configuration.
+            The URL that MCP clients (Claude Desktop, Cursor, or any compatible client) use to connect to <em>this specific project's</em> tools.
           </Typography>
           <Typography variant="body2" gutterBottom>
-            <strong>Claude Desktop</strong> — edit <code>claude_desktop_config.json</code>:
-          </Typography>
-          <Box sx={{ bgcolor: '#f5f5f5', borderRadius: 1, px: 1.5, py: 1, mb: 1, fontFamily: 'monospace', fontSize: '0.78rem' }}>
-            {`"mcpServers": {\n  "my-project": { "url": "<this URL>" }\n}`}
-          </Box>
-          <Typography variant="body2" gutterBottom>
-            <strong>Cursor</strong> — Settings → MCP → Add server → paste this URL.
-          </Typography>
-          <Typography variant="body2" gutterBottom>
-            This endpoint is <strong>project-scoped</strong>: the AI only sees the tools in this project, not tools from other projects. Use per-project endpoints to give different AI clients access to different parts of your infrastructure.
+            <strong>Share with client</strong> — generates a step-by-step setup page you can send to your client. The page includes a QR code and copy-ready configuration snippets for Claude Desktop, Cursor, and generic MCP clients.
           </Typography>
           <Typography variant="body2">
-            If <strong>MCP Authentication</strong> is enabled for this project, the client must include the header <code>auth: &lt;key&gt;</code> in every request. Without it the server returns HTTP 401.
+            If <strong>MCP Authentication</strong> is enabled, the client must include the header <code>auth: &lt;key&gt;</code> in every request. Without it the server returns HTTP 401.
           </Typography>
         </HelpButton>
       </Box>
@@ -416,6 +447,54 @@ function McpEndpointBar({ projectId, hasKeys }: { projectId: string; hasKeys: bo
           ? <>Configure this URL in your MCP client and include the header <Box component="code" sx={{ bgcolor: '#f0f0f0', px: 0.8, py: 0.2, borderRadius: 0.5, fontSize: '0.78rem' }}>auth: &lt;key&gt;</Box></>
           : 'Configure this URL in Claude Desktop, Cursor, or any compatible MCP client.'}
       </Typography>
+
+      {/* Share dialog */}
+      <Dialog open={shareOpen} onClose={() => setShareOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <ShareIcon fontSize="small" color="primary" />
+          Share with client
+        </DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            Send this link to anyone who needs to connect their AI client to this project. The page includes step-by-step instructions for Claude Desktop, Cursor, and a QR code for mobile.
+          </Typography>
+          {shareLoading ? (
+            <Box display="flex" justifyContent="center" py={3}><CircularProgress /></Box>
+          ) : fullShareLink ? (
+            <>
+              <Box display="flex" alignItems="center" gap={1} mb={2}>
+                <Box sx={{ flexGrow: 1, fontFamily: 'monospace', fontSize: '0.8rem', bgcolor: '#f5f5f5', border: '1px solid #e0e0e0', borderRadius: 1, px: 1.5, py: 1, wordBreak: 'break-all' }}>
+                  {fullShareLink}
+                </Box>
+                <Tooltip title={shareLinkCopied ? 'Copied!' : 'Copy link'}>
+                  <IconButton size="small" color={shareLinkCopied ? 'primary' : 'default'}
+                    onClick={() => { navigator.clipboard.writeText(fullShareLink); setShareLinkCopied(true); setTimeout(() => setShareLinkCopied(false), 2500) }}>
+                    <ContentCopyIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+              <Box display="flex" flexDirection="column" alignItems="center" gap={1} mb={2}>
+                <QRCodeSVG value={fullShareLink} size={140} />
+                <Typography variant="caption" color="text.disabled">Scan to open on a mobile device</Typography>
+              </Box>
+              <Alert severity="info" icon={<QrCode2Icon fontSize="small" />}>
+                This link is valid for 30 days. It gives read-only setup information — no access to data or credentials.
+              </Alert>
+            </>
+          ) : (
+            <Alert severity="error">Could not generate the share link. Please try again.</Alert>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={() => setShareOpen(false)}>Close</Button>
+          {fullShareLink && (
+            <Button variant="contained" startIcon={<ContentCopyIcon fontSize="small" />}
+              onClick={() => { navigator.clipboard.writeText(fullShareLink); setShareLinkCopied(true); setTimeout(() => setShareLinkCopied(false), 2500) }}>
+              {shareLinkCopied ? 'Copied!' : 'Copy link'}
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
     </Paper>
   )
 }
@@ -1184,6 +1263,243 @@ function AuthConfigPanel({ projectId, initialAuth, onChange }: {
   )
 }
 
+// ─── Project Controls Panel (pause / maintenance / availability) ──────────────
+
+const TIMEZONES = [
+  'UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+  'America/Sao_Paulo', 'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Moscow',
+  'Asia/Dubai', 'Asia/Kolkata', 'Asia/Singapore', 'Asia/Tokyo', 'Australia/Sydney',
+]
+
+function ProjectControlsPanel({ projectId, initialPaused, initialMaintenance, initialAvailability, onPausedChange }: {
+  projectId: string
+  initialPaused?: boolean
+  initialMaintenance?: { enabled: boolean; message: string }
+  initialAvailability?: { enabled: boolean; startHour: number; endHour: number; timezone: string }
+  onPausedChange: (v: boolean) => void
+}) {
+  const [paused, setPaused] = useState(initialPaused ?? false)
+  const [pauseSaving, setPauseSaving] = useState(false)
+
+  const [maintEnabled, setMaintEnabled] = useState(initialMaintenance?.enabled ?? false)
+  const [maintMsg, setMaintMsg] = useState(initialMaintenance?.message ?? '')
+  const [maintSave, setMaintSave] = useState<SaveStatus>('idle')
+
+  const [avEnabled, setAvEnabled] = useState(initialAvailability?.enabled ?? false)
+  const [avStart, setAvStart] = useState(initialAvailability?.startHour ?? 8)
+  const [avEnd, setAvEnd] = useState(initialAvailability?.endHour ?? 18)
+  const [avTz, setAvTz] = useState(initialAvailability?.timezone ?? 'UTC')
+  const [avSave, setAvSave] = useState<SaveStatus>('idle')
+
+  const maintTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const avTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handlePause = async (val: boolean) => {
+    setPauseSaving(true)
+    try {
+      await api.patch(`/swagger/projects/${projectId}/pause`, { isPaused: val })
+      setPaused(val)
+      onPausedChange(val)
+    } finally { setPauseSaving(false) }
+  }
+
+  const scheduleMaint = (enabled: boolean, message: string) => {
+    if (maintTimer.current) clearTimeout(maintTimer.current)
+    maintTimer.current = setTimeout(async () => {
+      setMaintSave('saving')
+      try {
+        await api.patch(`/swagger/projects/${projectId}/maintenance`, { enabled, message })
+        setMaintSave('saved'); setTimeout(() => setMaintSave('idle'), 2000)
+      } catch { setMaintSave('error') }
+    }, 700)
+  }
+
+  const scheduleAv = (enabled: boolean, startHour: number, endHour: number, timezone: string) => {
+    if (avTimer.current) clearTimeout(avTimer.current)
+    avTimer.current = setTimeout(async () => {
+      setAvSave('saving')
+      try {
+        await api.patch(`/swagger/projects/${projectId}/availability`, { enabled, startHour, endHour, timezone })
+        setAvSave('saved'); setTimeout(() => setAvSave('idle'), 2000)
+      } catch { setAvSave('error') }
+    }, 700)
+  }
+
+  const hours = Array.from({ length: 25 }, (_, i) => i)
+  const fmtHour = (h: number) => h === 0 ? '12:00 AM' : h < 12 ? `${h}:00 AM` : h === 12 ? '12:00 PM' : `${h - 12}:00 PM`
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2.5, mb: 2 }}>
+      {/* Pause */}
+      <Box display="flex" alignItems="center" gap={1.5} mb={2}>
+        {paused ? <PauseIcon color="warning" /> : <PlayArrowIcon color="success" />}
+        <Box flexGrow={1}>
+          <Typography variant="subtitle2" fontWeight={700}>
+            {paused ? 'Project is paused — AI cannot use it right now' : 'Project is running normally'}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {paused ? 'All MCP requests return a 503 error until you resume.' : 'Your AI assistant can call tools in this project.'}
+          </Typography>
+        </Box>
+        <Tooltip title={paused ? 'Resume — allow AI to use this project again' : 'Pause — block all AI requests to this project'}>
+          <span>
+            <Button size="small" variant={paused ? 'contained' : 'outlined'}
+              color={paused ? 'success' : 'warning'}
+              startIcon={pauseSaving ? <CircularProgress size={13} color="inherit" /> : paused ? <PlayArrowIcon fontSize="small" /> : <PauseIcon fontSize="small" />}
+              onClick={() => handlePause(!paused)} disabled={pauseSaving}>
+              {paused ? 'Resume' : 'Pause'}
+            </Button>
+          </span>
+        </Tooltip>
+      </Box>
+
+      <Divider sx={{ mb: 2 }} />
+
+      {/* Maintenance mode */}
+      <Box mb={2}>
+        <Box display="flex" alignItems="center" gap={1} mb={1}>
+          <Typography variant="subtitle2" fontWeight={700} flexGrow={1}>Maintenance message</Typography>
+          <SaveIndicator status={maintSave} />
+          <FormControlLabel
+            control={<Switch size="small" checked={maintEnabled} color="warning"
+              onChange={(e) => { setMaintEnabled(e.target.checked); scheduleMaint(e.target.checked, maintMsg) }} />}
+            label={<Typography variant="caption">{maintEnabled ? 'On' : 'Off'}</Typography>}
+            sx={{ mr: 0 }} />
+        </Box>
+        {maintEnabled && (
+          <TextField size="small" fullWidth multiline minRows={2}
+            label="Message shown to clients when maintenance is active"
+            placeholder="We are performing scheduled maintenance. Back online at 14:00 UTC."
+            value={maintMsg}
+            onChange={(e) => { setMaintMsg(e.target.value); scheduleMaint(maintEnabled, e.target.value) }}
+          />
+        )}
+        <Typography variant="caption" color="text.secondary">
+          When enabled, all requests get a 503 with this message. Useful for planned downtime.
+        </Typography>
+      </Box>
+
+      <Divider sx={{ mb: 2 }} />
+
+      {/* Availability window */}
+      <Box>
+        <Box display="flex" alignItems="center" gap={1} mb={1}>
+          <AccessTimeIcon fontSize="small" color={avEnabled ? 'primary' : 'disabled'} />
+          <Typography variant="subtitle2" fontWeight={700} flexGrow={1}>Availability hours</Typography>
+          <SaveIndicator status={avSave} />
+          <FormControlLabel
+            control={<Switch size="small" checked={avEnabled} color="primary"
+              onChange={(e) => { setAvEnabled(e.target.checked); scheduleAv(e.target.checked, avStart, avEnd, avTz) }} />}
+            label={<Typography variant="caption">{avEnabled ? 'On' : 'Off'}</Typography>}
+            sx={{ mr: 0 }} />
+        </Box>
+        {avEnabled && (
+          <Grid container spacing={1.5}>
+            <Grid item xs={12} sm={4}>
+              <FormControl size="small" fullWidth>
+                <InputLabel>From</InputLabel>
+                <Select value={avStart} label="From"
+                  onChange={(e) => { const v = Number(e.target.value); setAvStart(v); scheduleAv(avEnabled, v, avEnd, avTz) }}>
+                  {hours.filter(h => h < avEnd).map(h => <MenuItem key={h} value={h}>{fmtHour(h)}</MenuItem>)}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <FormControl size="small" fullWidth>
+                <InputLabel>To</InputLabel>
+                <Select value={avEnd} label="To"
+                  onChange={(e) => { const v = Number(e.target.value); setAvEnd(v); scheduleAv(avEnabled, avStart, v, avTz) }}>
+                  {hours.filter(h => h > avStart).map(h => <MenuItem key={h} value={h}>{fmtHour(h)}</MenuItem>)}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <FormControl size="small" fullWidth>
+                <InputLabel>Timezone</InputLabel>
+                <Select value={avTz} label="Timezone"
+                  onChange={(e) => { setAvTz(e.target.value); scheduleAv(avEnabled, avStart, avEnd, e.target.value) }}>
+                  {TIMEZONES.map(tz => <MenuItem key={tz} value={tz}>{tz}</MenuItem>)}
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+        )}
+        <Typography variant="caption" color="text.secondary">
+          Restrict AI access to specific hours. Requests outside the window return a 503 error.
+        </Typography>
+      </Box>
+    </Paper>
+  )
+}
+
+// ─── Alert config panel ────────────────────────────────────────────────────────
+
+function AlertConfigPanel({ projectId, initialConfig }: {
+  projectId: string
+  initialConfig?: { enabled: boolean; errorThresholdPct: number; notifyEmail: string }
+}) {
+  const [enabled, setEnabled] = useState(initialConfig?.enabled ?? false)
+  const [threshold, setThreshold] = useState(initialConfig?.errorThresholdPct ?? 20)
+  const [email, setEmail] = useState(initialConfig?.notifyEmail ?? '')
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const scheduleSave = (en: boolean, thr: number, em: string) => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(async () => {
+      setSaveStatus('saving')
+      try {
+        await api.patch(`/swagger/projects/${projectId}/alert-config`, { enabled: en, errorThresholdPct: thr, notifyEmail: em })
+        setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000)
+      } catch { setSaveStatus('error') }
+    }, 700)
+  }
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2.5, mb: 2 }}>
+      <Box display="flex" alignItems="center" gap={1} mb={enabled ? 2 : 0}>
+        <NotificationsActiveIcon fontSize="small" color={enabled ? 'warning' : 'disabled'} />
+        <Box flexGrow={1}>
+          <Typography variant="subtitle2" fontWeight={700}>Error alerts</Typography>
+          <Typography variant="caption" color="text.secondary">
+            Receive an email when the error rate exceeds a threshold.
+          </Typography>
+        </Box>
+        <SaveIndicator status={saveStatus} />
+        <FormControlLabel
+          control={<Switch size="small" checked={enabled} color="warning"
+            onChange={(e) => { setEnabled(e.target.checked); scheduleSave(e.target.checked, threshold, email) }} />}
+          label={<Typography variant="caption">{enabled ? 'On' : 'Off'}</Typography>}
+          sx={{ mr: 0 }} />
+      </Box>
+
+      {enabled && (
+        <Grid container spacing={1.5}>
+          <Grid item xs={12} sm={5}>
+            <TextField size="small" fullWidth label="Alert when error rate exceeds (%)"
+              type="number" inputProps={{ min: 1, max: 100 }}
+              value={threshold}
+              onChange={(e) => { const v = Math.max(1, Math.min(100, Number(e.target.value))); setThreshold(v); scheduleSave(enabled, v, email) }}
+            />
+          </Grid>
+          <Grid item xs={12} sm={7}>
+            <TextField size="small" fullWidth label="Send alert to (email)"
+              type="email" placeholder="manager@company.com"
+              value={email}
+              onChange={(e) => { setEmail(e.target.value); scheduleSave(enabled, threshold, e.target.value) }}
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <Typography variant="caption" color="text.secondary">
+              Checks every 15 minutes. At most one alert every 30 minutes per project.
+            </Typography>
+          </Grid>
+        </Grid>
+      )}
+    </Paper>
+  )
+}
+
 function ToolDialog({ open, onClose, onSaved, projectId, projectBaseUrl, editTool }: ToolDialogProps) {
   const isEdit = !!editTool
   const [form, setForm] = useState(() => toolToFormState(editTool))
@@ -1456,6 +1772,81 @@ function FieldInput({ name, schema, value, required, onChange }: {
   )
 }
 
+// ─── Tool comments ────────────────────────────────────────────────────────────
+
+function ToolCommentsSection({ projectId, toolName, initialComments }: {
+  projectId: string
+  toolName: string
+  initialComments: ToolComment[]
+}) {
+  const [comments, setComments] = useState<ToolComment[]>(initialComments)
+  const [text, setText] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [open, setOpen] = useState(false)
+
+  const handleAdd = async () => {
+    if (!text.trim()) return
+    setSaving(true)
+    try {
+      const { data } = await api.post<ToolComment>(
+        `/swagger/projects/${projectId}/tools/${encodeURIComponent(toolName)}/comments`,
+        { text: text.trim(), author: 'me' },
+      )
+      setComments((prev) => [...prev, data])
+      setText('')
+    } finally { setSaving(false) }
+  }
+
+  const handleDelete = async (id: string) => {
+    await api.delete(`/swagger/projects/${projectId}/tools/${encodeURIComponent(toolName)}/comments/${id}`)
+    setComments((prev) => prev.filter((c) => c.id !== id))
+  }
+
+  return (
+    <Box>
+      <Box display="flex" alignItems="center" gap={0.5} sx={{ cursor: 'pointer' }} onClick={() => setOpen((v) => !v)}>
+        <ChatBubbleOutlineIcon sx={{ fontSize: 15, color: 'text.disabled' }} />
+        <Typography variant="caption" color="text.secondary" fontWeight={600}>
+          Notes ({comments.length})
+        </Typography>
+        <ExpandMoreIcon sx={{ fontSize: 14, color: 'text.disabled', transform: open ? 'rotate(180deg)' : 'none', transition: '0.2s' }} />
+      </Box>
+
+      {open && (
+        <Box mt={1.5} display="flex" flexDirection="column" gap={1}>
+          {comments.length === 0 && (
+            <Typography variant="caption" color="text.disabled">No notes yet.</Typography>
+          )}
+          {comments.map((c) => (
+            <Box key={c.id} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', bgcolor: '#fafafa', border: '1px solid #eee', borderRadius: 1, px: 1.5, py: 1 }}>
+              <Box flexGrow={1}>
+                <Typography fontSize="0.82rem">{c.text}</Typography>
+                <Typography variant="caption" color="text.disabled">
+                  {c.author} · {new Date(c.createdAt).toLocaleDateString()}
+                </Typography>
+              </Box>
+              <Tooltip title="Delete note">
+                <IconButton size="small" color="error" onClick={() => handleDelete(c.id)}>
+                  <DeleteIcon sx={{ fontSize: 14 }} />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          ))}
+          <Box display="flex" gap={1} mt={0.5}>
+            <TextField size="small" fullWidth placeholder="Add a note…" value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAdd() } }} />
+            <Button size="small" variant="contained" onClick={handleAdd} disabled={!text.trim() || saving}
+              startIcon={saving ? <CircularProgress size={12} color="inherit" /> : undefined}>
+              Add
+            </Button>
+          </Box>
+        </Box>
+      )}
+    </Box>
+  )
+}
+
 // ─── Tool accordion ───────────────────────────────────────────────────────────
 
 function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged, onEditEndpoint, onToolDeleted }: {
@@ -1717,7 +2108,11 @@ function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged,
           </Box>
         )}
 
-        {/* Exemplos */}
+        {/* Notes / comments */}
+        <Divider sx={{ my: 2 }} />
+        <ToolCommentsSection projectId={projectId} toolName={tool.name} initialComments={tool.comments ?? []} />
+
+        {/* Examples */}
         {!tryMode && (
           <Box mt={2} display="flex" flexDirection="column" gap={2}>
             {/* Direct curl */}
@@ -1893,11 +2288,12 @@ export default function ProjectDetail() {
   const [toolMethodFilter, setToolMethodFilter] = useState<string | null>(null)
   const [reimportOpen, setReimportOpen] = useState(false)
   const [reimportSuccess, setReimportSuccess] = useState<{ added: number; updated: number } | null>(null)
+  const [isPaused, setIsPaused] = useState(false)
 
   useEffect(() => {
     if (!id) return
     api.get<Project>(`/swagger/projects/${id}`)
-      .then((r) => { setProject(r.data); setBaseUrl(r.data.baseUrl) })
+      .then((r) => { setProject(r.data); setBaseUrl(r.data.baseUrl); setIsPaused(r.data.isPaused ?? false) })
       .catch(() => setError('Project not found.'))
       .finally(() => setLoading(false))
   }, [id])
@@ -1967,7 +2363,9 @@ export default function ProjectDetail() {
             </Box>
           </Box>
           <Box display="flex" gap={1} flexWrap="wrap" alignItems="flex-start">
-            <Chip label={project.status === 'active' ? 'Active' : 'Error'} color={project.status === 'active' ? 'success' : 'error'} />
+            {isPaused
+              ? <Chip label="Paused" icon={<PauseIcon fontSize="small" />} sx={{ bgcolor: '#ff9800', color: '#fff' }} />
+              : <Chip label={project.status === 'active' ? 'Active' : 'Error'} color={project.status === 'active' ? 'success' : 'error'} />}
             {project.version && <Chip label={`v${project.version}`} variant="outlined" />}
             <Tooltip title="Upload a new version of the API spec to update tools">
               <Button size="small" variant="outlined" startIcon={<AutorenewIcon fontSize="small" />}
@@ -2012,6 +2410,18 @@ export default function ProjectDetail() {
         initialAuth={project.auth}
         onChange={(auth) => setProject((prev) => prev ? { ...prev, auth } : prev)}
       />
+
+      {/* Project controls: pause / maintenance / availability */}
+      <ProjectControlsPanel
+        projectId={id!}
+        initialPaused={project.isPaused}
+        initialMaintenance={project.maintenanceMode}
+        initialAvailability={project.availabilityWindow}
+        onPausedChange={setIsPaused}
+      />
+
+      {/* Alert config */}
+      <AlertConfigPanel projectId={id!} initialConfig={project.alertConfig} />
 
       {/* Tabs */}
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>

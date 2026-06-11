@@ -15,6 +15,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { DynamicMcpService } from './dynamic-mcp.service';
 import { McpApiKeyGuard } from './mcp-api-key.guard';
 import { RateLimitGuard } from './rate-limit.guard';
+import { ProjectStateGuard } from './project-state.guard';
 
 /**
  * Endpoint MCP por projeto — stateless Streamable HTTP.
@@ -45,7 +46,7 @@ export class DynamicMcpController {
     return this.dynamicMcpService.executeTool(projectId, toolName, args ?? {});
   }
 
-  @UseGuards(McpApiKeyGuard, RateLimitGuard)
+  @UseGuards(ProjectStateGuard, McpApiKeyGuard, RateLimitGuard)
   @Post(':projectId')
   @HttpCode(200)
   async handlePost(
@@ -65,7 +66,7 @@ export class DynamicMcpController {
     await transport.handleRequest(req, res, req.body);
   }
 
-  @UseGuards(McpApiKeyGuard, RateLimitGuard)
+  @UseGuards(ProjectStateGuard, McpApiKeyGuard, RateLimitGuard)
   @Get(':projectId')
   async handleGet(
     @Param('projectId') projectId: string,

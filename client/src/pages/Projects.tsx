@@ -32,28 +32,70 @@ interface Project {
   description?: string
   version?: string
   status: 'active' | 'error'
+  isPaused?: boolean
   tools: { name: string }[]
   tags: string[]
   createdAt: string
 }
 
+interface HealthEntry {
+  projectId: string
+  errorRatePct: number  // -1 = no data
+  totalCalls: number
+  isPaused: boolean
+}
+
+// ─── Traffic light dot ───────────────────────────────────────────────────────
+
+function TrafficLight({ health, isPaused }: { health?: HealthEntry; isPaused?: boolean }) {
+  if (isPaused) {
+    return (
+      <Tooltip title="Paused by manager">
+        <Box sx={{ width: 11, height: 11, borderRadius: '50%', bgcolor: '#9e9e9e', flexShrink: 0, border: '1.5px solid #757575' }} />
+      </Tooltip>
+    )
+  }
+  if (!health || health.totalCalls === 0) {
+    return (
+      <Tooltip title="No activity in the last hour">
+        <Box sx={{ width: 11, height: 11, borderRadius: '50%', bgcolor: '#e0e0e0', flexShrink: 0, border: '1.5px solid #bdbdbd' }} />
+      </Tooltip>
+    )
+  }
+  const { errorRatePct } = health
+  const color = errorRatePct === 0 ? '#22c55e' : errorRatePct < 20 ? '#f59e0b' : '#ef4444'
+  const border = errorRatePct === 0 ? '#16a34a' : errorRatePct < 20 ? '#d97706' : '#dc2626'
+  const label = errorRatePct === 0
+    ? `All ${health.totalCalls} requests succeeded in the last hour`
+    : `${errorRatePct}% error rate in the last hour (${health.totalCalls} requests)`
+  return (
+    <Tooltip title={label}>
+      <Box sx={{ width: 11, height: 11, borderRadius: '50%', bgcolor: color, flexShrink: 0, border: `1.5px solid ${border}` }} />
+    </Tooltip>
+  )
+}
+
 // ─── Project card ─────────────────────────────────────────────────────────────
 
-function ProjectCard({ p, onDelete, onDuplicate }: {
+function ProjectCard({ p, health, onDelete, onDuplicate }: {
   p: Project
+  health?: HealthEntry
   onDelete: (e: React.MouseEvent, id: string) => void
   onDuplicate: (e: React.MouseEvent, id: string) => void
 }) {
   const navigate = useNavigate()
   return (
-    <Card variant="outlined" sx={{ height: '100%', position: 'relative' }}>
+    <Card variant="outlined" sx={{ height: '100%', position: 'relative', opacity: p.isPaused ? 0.75 : 1 }}>
       <CardActionArea sx={{ height: '100%' }} onClick={() => navigate(`/projects/${p._id}`)}>
         <CardContent>
           <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-            <Typography variant="h6" fontWeight="bold" gutterBottom noWrap sx={{ maxWidth: '70%' }}>
-              {p.name}
-            </Typography>
-            <Box display="flex" gap={0.5}>
+            <Box display="flex" alignItems="center" gap={1} minWidth={0} flexGrow={1}>
+              <TrafficLight health={health} isPaused={p.isPaused} />
+              <Typography variant="h6" fontWeight="bold" gutterBottom noWrap sx={{ mb: 0 }}>
+                {p.name}
+              </Typography>
+            </Box>
+            <Box display="flex" gap={0.5} flexShrink={0} ml={1}>
               <Tooltip title="Duplicate project">
                 <IconButton size="small" onClick={(e) => onDuplicate(e, p._id)}>
                   <ContentCopyIcon fontSize="small" />
@@ -68,7 +110,7 @@ function ProjectCard({ p, onDelete, onDuplicate }: {
           </Box>
 
           {p.description && (
-            <Typography variant="body2" color="text.secondary" gutterBottom>
+            <Typography variant="body2" color="text.secondary" gutterBottom mt={0.5}>
               {p.description.slice(0, 100)}{p.description.length > 100 ? '…' : ''}
             </Typography>
           )}
@@ -78,7 +120,9 @@ function ProjectCard({ p, onDelete, onDuplicate }: {
           </Typography>
 
           <Box display="flex" gap={1} flexWrap="wrap" mt={1}>
-            <Chip label={p.status === 'active' ? 'Active' : 'Error'} color={p.status === 'active' ? 'success' : 'error'} size="small" />
+            {p.isPaused
+              ? <Chip label="Paused" size="small" sx={{ bgcolor: '#9e9e9e', color: '#fff' }} />
+              : <Chip label={p.status === 'active' ? 'Active' : 'Error'} color={p.status === 'active' ? 'success' : 'error'} size="small" />}
             <Chip label={`${p.tools?.length ?? 0} tool${(p.tools?.length ?? 0) !== 1 ? 's' : ''}`} size="small" variant="outlined" />
             {p.version && <Chip label={`v${p.version}`} size="small" variant="outlined" />}
           </Box>
@@ -100,8 +144,16 @@ function ProjectCard({ p, onDelete, onDuplicate }: {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+interface HealthSummaryEntry {
+  projectId: string
+  isPaused: boolean
+  errorRatePct: number
+  totalCalls: number
+}
+
 export default function Projects() {
   const [projects, setProjects] = useState<Project[]>([])
+  const [health, setHealth] = useState<Map<string, HealthEntry>>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -111,8 +163,18 @@ export default function Projects() {
   const load = () => {
     setLoading(true)
     setError(null)
-    api.get<Project[]>('/swagger/projects')
-      .then((r) => setProjects(r.data))
+    Promise.all([
+      api.get<Project[]>('/swagger/projects'),
+      api.get<HealthSummaryEntry[]>('/dashboard/health-summary').catch(() => ({ data: [] as HealthSummaryEntry[] })),
+    ])
+      .then(([projectsRes, healthRes]) => {
+        setProjects(projectsRes.data)
+        const map = new Map<string, HealthEntry>()
+        for (const h of healthRes.data) {
+          map.set(h.projectId, { projectId: h.projectId, errorRatePct: h.errorRatePct, totalCalls: h.totalCalls, isPaused: h.isPaused })
+        }
+        setHealth(map)
+      })
       .catch((err) => setError(err?.response?.data?.message || 'Failed to load projects.'))
       .finally(() => setLoading(false))
   }
@@ -182,7 +244,8 @@ export default function Projects() {
               <strong>Card indicators:</strong>
             </Typography>
             <Box component="ul" sx={{ mt: 0, mb: 1, pl: 2.5 }}>
-              <Box component="li"><Typography variant="body2"><strong>Active / Error chip:</strong> whether the project is healthy.</Typography></Box>
+              <Box component="li"><Typography variant="body2"><strong>Coloured dot:</strong> traffic light for the last hour — green (all ok), yellow (some errors), red (high error rate), grey (no activity or paused).</Typography></Box>
+              <Box component="li"><Typography variant="body2"><strong>Active / Paused chip:</strong> whether the project is accepting requests right now.</Typography></Box>
               <Box component="li"><Typography variant="body2"><strong>Tool count:</strong> how many MCP tools are registered. 0 tools means no AI can use this project yet.</Typography></Box>
               <Box component="li"><Typography variant="body2"><strong>Tags:</strong> custom labels for organisation and filtering.</Typography></Box>
             </Box>
@@ -238,7 +301,7 @@ export default function Projects() {
         <Grid container spacing={2}>
           {filtered.map((p) => (
             <Grid item xs={12} sm={6} md={4} key={p._id}>
-              <ProjectCard p={p} onDelete={handleDelete} onDuplicate={handleDuplicate} />
+              <ProjectCard p={p} health={health.get(p._id)} onDelete={handleDelete} onDuplicate={handleDuplicate} />
             </Grid>
           ))}
         </Grid>

@@ -65,14 +65,21 @@ export interface ParameterMapping {
   required: boolean;
 }
 
+export interface ToolComment {
+  id: string;
+  text: string;
+  author: string;
+  createdAt: Date;
+}
+
 /** Tool pronta para ser servida pelo MCP server e armazenada no MongoDB */
 export interface GeneratedTool {
   name: string;
   description: string;
   inputSchema: JsonSchema;
   endpointRef: EndpointRef;
-  /** false = tool desabilitada; ausente/true = habilitada */
   enabled?: boolean;
+  comments?: ToolComment[];
 }
 
 export interface EndpointRef {

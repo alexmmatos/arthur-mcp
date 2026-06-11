@@ -3,14 +3,26 @@ import * as crypto from 'crypto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as yaml from 'js-yaml';
+import axios from 'axios';
+import * as jwt from 'jsonwebtoken';
 import { parseSpec } from '../dynamic-mcp/openapi-parser';
 import { generateTools } from '../dynamic-mcp/tool-generator';
-import type { AuthConfig } from '../dynamic-mcp/types';
+import type { AuthConfig, ToolComment } from '../dynamic-mcp/types';
 import {
   McpApiKeyEntry,
   SwaggerProject,
   SwaggerProjectDocument,
 } from './swagger-project.schema';
+import { parsePostmanCollection } from './postman-parser';
+
+const SHARE_SECRET = process.env.JWT_SECRET ?? 'mcp-share-secret';
+const SPEC_PATHS = [
+  '/openapi.json', '/openapi.yaml', '/openapi.yml',
+  '/swagger.json', '/swagger.yaml',
+  '/api-docs', '/api-docs.json', '/api-docs.yaml',
+  '/swagger/v2/api-docs', '/v2/api-docs',
+  '/docs/api.json', '/api/openapi.json', '/api/swagger.json',
+];
 
 @Injectable()
 export class SwaggerService {
@@ -467,5 +479,206 @@ export class SwaggerService {
     project.markModified('tools');
 
     return project.save();
+  }
+
+  // ── Pause ────────────────────────────────────────────────────────────────────
+
+  async setPaused(id: string, isPaused: boolean): Promise<SwaggerProjectDocument> {
+    const project = await this.projectModel.findByIdAndUpdate(id, { isPaused }, { new: true }).exec();
+    if (!project) throw new NotFoundException('Project not found.');
+    return project;
+  }
+
+  // ── Maintenance mode ─────────────────────────────────────────────────────────
+
+  async setMaintenanceMode(id: string, dto: { enabled: boolean; message?: string }): Promise<SwaggerProjectDocument> {
+    const project = await this.projectModel.findByIdAndUpdate(
+      id, { maintenanceMode: { enabled: dto.enabled, message: dto.message ?? '' } }, { new: true },
+    ).exec();
+    if (!project) throw new NotFoundException('Project not found.');
+    return project;
+  }
+
+  // ── Availability window ───────────────────────────────────────────────────────
+
+  async setAvailabilityWindow(id: string, dto: { enabled: boolean; startHour: number; endHour: number; timezone: string }): Promise<SwaggerProjectDocument> {
+    const project = await this.projectModel.findByIdAndUpdate(
+      id, { availabilityWindow: dto }, { new: true },
+    ).exec();
+    if (!project) throw new NotFoundException('Project not found.');
+    return project;
+  }
+
+  // ── Alert config ─────────────────────────────────────────────────────────────
+
+  async setAlertConfig(id: string, dto: { enabled: boolean; errorThresholdPct: number; notifyEmail: string }): Promise<SwaggerProjectDocument> {
+    const project = await this.projectModel.findByIdAndUpdate(
+      id, { alertConfig: dto }, { new: true },
+    ).exec();
+    if (!project) throw new NotFoundException('Project not found.');
+    return project;
+  }
+
+  // ── Tool comments ─────────────────────────────────────────────────────────────
+
+  async addToolComment(id: string, toolName: string, text: string, author: string): Promise<ToolComment> {
+    const project = await this.projectModel.findById(id).exec();
+    if (!project) throw new NotFoundException('Project not found.');
+    const tool = project.tools.find((t) => t.name === toolName) as any;
+    if (!tool) throw new NotFoundException(`Tool "${toolName}" not found.`);
+
+    const comment: ToolComment = { id: crypto.randomUUID(), text: text.trim(), author, createdAt: new Date() };
+    if (!tool.comments) tool.comments = [];
+    tool.comments.push(comment);
+    project.markModified('tools');
+    await project.save();
+    return comment;
+  }
+
+  async deleteToolComment(id: string, toolName: string, commentId: string): Promise<void> {
+    const project = await this.projectModel.findById(id).exec();
+    if (!project) throw new NotFoundException('Project not found.');
+    const tool = project.tools.find((t) => t.name === toolName) as any;
+    if (!tool) throw new NotFoundException(`Tool "${toolName}" not found.`);
+    tool.comments = (tool.comments ?? []).filter((c: ToolComment) => c.id !== commentId);
+    project.markModified('tools');
+    await project.save();
+  }
+
+  // ── Spec auto-discovery ───────────────────────────────────────────────────────
+
+  async discoverSpec(baseUrl: string): Promise<{ found: boolean; specUrl?: string; paths: { url: string; status: number }[] }> {
+    const base = baseUrl.replace(/\/$/, '');
+    const results: { url: string; status: number }[] = [];
+
+    for (const path of SPEC_PATHS) {
+      const url = `${base}${path}`;
+      try {
+        const res = await axios.get(url, { timeout: 5000, validateStatus: () => true });
+        results.push({ url, status: res.status });
+        if (res.status === 200) {
+          const ct = res.headers['content-type'] ?? '';
+          const data = res.data;
+          const isSpec = (typeof data === 'object' && (data.openapi || data.swagger)) ||
+            (typeof data === 'string' && (data.includes('openapi:') || data.includes('swagger:')));
+          if (isSpec) return { found: true, specUrl: url, paths: results };
+        }
+      } catch {
+        results.push({ url, status: 0 });
+      }
+    }
+    return { found: false, paths: results };
+  }
+
+  // ── Test connection ───────────────────────────────────────────────────────────
+
+  async testConnection(baseUrl: string, auth?: AuthConfig): Promise<{ success: boolean; statusCode?: number; message: string; responseTimeMs: number }> {
+    const t0 = Date.now();
+    const headers: Record<string, string> = {};
+
+    if (auth) {
+      if (auth.type === 'bearer') headers['Authorization'] = `Bearer ${auth.token}`;
+      else if (auth.type === 'api-key' && auth.in === 'header') headers[auth.name] = auth.value;
+      else if (auth.type === 'basic') {
+        const encoded = Buffer.from(`${auth.username}:${auth.password}`).toString('base64');
+        headers['Authorization'] = `Basic ${encoded}`;
+      }
+    }
+
+    try {
+      const res = await axios.get(baseUrl.replace(/\/$/, ''), { headers, timeout: 8000, validateStatus: () => true });
+      const ms = Date.now() - t0;
+      const ok = res.status >= 200 && res.status < 500;
+      return {
+        success: ok,
+        statusCode: res.status,
+        responseTimeMs: ms,
+        message: ok
+          ? `Connected successfully — server responded with ${res.status} in ${ms}ms.`
+          : `Server returned ${res.status}. Check your base URL and credentials.`,
+      };
+    } catch (err: any) {
+      return { success: false, responseTimeMs: Date.now() - t0, message: `Could not reach the server: ${err?.message ?? 'Unknown error'}. Check the URL and that the API is accessible from this machine.` };
+    }
+  }
+
+  // ── Postman import ────────────────────────────────────────────────────────────
+
+  async fromPostman(content: string, baseUrlOverride?: string): Promise<SwaggerProjectDocument> {
+    let openApiSpec: Record<string, any>;
+    try {
+      openApiSpec = parsePostmanCollection(content);
+    } catch (err: any) {
+      throw new BadRequestException(err?.message ?? 'Failed to parse Postman collection.');
+    }
+
+    const base = baseUrlOverride?.trim() || openApiSpec.servers?.[0]?.url || 'http://localhost';
+    const normalizedSpec = await parseSpec(openApiSpec);
+    const tools = generateTools(normalizedSpec, base);
+
+    return this.projectModel.create({
+      name: openApiSpec.info.title ?? 'Imported from Postman',
+      baseUrl: base,
+      description: openApiSpec.info.description,
+      tools,
+      auth: { type: 'none' },
+      status: 'active',
+    });
+  }
+
+  async previewPostman(content: string, baseUrlOverride?: string): Promise<{
+    name: string; resolvedBaseUrl: string; totalTools: number;
+    tools: Array<{ name: string; description?: string; method: string; path: string }>;
+  }> {
+    let openApiSpec: Record<string, any>;
+    try {
+      openApiSpec = parsePostmanCollection(content);
+    } catch (err: any) {
+      throw new BadRequestException(err?.message ?? 'Failed to parse Postman collection.');
+    }
+
+    const base = baseUrlOverride?.trim() || openApiSpec.servers?.[0]?.url || 'http://localhost';
+    const normalizedSpec = await parseSpec(openApiSpec);
+    const tools = generateTools(normalizedSpec, base);
+
+    return {
+      name: openApiSpec.info.title ?? 'Postman Collection',
+      resolvedBaseUrl: base,
+      totalTools: tools.length,
+      tools: tools.map((t) => ({ name: t.name, description: t.description, method: t.endpointRef.method, path: t.endpointRef.path })),
+    };
+  }
+
+  // ── Project health summary (for traffic lights) ───────────────────────────────
+
+  async getHealthSummary(): Promise<{ projectId: string; errorRatePct: number; lastCallAt?: Date; totalCalls: number }[]> {
+    const projects = await this.projectModel.find().select('_id').lean().exec();
+    return projects.map((p) => ({ projectId: String(p._id), errorRatePct: 0, totalCalls: 0 }));
+  }
+
+  // ── Share link (public client setup page) ────────────────────────────────────
+
+  generateShareToken(projectId: string): string {
+    return jwt.sign({ projectId, type: 'share' }, SHARE_SECRET, { expiresIn: '30d' });
+  }
+
+  async getProjectForShare(token: string): Promise<{ name: string; mcpUrl: string; hasKey: boolean; description?: string; toolCount: number }> {
+    let payload: any;
+    try {
+      payload = jwt.verify(token, SHARE_SECRET);
+    } catch {
+      throw new BadRequestException('Invalid or expired share link.');
+    }
+
+    const project = await this.projectModel.findById(payload.projectId).select('name description tools mcpApiKeys mcpApiKey').exec();
+    if (!project) throw new NotFoundException('Project not found.');
+
+    return {
+      name: project.name,
+      description: project.description,
+      mcpUrl: `/api/mcp/project/${project._id}`,
+      hasKey: (project.mcpApiKeys?.length ?? 0) > 0 || !!project.mcpApiKey,
+      toolCount: project.tools?.length ?? 0,
+    };
   }
 }

@@ -30,4 +30,9 @@ export class DashboardController {
 
     return this.dashboard.getStats(from, to);
   }
+
+  @Get('health-summary')
+  getHealthSummary() {
+    return this.dashboard.getHealthSummary();
+  }
 }

@@ -12,23 +12,38 @@ import Profile from './pages/Profile'
 import Dashboard from './pages/Dashboard'
 import Settings from './pages/Settings'
 import AuditLogs from './pages/AuditLogs'
+import SetupWizard from './pages/SetupWizard'
+import SharePage from './pages/SharePage'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem('token')
   return token ? <>{children}</> : <Navigate to="/login" replace />
 }
 
+function RequireSetup({ children }: { children: React.ReactNode }) {
+  const done = localStorage.getItem('setupComplete')
+  return done ? <>{children}</> : <Navigate to="/setup" replace />
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Public routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route
-          path="/*"
-          element={
-            <RequireAuth>
+        <Route path="/share/:token" element={<SharePage />} />
+
+        {/* Setup wizard — shown once after first login */}
+        <Route path="/setup" element={
+          <RequireAuth><SetupWizard /></RequireAuth>
+        } />
+
+        {/* Protected app */}
+        <Route path="/*" element={
+          <RequireAuth>
+            <RequireSetup>
               <Layout>
                 <Routes>
                   <Route path="/" element={<Projects />} />
@@ -43,9 +58,9 @@ export default function App() {
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Layout>
-            </RequireAuth>
-          }
-        />
+            </RequireSetup>
+          </RequireAuth>
+        } />
       </Routes>
     </BrowserRouter>
   )

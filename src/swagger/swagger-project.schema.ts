@@ -27,19 +27,12 @@ export class SwaggerProject {
   @Prop()
   version?: string;
 
-  /** Spec original (YAML/JSON parseado) — usado para re-parse se necessário */
   @Prop({ type: Object })
   rawSpec: Record<string, any>;
 
-  /**
-   * Tools geradas pelo motor mcp-openapi.
-   * Cada tool contém inputSchema (para ListTools) e endpointRef/parameterMap
-   * (para executar o CallTool sem re-parsear o spec).
-   */
   @Prop({ type: [Object], default: [] })
   tools: GeneratedTool[];
 
-  /** Configuração de autenticação para chamadas à API upstream */
   @Prop({ type: Object, default: { type: 'none' } })
   auth: AuthConfig;
 
@@ -49,21 +42,35 @@ export class SwaggerProject {
   @Prop()
   errorMessage?: string;
 
-  /** Legacy: chave única. Mantido para backward-compat com projetos existentes. */
+  /** Legacy single key — backward-compat */
   @Prop()
   mcpApiKey?: string;
 
-  /** Multi-key: lista de chaves nomeadas (novo sistema) */
+  /** Multi-key list */
   @Prop({ type: [Object], default: [] })
   mcpApiKeys: McpApiKeyEntry[];
 
-  /** Tags/categorias para filtragem na listagem */
   @Prop({ type: [String], default: [] })
   tags: string[];
 
-  /** Rate limiting para chamadas ao MCP server deste projeto */
   @Prop({ type: Object, default: { enabled: false, requestsPerMinute: 60 } })
   rateLimit: { enabled: boolean; requestsPerMinute: number };
+
+  /** Paused by PM — MCP endpoint returns 503 */
+  @Prop({ default: false })
+  isPaused: boolean;
+
+  /** Maintenance mode — MCP returns custom message */
+  @Prop({ type: Object, default: { enabled: false, message: '' } })
+  maintenanceMode: { enabled: boolean; message: string };
+
+  /** Time-window access control */
+  @Prop({ type: Object, default: { enabled: false, startHour: 0, endHour: 24, timezone: 'UTC' } })
+  availabilityWindow: { enabled: boolean; startHour: number; endHour: number; timezone: string };
+
+  /** Alert config */
+  @Prop({ type: Object, default: { enabled: false, errorThresholdPct: 20, notifyEmail: '' } })
+  alertConfig: { enabled: boolean; errorThresholdPct: number; notifyEmail: string };
 }
 
 export const SwaggerProjectSchema = SchemaFactory.createForClass(SwaggerProject);

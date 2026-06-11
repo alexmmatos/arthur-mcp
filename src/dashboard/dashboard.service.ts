@@ -101,4 +101,22 @@ export class DashboardService {
     const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
     return `${d.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
   }
+
+  async getHealthSummary(): Promise<{ projectId: string; projectName: string; isPaused: boolean; errorRatePct: number; totalCalls: number; lastCallAt?: Date }[]> {
+    const projects = await this.projectModel.find().select('_id name isPaused').lean().exec();
+    const ids = projects.map((p) => String(p._id));
+    const healthMap = this.executionLogs.getHealthSummary(ids);
+
+    return projects.map((p) => {
+      const h = healthMap.get(String(p._id));
+      return {
+        projectId: String(p._id),
+        projectName: p.name,
+        isPaused: (p as any).isPaused ?? false,
+        errorRatePct: h?.errorRatePct ?? -1,
+        totalCalls: h?.totalCalls ?? 0,
+        lastCallAt: h?.lastCallAt,
+      };
+    });
+  }
 }

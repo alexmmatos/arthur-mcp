@@ -105,6 +105,39 @@ export class ExecutionLogsService {
     return this.allEntries().filter((e) => e.createdAt >= from && e.createdAt <= to);
   }
 
+  async getProjectStats(projectId: string, since?: Date): Promise<{
+    total: number; errors: number; avgResponseMs: number;
+    byTool: { toolName: string; count: number; errors: number }[];
+  }> {
+    let logs = this.projectEntries(projectId);
+    if (since) logs = logs.filter((e) => e.createdAt >= since);
+    const total = logs.length;
+    const errors = logs.filter((e) => e.isError).length;
+    const avgResponseMs = total > 0 ? Math.round(logs.reduce((s, e) => s + e.responseTimeMs, 0) / total) : 0;
+    const toolMap = new Map<string, { count: number; errors: number }>();
+    for (const e of logs) {
+      const t = toolMap.get(e.toolName) ?? { count: 0, errors: 0 };
+      t.count++; if (e.isError) t.errors++;
+      toolMap.set(e.toolName, t);
+    }
+    const byTool = [...toolMap.entries()].map(([toolName, s]) => ({ toolName, ...s })).sort((a, b) => b.count - a.count);
+    return { total, errors, avgResponseMs, byTool };
+  }
+
+  /** Health summary for all projects: error rate in last hour */
+  getHealthSummary(projectIds: string[]): Map<string, { errorRatePct: number; totalCalls: number; lastCallAt?: Date }> {
+    const since1h = new Date(Date.now() - 60 * 60 * 1000);
+    const result = new Map<string, { errorRatePct: number; totalCalls: number; lastCallAt?: Date }>();
+    for (const id of projectIds) {
+      const logs = this.projectEntries(id).filter(e => e.createdAt >= since1h);
+      const total = logs.length;
+      const errors = logs.filter(e => e.isError).length;
+      const lastCallAt = logs[0]?.createdAt;
+      result.set(id, { totalCalls: total, errorRatePct: total > 0 ? Math.round((errors / total) * 100) : -1, lastCallAt });
+    }
+    return result;
+  }
+
   deleteByProject(projectId: string): void {
     const prefix = `${projectId}:`;
     const keys = this.cache.keys().filter((k) => k.startsWith(prefix));

@@ -231,4 +231,96 @@ export class SwaggerController {
   remove(@Param('id') id: string) {
     return this.swaggerService.remove(id);
   }
+
+  // ── Pause ────────────────────────────────────────────────────────────────────
+
+  @Patch('projects/:id/pause')
+  setPaused(@Param('id') id: string, @Body('isPaused') isPaused: boolean) {
+    return this.swaggerService.setPaused(id, !!isPaused);
+  }
+
+  // ── Maintenance mode ─────────────────────────────────────────────────────────
+
+  @Patch('projects/:id/maintenance')
+  setMaintenanceMode(@Param('id') id: string, @Body() dto: { enabled: boolean; message?: string }) {
+    return this.swaggerService.setMaintenanceMode(id, dto);
+  }
+
+  // ── Availability window ───────────────────────────────────────────────────────
+
+  @Patch('projects/:id/availability')
+  setAvailabilityWindow(@Param('id') id: string, @Body() dto: { enabled: boolean; startHour: number; endHour: number; timezone: string }) {
+    return this.swaggerService.setAvailabilityWindow(id, dto);
+  }
+
+  // ── Alert config ─────────────────────────────────────────────────────────────
+
+  @Patch('projects/:id/alert-config')
+  setAlertConfig(@Param('id') id: string, @Body() dto: { enabled: boolean; errorThresholdPct: number; notifyEmail: string }) {
+    return this.swaggerService.setAlertConfig(id, dto);
+  }
+
+  // ── Tool comments ─────────────────────────────────────────────────────────────
+
+  @Post('projects/:id/tools/:toolName/comments')
+  addToolComment(
+    @Param('id') id: string,
+    @Param('toolName') toolName: string,
+    @Body('text') text: string,
+    @Body('author') author: string,
+  ) {
+    if (!text?.trim()) throw new BadRequestException('text is required.');
+    return this.swaggerService.addToolComment(id, toolName, text, author ?? 'Unknown');
+  }
+
+  @Delete('projects/:id/tools/:toolName/comments/:commentId')
+  @HttpCode(204)
+  deleteToolComment(
+    @Param('id') id: string,
+    @Param('toolName') toolName: string,
+    @Param('commentId') commentId: string,
+  ) {
+    return this.swaggerService.deleteToolComment(id, toolName, commentId);
+  }
+
+  // ── Auto-discover spec ────────────────────────────────────────────────────────
+
+  @Post('discover')
+  discoverSpec(@Body('baseUrl') baseUrl: string) {
+    if (!baseUrl?.trim()) throw new BadRequestException('baseUrl is required.');
+    return this.swaggerService.discoverSpec(baseUrl.trim());
+  }
+
+  // ── Test connection ───────────────────────────────────────────────────────────
+
+  @Post('test-connection')
+  testConnection(@Body() dto: { baseUrl: string; auth?: AuthConfig }) {
+    if (!dto?.baseUrl?.trim()) throw new BadRequestException('baseUrl is required.');
+    return this.swaggerService.testConnection(dto.baseUrl.trim(), dto.auth);
+  }
+
+  // ── Postman import ────────────────────────────────────────────────────────────
+
+  @Post('parse-postman')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
+  async parsePostman(@UploadedFile() file: Express.Multer.File, @Query('baseUrl') baseUrl?: string) {
+    if (!file) throw new BadRequestException('No file uploaded.');
+    return this.swaggerService.previewPostman(file.buffer.toString('utf-8'), baseUrl);
+  }
+
+  @Post('import-postman')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
+  async importPostman(@UploadedFile() file: Express.Multer.File, @Query('baseUrl') baseUrl?: string) {
+    if (!file) throw new BadRequestException('No file uploaded.');
+    const project = await this.swaggerService.fromPostman(file.buffer.toString('utf-8'), baseUrl);
+    return { _id: project._id, name: project.name, baseUrl: project.baseUrl, toolCount: project.tools.length };
+  }
+
+  // ── Share link ────────────────────────────────────────────────────────────────
+
+  @Post('projects/:id/share-link')
+  generateShareLink(@Param('id') id: string) {
+    const token = this.swaggerService.generateShareToken(id);
+    return { token, url: `/share/${token}` };
+  }
 }
