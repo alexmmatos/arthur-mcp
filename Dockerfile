@@ -12,7 +12,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=builder /app/dist ./dist
-RUN mkdir -p /app/data && chown node:node /app/data
+ENV SQLITE_PATH=/app/data/database.sqlite
+RUN mkdir -p /app/data && chown node:node /app /app/data
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
