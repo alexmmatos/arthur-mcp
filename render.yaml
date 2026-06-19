@@ -1,13 +1,4 @@
 services:
-  # ── Backend NestJS (API only — frontend served separately) ───────────────────
-  #
-  # Render free tier notes:
-  #   • The service sleeps after 15 min of inactivity.
-  #   • SQLite: the free tier filesystem is ephemeral — data is lost on each
-  #     redeploy. For real persistence, add a Render Disk and point SQLITE_PATH
-  #     to the disk path, or use DATABASE=mongodb with Atlas.
-  #   • MongoDB Atlas M0 free tier: https://cloud.mongodb.com
-  #
   - type: web
     name: mcp-server
     runtime: docker
@@ -21,31 +12,31 @@ services:
       - key: NODE_ENV
         value: production
 
-      # PORT is injected by Render automatically
+      # Render injeta PORT automaticamente (10000 no free tier)
       - key: PORT
         value: 10000
 
       # ── Database ─────────────────────────────────────────────────────────────
-      # Option 1: SQLite (default, no extra setup needed)
-      #   Warning: data is lost on redeploys on the free tier.
-      #   For persistence: add a Render Disk mounted at /app/data
-      #   and set SQLITE_PATH=/app/data/database.sqlite in the dashboard.
+      # Opção 1: SQLite (padrão, sem configuração extra)
+      #   Atenção: no free tier o filesystem é efêmero — dados são perdidos a cada
+      #   redeploy. Para persistência adicione um Render Disk em /app/data e defina
+      #   SQLITE_PATH=/app/data/database.sqlite no dashboard.
       - key: DATABASE
         value: sqlite
       - key: SQLITE_PATH
         value: /app/data/database.sqlite
 
-      # Option 2: MongoDB Atlas (uncomment and configure in the dashboard)
+      # Opção 2: MongoDB Atlas (descomente e configure no dashboard)
       # - key: DATABASE
       #   value: mongodb
       # - key: MONGODB_URI
-      #   sync: false   # paste the connection string in the Render dashboard
+      #   sync: false   # cole a connection string no dashboard do Render
 
-      # ── Dashboard ────────────────────────────────────────────────────────────
+      # ── Credenciais ──────────────────────────────────────────────────────────
       - key: DASHBOARD_USER
         value: admin
       - key: DASHBOARD_PASSWORD
-        value: admin    # set a strong password in the Render dashboard
+        value: admin    # troque no dashboard do Render antes de ir para produção
 
       # ── JWT ──────────────────────────────────────────────────────────────────
       - key: JWT_SECRET
