@@ -3,7 +3,7 @@ import { Request, Response } from 'express';
 import { join } from 'path';
 import { existsSync } from 'fs';
 
-const INDEX_HTML = join(__dirname, '..', '..', '..', 'public', 'index.html');
+const INDEX_HTML = join(__dirname, '..', '..', 'public', 'index.html');
 
 const API_PREFIXES = ['/api', '/mcp', '/health', '/mcp-docs'];
 

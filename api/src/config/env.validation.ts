@@ -5,7 +5,7 @@ const envSchema = z
     NODE_ENV: z.enum(['development', 'production', 'test', 'dev']).default('development'),
     PORT: z.coerce.number().int().positive().default(3000),
     DATABASE: z.enum(['mongodb', 'sqlite']).default('sqlite'),
-    MONGODB_URI: z.string().url().optional(),
+    MONGODB_URI: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
     DASHBOARD_USER: z.string().min(1).default('admin'),
     DASHBOARD_PASSWORD: z.string().min(1).default('admin123'),
     JWT_SECRET: z
