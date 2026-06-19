@@ -9,7 +9,7 @@ const tokenCache = new Map<string, TokenEntry>();
 async function fetchOAuth2Token(tokenUrl: string, clientId: string, clientSecret: string, scope?: string): Promise<string> {
   const cacheKey = `${tokenUrl}::${clientId}`;
   const cached = tokenCache.get(cacheKey);
-  // Renova 60s antes de expirar para evitar chamadas com token quase vencido
+  // Refresh 60s before expiry to avoid requests with a nearly-expired token
   if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token;
 
   const body = new URLSearchParams({

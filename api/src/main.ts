@@ -16,7 +16,7 @@ async function bootstrap() {
     : true; // allow all origins if CORS_ORIGIN is not set
   app.enableCors({ origin: allowedOrigins, credentials: true });
 
-  // Prefixo global /api — exclui endpoints MCP e health (acessados diretamente)
+  // Global prefix /api — excludes MCP and health endpoints (accessed directly)
   app.setGlobalPrefix('api', {
     exclude: [
       { path: 'health',      method: RequestMethod.ALL },

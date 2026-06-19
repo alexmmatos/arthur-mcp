@@ -415,7 +415,7 @@ export function McpDocsContent({ project, projectId }: { project: DocsProject; p
   )
 }
 
-// ─── Standalone page (mantida para compatibilidade de rota) ───────────────────
+// ─── Standalone page (kept for route compatibility) ───────────────────────────
 
 export default function McpDocs() {
   const { id } = useParams<{ id: string }>()

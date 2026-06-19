@@ -5,7 +5,7 @@ export interface McpToolResult {
   isError?: boolean;
 }
 
-const MAX_LEN = 5000;
+const MAX_LEN = 100000;
 
 export function mapResponse(response: HttpResponse): McpToolResult {
   if (response.status >= 400) {
@@ -36,7 +36,7 @@ export function mapResponse(response: HttpResponse): McpToolResult {
 
 function truncate(text: string, max: number): string {
   if (text.length <= max) return text;
-  return `${text.slice(0, max)}\n\n... [truncado, ${text.length - max} caracteres omitidos]`;
+  return `${text.slice(0, max)}\n\n... [truncated], ${text.length - max} characters omitted]`;
 }
 
 function smartTruncate(data: unknown, maxLen = MAX_LEN, maxDepth = 5, arraySlice = 20): string {
@@ -50,7 +50,7 @@ function shrinkData(data: unknown, depth: number, arraySlice: number): unknown {
   if (Array.isArray(data)) {
     const sliced = data.slice(0, arraySlice);
     const result = sliced.map((item) => shrinkData(item, depth - 1, arraySlice));
-    if (data.length > arraySlice) result.push(`... ${data.length - arraySlice} mais itens`);
+    if (data.length > arraySlice) result.push(`... ${data.length - arraySlice} more items`);
     return result;
   }
   if (data !== null && typeof data === 'object') {

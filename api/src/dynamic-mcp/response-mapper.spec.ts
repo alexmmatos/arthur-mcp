@@ -55,7 +55,7 @@ describe('mapResponse', () => {
     const longBody = 'a'.repeat(10_000);
     const result = mapResponse(res({ body: longBody, contentType: 'text/plain' }));
     expect(result.content[0].text.length).toBeLessThan(10_000);
-    expect(result.content[0].text).toContain('truncado');
+    expect(result.content[0].text).toContain('truncated');
   });
 
   it('slices large JSON arrays and adds "mais itens" note', () => {

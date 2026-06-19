@@ -12,31 +12,23 @@ services:
       - key: NODE_ENV
         value: production
 
-      # Render injeta PORT automaticamente (10000 no free tier)
-      - key: PORT
-        value: 10000
-
       # ── Database ─────────────────────────────────────────────────────────────
-      # Opção 1: SQLite (padrão, sem configuração extra)
-      #   Atenção: no free tier o filesystem é efêmero — dados são perdidos a cada
-      #   redeploy. Para persistência adicione um Render Disk em /app/data e defina
-      #   SQLITE_PATH=/app/data/database.sqlite no dashboard.
       - key: DATABASE
         value: sqlite
       - key: SQLITE_PATH
         value: /app/data/database.sqlite
 
-      # Opção 2: MongoDB Atlas (descomente e configure no dashboard)
+      # To use MongoDB Atlas instead, replace the values above with:
       # - key: DATABASE
       #   value: mongodb
       # - key: MONGODB_URI
-      #   sync: false   # cole a connection string no dashboard do Render
+      #   sync: false
 
       # ── Credenciais ──────────────────────────────────────────────────────────
       - key: DASHBOARD_USER
         value: admin
       - key: DASHBOARD_PASSWORD
-        value: admin    # troque no dashboard do Render antes de ir para produção
+        sync: false   # set in the Render dashboard
 
       # ── JWT ──────────────────────────────────────────────────────────────────
       - key: JWT_SECRET

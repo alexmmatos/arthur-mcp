@@ -18,12 +18,12 @@ import { RateLimitGuard } from './rate-limit.guard';
 import { ProjectStateGuard } from './project-state.guard';
 
 /**
- * Endpoint MCP por projeto — stateless Streamable HTTP.
+ * Per-project MCP endpoint — stateless Streamable HTTP.
  * URL: /mcp/project/:projectId
  *
- * Suporte a clientes MCP (Claude Desktop, Cursor, etc.) que usam:
+ * Supports MCP clients (Claude Desktop, Cursor, etc.) using:
  *   POST   /mcp/project/:projectId   → ListTools / CallTool
- *   GET    /mcp/project/:projectId   → SSE (ping de conectividade)
+ *   GET    /mcp/project/:projectId   → SSE (connectivity ping)
  *   DELETE /mcp/project/:projectId   → End session (no-op in stateless mode)
  */
 @Controller('mcp/project')
@@ -31,8 +31,8 @@ export class DynamicMcpController {
   constructor(private readonly dynamicMcpService: DynamicMcpService) {}
 
   /**
-   * Endpoint REST simples para testar uma tool direto no frontend.
-   * Chama baseUrl + endpoint externo sem passar pelo protocolo MCP.
+   * Simple REST endpoint for testing a tool directly from the frontend.
+   * Calls baseUrl + external endpoint without going through the MCP protocol.
    * POST /mcp/project/:projectId/execute/:toolName
    * Body: { arguments: { param1: value1, ... } }
    */
@@ -57,7 +57,7 @@ export class DynamicMcpController {
     const server = await this.dynamicMcpService.createMcpServer(projectId);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
-      enableJsonResponse: true, // retorna JSON puro em vez de SSE para clientes que aceitam JSON
+      enableJsonResponse: true, // returns plain JSON instead of SSE for clients that accept JSON
     });
 
     res.on('close', () => server.close().catch(() => undefined));

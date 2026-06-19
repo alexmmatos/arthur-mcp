@@ -18,6 +18,7 @@ RUN npm run build
 # ── Stage 3: runner ───────────────────────────────────────────────────────────
 FROM node:20-alpine
 WORKDIR /app
+RUN mkdir -p /app/data
 # native modules (sqlite3) já compilados para Alpine
 COPY --from=backend-builder /app/node_modules ./node_modules
 # NestJS compilado (inclui templates .hbs copiados pelo nest-cli assets)
