@@ -332,6 +332,24 @@ export class SwaggerService {
     return saved;
   }
 
+  async updateToolOutputSchema(
+    id: string,
+    toolName: string,
+    outputSchema: Record<string, unknown> | null,
+  ): Promise<SwaggerProjectRecord> {
+    const project = await this.projectRepo.findById(id);
+    if (!project) throw new NotFoundException('Project not found.');
+
+    const tool = project.tools.find((t) => t.name === toolName) as any;
+    if (!tool) throw new NotFoundException(`Tool "${toolName}" not found.`);
+
+    tool.outputSchema = outputSchema ?? undefined;
+
+    const saved = await this.projectRepo.save(project);
+    this.dynamicMcp.invalidate(id);
+    return saved;
+  }
+
   async removeTool(id: string, toolName: string): Promise<SwaggerProjectRecord> {
     const project = await this.projectRepo.findById(id);
     if (!project) throw new NotFoundException('Project not found.');

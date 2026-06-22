@@ -94,6 +94,7 @@ interface EndpointRef {
 interface JsonSchema {
   type?: string
   properties?: Record<string, JsonSchema>
+  items?: JsonSchema
   required?: string[]
   description?: string
   enum?: unknown[]
@@ -110,6 +111,7 @@ interface GeneratedTool {
   name: string
   description?: string
   inputSchema: JsonSchema
+  outputSchema?: JsonSchema
   endpointRef: EndpointRef
   enabled?: boolean
   comments?: ToolComment[]
@@ -2063,6 +2065,23 @@ function buildMcpCurl(tool: GeneratedTool, projectId: string, hasKeys: boolean):
   return lines.join('\n')
 }
 
+// ─── Schema inference ─────────────────────────────────────────────────────────
+
+function inferSchema(value: unknown): JsonSchema {
+  if (value === null || value === undefined) return { type: 'string' }
+  if (Array.isArray(value)) return { type: 'array', items: value.length > 0 ? inferSchema(value[0]) : {} }
+  if (typeof value === 'object') {
+    const properties: Record<string, JsonSchema> = {}
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      properties[k] = inferSchema(v)
+    }
+    return { type: 'object', properties }
+  }
+  if (typeof value === 'boolean') return { type: 'boolean' }
+  if (typeof value === 'number') return Number.isInteger(value) ? { type: 'integer' } : { type: 'number' }
+  return { type: 'string' }
+}
+
 // ─── FieldInput ───────────────────────────────────────────────────────────────
 
 function FieldInput({ name, schema, value, required, onChange }: {
@@ -2189,6 +2208,8 @@ function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged,
   const [executing, setExecuting] = useState(false)
   const [response, setResponse] = useState<string | null>(null)
   const [responseIsError, setResponseIsError] = useState(false)
+  const [savingSchema, setSavingSchema] = useState(false)
+  const [schemaOpen, setSchemaOpen] = useState(false)
 
   // Sync when parent updates the tool (e.g. after dialog save)
   useEffect(() => { setTool(initialTool) }, [initialTool])
@@ -2393,17 +2414,82 @@ function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged,
             </Button>
 
             {response !== null && (
-              <Box component="pre" sx={{
-                bgcolor: responseIsError ? '#fff8f8' : '#1e1e1e',
-                color: responseIsError ? '#c62828' : '#d4d4d4',
-                border: '1px solid', borderColor: responseIsError ? '#ffcdd2' : 'transparent',
-                p: 2, borderRadius: 1, fontSize: '0.78rem',
-                overflowX: 'auto', overflowY: 'auto', maxHeight: 400,
-                whiteSpace: 'pre-wrap', wordBreak: 'break-word', m: 0,
-              }}>
-                {response}
-              </Box>
+              <>
+                <Box component="pre" sx={{
+                  bgcolor: responseIsError ? '#fff8f8' : '#1e1e1e',
+                  color: responseIsError ? '#c62828' : '#d4d4d4',
+                  border: '1px solid', borderColor: responseIsError ? '#ffcdd2' : 'transparent',
+                  p: 2, borderRadius: 1, fontSize: '0.78rem',
+                  overflowX: 'auto', overflowY: 'auto', maxHeight: 400,
+                  whiteSpace: 'pre-wrap', wordBreak: 'break-word', m: 0, mb: 1,
+                }}>
+                  {response}
+                </Box>
+                {!responseIsError && (() => {
+                  let parsed: unknown = null
+                  try { parsed = JSON.parse(response) } catch { /* not JSON */ }
+                  if (parsed === null) return null
+                  return (
+                    <Button size="small" variant="outlined" disabled={savingSchema}
+                      startIcon={savingSchema ? <CircularProgress size={12} color="inherit" /> : undefined}
+                      onClick={async () => {
+                        setSavingSchema(true)
+                        try {
+                          const schema = inferSchema(parsed)
+                          await api.patch(`/swagger/projects/${projectId}/tools/${encodeURIComponent(tool.name)}/output-schema`, { outputSchema: schema })
+                          const updated = { ...tool, outputSchema: schema }
+                          setTool(updated)
+                          onToolChanged(tool.name, updated)
+                        } finally { setSavingSchema(false) }
+                      }}>
+                      {savingSchema ? 'Saving…' : 'Use as output schema'}
+                    </Button>
+                  )
+                })()}
+              </>
             )}
+          </Box>
+        )}
+
+        {/* Output Schema */}
+        <Divider sx={{ my: 2 }} />
+        <Box display="flex" alignItems="center" justifyContent="space-between" mb={schemaOpen ? 1.5 : 0}>
+          <Box display="flex" alignItems="center" gap={1}>
+            <Typography variant="subtitle2" fontWeight={700}>Output Schema</Typography>
+            {tool.outputSchema
+              ? <Chip label="configured" size="small" color="success" sx={{ fontSize: '0.65rem', height: 18 }} />
+              : <Chip label="none" size="small" sx={{ fontSize: '0.65rem', height: 18, opacity: 0.5 }} />}
+          </Box>
+          <Box display="flex" gap={0.5}>
+            {tool.outputSchema && (
+              <Button size="small" color="error" disabled={savingSchema}
+                onClick={async () => {
+                  setSavingSchema(true)
+                  try {
+                    await api.patch(`/swagger/projects/${projectId}/tools/${encodeURIComponent(tool.name)}/output-schema`, { outputSchema: null })
+                    const updated = { ...tool, outputSchema: undefined }
+                    setTool(updated)
+                    onToolChanged(tool.name, updated)
+                    setSchemaOpen(false)
+                  } finally { setSavingSchema(false) }
+                }}>
+                Clear
+              </Button>
+            )}
+            {tool.outputSchema && (
+              <Button size="small" onClick={() => setSchemaOpen((v) => !v)}>
+                {schemaOpen ? 'Hide' : 'View'}
+              </Button>
+            )}
+          </Box>
+        </Box>
+        {schemaOpen && tool.outputSchema && (
+          <Box component="pre" sx={{
+            bgcolor: '#1e1e1e', color: '#d4d4d4', p: 2, borderRadius: 1,
+            fontSize: '0.75rem', overflowX: 'auto', maxHeight: 300,
+            whiteSpace: 'pre-wrap', wordBreak: 'break-word', m: 0, mb: 2,
+          }}>
+            {JSON.stringify(tool.outputSchema, null, 2)}
           </Box>
         )}
 

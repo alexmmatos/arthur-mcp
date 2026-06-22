@@ -77,6 +77,7 @@ export interface GeneratedTool {
   name: string;
   description: string;
   inputSchema: JsonSchema;
+  outputSchema?: JsonSchema;
   endpointRef: EndpointRef;
   enabled?: boolean;
   comments?: ToolComment[];

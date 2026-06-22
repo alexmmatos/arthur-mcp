@@ -100,15 +100,26 @@ export class DynamicMcpService {
     );
 
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: tools.map((t) => ({
-        name: t.name,
-        description: t.description,
-        inputSchema: {
-          type: 'object' as const,
-          properties: t.inputSchema.properties ?? {},
-          ...(t.inputSchema.required ? { required: t.inputSchema.required } : {}),
-        },
-      })),
+      tools: tools.map((t) => {
+        const method = (t.endpointRef?.method ?? 'GET').toUpperCase();
+        const readOnly = method === 'GET' || method === 'HEAD';
+        const destructive = method === 'DELETE';
+        return {
+          name: t.name,
+          description: t.description,
+          inputSchema: {
+            type: 'object' as const,
+            properties: t.inputSchema.properties ?? {},
+            ...(t.inputSchema.required ? { required: t.inputSchema.required } : {}),
+          },
+          ...(t.outputSchema ? { outputSchema: t.outputSchema } : {}),
+          annotations: {
+            readOnlyHint: readOnly,
+            destructiveHint: destructive,
+            openWorldHint: true,
+          },
+        };
+      }),
     }));
 
     server.setRequestHandler(CallToolRequestSchema, async (req): Promise<any> => {
@@ -147,6 +158,18 @@ export class DynamicMcpService {
         this.logger.log(`← HTTP ${httpRes.status} ${httpRes.statusText}`);
         const result = mapResponse(httpRes);
         this.executionLogs.log({ projectId, projectName: name, toolName, source: 'mcp', statusCode: httpRes.status, responseTimeMs: Date.now() - t0, isError: result.isError ?? false });
+
+        // If the tool declares an outputSchema, also populate structuredContent
+        if (tool.outputSchema && !result.isError) {
+          const rawText = (result as any).content?.[0]?.text;
+          if (rawText) {
+            try {
+              const parsed = JSON.parse(rawText);
+              return { ...result, structuredContent: parsed };
+            } catch { /* non-JSON response — structuredContent omitted */ }
+          }
+        }
+
         return result;
       } catch (err: any) {
         this.logger.error(`Erro ao executar "${toolName}": ${err?.message}`);

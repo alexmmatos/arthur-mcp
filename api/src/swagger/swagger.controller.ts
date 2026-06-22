@@ -114,6 +114,15 @@ export class SwaggerController {
     return this.swaggerService.updateToolMeta(id, toolName, dto);
   }
 
+  @Patch('projects/:id/tools/:toolName/output-schema')
+  updateToolOutputSchema(
+    @Param('id') id: string,
+    @Param('toolName') toolName: string,
+    @Body('outputSchema') outputSchema: Record<string, unknown> | null,
+  ) {
+    return this.swaggerService.updateToolOutputSchema(id, decodeURIComponent(toolName), outputSchema);
+  }
+
   @Put('projects/:id/tools/:toolName')
   updateTool(
     @Param('id') id: string,
