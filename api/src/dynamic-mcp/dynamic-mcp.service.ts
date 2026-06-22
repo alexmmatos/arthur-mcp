@@ -2,9 +2,13 @@ import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
   CallToolRequestSchema,
+  GetPromptRequestSchema,
+  ListPromptsRequestSchema,
+  ListResourcesRequestSchema,
   ListToolsRequestSchema,
+  ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import type { AuthConfig, GeneratedTool, JsonSchema } from './types';
+import type { AuthConfig, GeneratedTool, JsonSchema, McpPrompt, McpResource } from './types';
 import { buildRequest } from './request-builder';
 import { executeRequest } from './http-client';
 import { mapResponse, McpToolResult } from './response-mapper';
@@ -18,6 +22,8 @@ interface CachedProject {
   auth: AuthConfig;
   name: string;
   version: string;
+  resources: McpResource[];
+  prompts: McpPrompt[];
   expiresAt: number;
 }
 
@@ -80,6 +86,8 @@ export class DynamicMcpService {
       auth: project.auth ?? { type: 'none' },
       name: project.name,
       version: project.version ?? '1.0.0',
+      resources: project.resources ?? [],
+      prompts: project.prompts ?? [],
       expiresAt: Date.now() + this.CACHE_TTL_MS,
     };
     this.projectCache.set(projectId, entry);
@@ -87,7 +95,7 @@ export class DynamicMcpService {
   }
 
   async createMcpServer(projectId: string): Promise<Server> {
-    const { tools: allTools, auth, name, version } = await this.getProjectData(projectId);
+    const { tools: allTools, auth, name, version, resources, prompts } = await this.getProjectData(projectId);
 
     const tools: GeneratedTool[] = allTools.filter((t) => t.enabled !== false);
     const toolMap = new Map(tools.map((t) => [t.name, t]));
@@ -96,7 +104,7 @@ export class DynamicMcpService {
 
     const server = new Server(
       { name: `arthur-mcp-adapter:${name}`, version },
-      { capabilities: { tools: {} } },
+      { capabilities: { tools: {}, resources: {}, prompts: {} } },
     );
 
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -176,6 +184,66 @@ export class DynamicMcpService {
         this.executionLogs.log({ projectId, projectName: name, toolName, source: 'mcp', isError: true, statusCode: 500, errorMessage: err?.message, responseTimeMs: Date.now() - t0 });
         return { content: [{ type: 'text' as const, text: `Erro: ${err?.message ?? 'Erro desconhecido'}` }], isError: true };
       }
+    });
+
+    server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+      resources: resources.map((r) => ({
+        uri: r.uri,
+        name: r.name,
+        ...(r.description ? { description: r.description } : {}),
+        ...(r.mimeType ? { mimeType: r.mimeType } : {}),
+      })),
+    }));
+
+    server.setRequestHandler(ReadResourceRequestSchema, async (req) => {
+      const uri = req.params.uri;
+      const resource = resources.find((r) => r.uri === uri);
+      if (!resource) throw new Error(`Resource not found: ${uri}`);
+      return {
+        contents: [{ uri, text: resource.content, ...(resource.mimeType ? { mimeType: resource.mimeType } : {}) }],
+      };
+    });
+
+    server.setRequestHandler(ListPromptsRequestSchema, async () => ({
+      prompts: prompts.map((p) => ({
+        name: p.name,
+        ...(p.description ? { description: p.description } : {}),
+        ...(p.arguments?.length ? { arguments: p.arguments } : {}),
+      })),
+    }));
+
+    server.setRequestHandler(GetPromptRequestSchema, async (req) => {
+      const { name, arguments: args = {} } = req.params as { name: string; arguments?: Record<string, string> };
+      const prompt = prompts.find((p) => p.name === name);
+      if (!prompt) throw new Error(`Prompt not found: ${name}`);
+
+      let text: string;
+
+      if (prompt.endpoint?.url) {
+        const method = (prompt.endpoint.method ?? 'GET').toUpperCase();
+        let reqUrl = prompt.endpoint.url;
+        let body: Record<string, unknown> | undefined;
+
+        if (method === 'GET') {
+          const u = new URL(reqUrl);
+          for (const [k, v] of Object.entries(args as Record<string, string>)) {
+            u.searchParams.set(k, String(v));
+          }
+          reqUrl = u.toString();
+        } else {
+          body = args as Record<string, unknown>;
+        }
+
+        let prepared = await applyAuth({ method, url: reqUrl, headers: {}, ...(body ? { body } : {}) }, auth);
+        const httpRes = await executeRequest(prepared);
+        text = httpRes.body;
+      } else {
+        text = (prompt.template ?? '').replace(/\{\{(\w+)\}\}/g, (_, key) => String((args as Record<string, string>)[key] ?? `{{${key}}}`));
+      }
+
+      return {
+        messages: [{ role: 'user' as const, content: { type: 'text' as const, text } }],
+      };
     });
 
     return server;

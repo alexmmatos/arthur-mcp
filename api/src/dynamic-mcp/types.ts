@@ -99,3 +99,32 @@ export type AuthConfig =
   | { type: 'basic'; username: string; password: string }
   | { type: 'oauth2-client'; tokenUrl: string; clientId: string; clientSecret: string; scope?: string }
   | { type: 'custom'; headers: { name: string; value: string }[] };
+
+export interface McpResource {
+  id: string;
+  name: string;
+  uri: string;
+  description?: string;
+  mimeType?: string;
+  content: string;
+}
+
+export interface McpPromptArgument {
+  name: string;
+  description?: string;
+  required?: boolean;
+}
+
+export interface McpPromptEndpoint {
+  method: string;
+  url: string;
+}
+
+export interface McpPrompt {
+  id: string;
+  name: string;
+  description?: string;
+  arguments?: McpPromptArgument[];
+  template?: string;
+  endpoint?: McpPromptEndpoint;
+}

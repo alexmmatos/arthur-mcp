@@ -67,6 +67,9 @@ import {
   IconSearch,
   IconEye,
   IconEyeOff,
+  IconDatabase,
+  IconBulb,
+  IconRoute,
 } from '@tabler/icons-react'
 import { QRCodeSVG } from 'qrcode.react'
 import api from '../api'
@@ -124,6 +127,35 @@ interface McpApiKeyEntry {
   createdAt: string
 }
 
+interface McpResource {
+  id: string
+  name: string
+  uri: string
+  description?: string
+  mimeType?: string
+  content: string
+}
+
+interface McpPromptArgument {
+  name: string
+  description?: string
+  required?: boolean
+}
+
+interface McpPromptEndpoint {
+  method: string
+  url: string
+}
+
+interface McpPrompt {
+  id: string
+  name: string
+  description?: string
+  arguments?: McpPromptArgument[]
+  template?: string
+  endpoint?: McpPromptEndpoint
+}
+
 interface Project {
   _id: string
   name: string
@@ -136,6 +168,8 @@ interface Project {
   availabilityWindow?: { enabled: boolean; timezone: string; schedule?: Array<{ day: number; startHour: number; endHour: number }> }
   alertConfig?: { enabled: boolean; errorThresholdPct: number; notifyEmail: string }
   tools: GeneratedTool[]
+  resources?: McpResource[]
+  prompts?: McpPrompt[]
   mcpApiKey?: string
   mcpApiKeys?: McpApiKeyEntry[]
   oauthClientId?: string
@@ -918,6 +952,174 @@ function OAuthClientPanel({ projectId, initialClientId, initialClientSecret, ser
         onClose={() => setConfirmRemove(false)}
       />
     </Paper>
+  )
+}
+
+// ─── API Endpoints tab ────────────────────────────────────────────────────────
+
+function ApiEndpointsTab({ tools }: { tools: GeneratedTool[] }) {
+  const [search, setSearch] = useState('')
+  const [methodFilter, setMethodFilter] = useState<string | null>(null)
+
+  const endpoints = tools.map((t) => ({ tool: t, ...t.endpointRef }))
+
+  const methods = [...new Set(endpoints.map((e) => e.method.toUpperCase()))].sort()
+
+  const visible = endpoints.filter((e) => {
+    const m = e.method.toUpperCase()
+    if (methodFilter && m !== methodFilter) return false
+    if (search) {
+      const q = search.toLowerCase()
+      return (
+        e.path.toLowerCase().includes(q) ||
+        (e.tool.description ?? '').toLowerCase().includes(q) ||
+        e.tool.name.toLowerCase().includes(q)
+      )
+    }
+    return true
+  })
+
+  const methodCounts = Object.fromEntries(
+    methods.map((m) => [m, endpoints.filter((e) => e.method.toUpperCase() === m).length])
+  )
+
+  return (
+    <Box>
+      {/* Stats row */}
+      <Grid container spacing={2} mb={3}>
+        <Grid item xs={6} sm={3}>
+          <StatCard label="Total endpoints" value={endpoints.length} color="#5D87FF" />
+        </Grid>
+        {methods.map((m) => (
+          <Grid item xs={6} sm={3} key={m}>
+            <StatCard label={m} value={methodCounts[m]} color={METHOD_COLOR[m]} />
+          </Grid>
+        ))}
+      </Grid>
+
+      {/* Search + filter */}
+      <Box display="flex" alignItems="center" gap={1} mb={2} flexWrap="wrap">
+        <TextField
+          size="small" placeholder="Search by path, name or description…" value={search}
+          onChange={(e) => setSearch(e.target.value)} sx={{ width: 300 }}
+          InputProps={{ startAdornment: <InputAdornment position="start"><IconSearch size={16} /></InputAdornment> }}
+        />
+        {methods.length > 1 && (
+          <Box display="flex" gap={0.5} flexWrap="wrap">
+            <Chip label="All" size="small" clickable onClick={() => setMethodFilter(null)}
+              color={methodFilter === null ? 'primary' : 'default'}
+              variant={methodFilter === null ? 'filled' : 'outlined'} />
+            {methods.map((m) => (
+              <Chip key={m} label={m} size="small" clickable
+                onClick={() => setMethodFilter(methodFilter === m ? null : m)}
+                sx={{
+                  fontFamily: 'monospace', fontWeight: 700, fontSize: '0.7rem',
+                  bgcolor: methodFilter === m ? METHOD_COLOR[m] : 'transparent',
+                  color: methodFilter === m ? '#fff' : METHOD_COLOR[m],
+                  borderColor: METHOD_COLOR[m],
+                }}
+                variant="outlined" />
+            ))}
+          </Box>
+        )}
+        {(search || methodFilter) && (
+          <Typography variant="body2" color="text.secondary" ml="auto">
+            {visible.length} of {endpoints.length}
+          </Typography>
+        )}
+      </Box>
+
+      {/* Endpoint list */}
+      {endpoints.length === 0 ? (
+        <Alert severity="info">No endpoints — upload an OpenAPI spec to populate this list.</Alert>
+      ) : visible.length === 0 ? (
+        <Alert severity="info">No endpoints match your search.</Alert>
+      ) : (
+        <Box display="flex" flexDirection="column" gap={1}>
+          {visible.map((e, i) => {
+            const method = e.method.toUpperCase()
+            const queryParams = (e.parameterMap ?? []).filter((p) => p.source === 'query')
+            const pathParams = (e.parameterMap ?? []).filter((p) => p.source === 'path')
+            const bodyParams = (e.parameterMap ?? []).filter((p) => p.source === 'body')
+            const headerParams = (e.parameterMap ?? []).filter((p) => p.source === 'header')
+            return (
+              <Paper key={i} variant="outlined" sx={{
+                p: 0, overflow: 'hidden',
+                borderColor: `${METHOD_COLOR[method] ?? '#ddd'}44`,
+                '&:hover': { borderColor: `${METHOD_COLOR[method] ?? '#ddd'}99` },
+                transition: 'border-color 0.15s',
+              }}>
+                <Box sx={{ bgcolor: METHOD_BG[method] ?? '#fafafa', px: 2, py: 1.25, display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                  {/* Method badge */}
+                  <Box sx={{
+                    px: 1.2, py: 0.35, borderRadius: '4px',
+                    bgcolor: METHOD_COLOR[method] ?? '#888', color: '#fff',
+                    fontWeight: 700, fontSize: '0.72rem', fontFamily: 'monospace',
+                    minWidth: 58, textAlign: 'center', flexShrink: 0,
+                  }}>
+                    {method}
+                  </Box>
+
+                  {/* Path */}
+                  <Typography fontFamily="monospace" fontWeight={600} fontSize="0.875rem" flexGrow={1} minWidth={0}
+                    sx={{ wordBreak: 'break-all' }}>
+                    {e.path}
+                  </Typography>
+
+                  {/* Tool name chip */}
+                  <Chip
+                    label={e.tool.name}
+                    size="small"
+                    sx={{ fontFamily: 'monospace', fontSize: '0.68rem', height: 20, bgcolor: '#f0f0f0' }}
+                  />
+                </Box>
+
+                <Box sx={{ px: 2, py: 1.25 }}>
+                  {/* Base URL */}
+                  <Typography variant="caption" color="text.disabled" display="block" mb={0.5}
+                    sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                    {e.baseUrl}{e.path}
+                  </Typography>
+
+                  {/* Description */}
+                  {e.tool.description && (
+                    <Typography variant="body2" color="text.secondary" mb={1}>
+                      {e.tool.description.replace(/\s*\[.*?\]\s*$/, '')}
+                    </Typography>
+                  )}
+
+                  {/* Parameters */}
+                  {(e.parameterMap ?? []).length > 0 && (
+                    <Box display="flex" gap={0.75} flexWrap="wrap">
+                      {pathParams.length > 0 && (
+                        <Chip label={`${pathParams.length} path`} size="small" color="warning"
+                          sx={{ fontSize: '0.65rem', height: 18 }} />
+                      )}
+                      {queryParams.length > 0 && (
+                        <Chip label={`${queryParams.length} query`} size="small" color="info"
+                          sx={{ fontSize: '0.65rem', height: 18 }} />
+                      )}
+                      {bodyParams.length > 0 && (
+                        <Chip label={`${bodyParams.length} body`} size="small" color="secondary"
+                          sx={{ fontSize: '0.65rem', height: 18 }} />
+                      )}
+                      {headerParams.length > 0 && (
+                        <Chip label={`${headerParams.length} header`} size="small"
+                          sx={{ fontSize: '0.65rem', height: 18 }} />
+                      )}
+                      {e.contentType && e.contentType !== 'application/json' && (
+                        <Chip label={e.contentType} size="small" variant="outlined"
+                          sx={{ fontSize: '0.65rem', height: 18, fontFamily: 'monospace' }} />
+                      )}
+                    </Box>
+                  )}
+                </Box>
+              </Paper>
+            )
+          })}
+        </Box>
+      )}
+    </Box>
   )
 }
 
@@ -2542,6 +2744,450 @@ function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged,
   )
 }
 
+// ─── ResourcesTab ─────────────────────────────────────────────────────────────
+
+function ResourcesTab({ projectId, initialResources, onChange }: {
+  projectId: string
+  initialResources: McpResource[]
+  onChange: (resources: McpResource[]) => void
+}) {
+  const [resources, setResources] = useState<McpResource[]>(initialResources)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editTarget, setEditTarget] = useState<McpResource | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<McpResource | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState('')
+
+  const emptyForm = () => ({ name: '', uri: '', description: '', mimeType: 'text/plain', content: '' })
+  const [form, setForm] = useState(emptyForm())
+
+  const slugify = (s: string) => s.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+
+  const openAdd = () => {
+    setEditTarget(null)
+    setForm(emptyForm())
+    setFormError('')
+    setDialogOpen(true)
+  }
+
+  const openEdit = (r: McpResource) => {
+    setEditTarget(r)
+    setForm({ name: r.name, uri: r.uri, description: r.description ?? '', mimeType: r.mimeType ?? 'text/plain', content: r.content })
+    setFormError('')
+    setDialogOpen(true)
+  }
+
+  const handleNameChange = (name: string) => {
+    const uri = editTarget ? form.uri : `resource://${projectId}/${slugify(name)}`
+    setForm((f) => ({ ...f, name, uri }))
+  }
+
+  const handleSave = async () => {
+    if (!form.name.trim()) { setFormError('Name is required.'); return }
+    if (!form.uri.trim()) { setFormError('URI is required.'); return }
+    if (!form.content.trim()) { setFormError('Content is required.'); return }
+    setSaving(true); setFormError('')
+    try {
+      const dto = { name: form.name.trim(), uri: form.uri.trim(), description: form.description.trim() || undefined, mimeType: form.mimeType.trim() || undefined, content: form.content }
+      if (editTarget) {
+        await api.put(`/swagger/projects/${projectId}/resources/${editTarget.id}`, dto)
+        const updated = resources.map((r) => r.id === editTarget.id ? { ...r, ...dto } : r)
+        setResources(updated); onChange(updated)
+      } else {
+        const { data } = await api.post<McpResource>(`/swagger/projects/${projectId}/resources`, dto)
+        const updated = [...resources, data]
+        setResources(updated); onChange(updated)
+      }
+      setDialogOpen(false)
+    } catch (err: any) {
+      setFormError(err?.response?.data?.message ?? 'Failed to save.')
+    } finally { setSaving(false) }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await api.delete(`/swagger/projects/${projectId}/resources/${deleteTarget.id}`)
+      const updated = resources.filter((r) => r.id !== deleteTarget.id)
+      setResources(updated); onChange(updated)
+    } finally { setDeleting(false); setDeleteTarget(null) }
+  }
+
+  return (
+    <Box>
+      <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+        <Box display="flex" alignItems="center" gap={1}>
+          <Typography variant="h6" fontWeight={700}>Resources</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Static content exposed to the AI via the MCP protocol
+          </Typography>
+        </Box>
+        <Button variant="contained" size="small" startIcon={<IconPlus size={18} />} onClick={openAdd}>
+          Add resource
+        </Button>
+      </Box>
+
+      {resources.length === 0 ? (
+        <Alert severity="info">No resources yet. Resources let you expose static content (documentation, configuration, data files) to the AI client.</Alert>
+      ) : (
+        <Box display="flex" flexDirection="column" gap={1.5}>
+          {resources.map((r) => (
+            <Paper key={r.id} variant="outlined" sx={{ p: 2 }}>
+              <Box display="flex" alignItems="flex-start" gap={1.5}>
+                <Box sx={{ color: 'primary.main', mt: 0.25, flexShrink: 0 }}>
+                  <IconDatabase size={18} />
+                </Box>
+                <Box flexGrow={1} minWidth={0}>
+                  <Box display="flex" alignItems="center" gap={1} flexWrap="wrap" mb={0.25}>
+                    <Typography fontWeight={700} fontSize="0.925rem">{r.name}</Typography>
+                    {r.mimeType && (
+                      <Chip label={r.mimeType} size="small" variant="outlined" sx={{ fontSize: '0.68rem', height: 18 }} />
+                    )}
+                  </Box>
+                  <Typography fontFamily="monospace" fontSize="0.78rem" color="text.secondary" sx={{ wordBreak: 'break-all' }}>
+                    {r.uri}
+                  </Typography>
+                  {r.description && (
+                    <Typography variant="body2" color="text.secondary" mt={0.5}>{r.description}</Typography>
+                  )}
+                  <Typography variant="caption" color="text.disabled" display="block" mt={0.5}>
+                    {r.content.length} chars · {r.content.split('\n').length} lines
+                  </Typography>
+                </Box>
+                <Box display="flex" gap={0.5} flexShrink={0}>
+                  <Tooltip title="Edit">
+                    <IconButton size="small" onClick={() => openEdit(r)}><IconEdit size={16} /></IconButton>
+                  </Tooltip>
+                  <Tooltip title="Delete">
+                    <IconButton size="small" color="error" onClick={() => setDeleteTarget(r)}><IconTrash size={16} /></IconButton>
+                  </Tooltip>
+                </Box>
+              </Box>
+            </Paper>
+          ))}
+        </Box>
+      )}
+
+      {/* Add / Edit dialog */}
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth scroll="paper">
+        <DialogTitle>{editTarget ? `Edit resource — ${editTarget.name}` : 'New resource'}</DialogTitle>
+        <DialogContent dividers>
+          {formError && <Alert severity="error" sx={{ mb: 2 }}>{formError}</Alert>}
+          <Box display="flex" flexDirection="column" gap={2}>
+            <TextField size="small" fullWidth label="Name" required value={form.name}
+              onChange={(e) => handleNameChange(e.target.value)} />
+            <TextField size="small" fullWidth label="URI" required value={form.uri}
+              onChange={(e) => setForm((f) => ({ ...f, uri: e.target.value }))}
+              helperText="Unique identifier used by the MCP client to read this resource"
+              InputProps={{ sx: { fontFamily: 'monospace' } }} />
+            <TextField size="small" fullWidth label="Description" value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
+            <TextField size="small" fullWidth label="MIME Type" value={form.mimeType}
+              onChange={(e) => setForm((f) => ({ ...f, mimeType: e.target.value }))}
+              placeholder="text/plain" />
+            <TextField size="small" fullWidth multiline minRows={8} maxRows={20} label="Content" required
+              value={form.content}
+              onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
+              InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.82rem' } }} />
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleSave} disabled={saving}
+            startIcon={saving ? <CircularProgress size={14} color="inherit" /> : undefined}>
+            {saving ? 'Saving…' : editTarget ? 'Save changes' : 'Create resource'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={`Delete "${deleteTarget?.name}"?`}
+        message="This resource will be permanently removed."
+        confirmLabel="Delete"
+        confirmColor="error"
+        loading={deleting}
+        onConfirm={handleDelete}
+        onClose={() => setDeleteTarget(null)}
+      />
+    </Box>
+  )
+}
+
+// ─── PromptsTab ───────────────────────────────────────────────────────────────
+
+function PromptsTab({ projectId, initialPrompts, onChange }: {
+  projectId: string
+  initialPrompts: McpPrompt[]
+  onChange: (prompts: McpPrompt[]) => void
+}) {
+  const [prompts, setPrompts] = useState<McpPrompt[]>(initialPrompts)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editTarget, setEditTarget] = useState<McpPrompt | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<McpPrompt | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState('')
+
+  const emptyForm = () => ({
+    name: '',
+    description: '',
+    source: 'template' as 'template' | 'endpoint',
+    template: '',
+    endpointMethod: 'GET',
+    endpointUrl: '',
+    args: [] as Array<{ id: string; name: string; description: string; required: boolean }>,
+  })
+  const [form, setForm] = useState(emptyForm())
+
+  const openAdd = () => {
+    setEditTarget(null); setForm(emptyForm()); setFormError(''); setDialogOpen(true)
+  }
+
+  const openEdit = (p: McpPrompt) => {
+    setEditTarget(p)
+    setForm({
+      name: p.name,
+      description: p.description ?? '',
+      source: p.endpoint ? 'endpoint' : 'template',
+      template: p.template ?? '',
+      endpointMethod: p.endpoint?.method ?? 'GET',
+      endpointUrl: p.endpoint?.url ?? '',
+      args: (p.arguments ?? []).map((a) => ({ id: crypto.randomUUID(), name: a.name, description: a.description ?? '', required: a.required ?? false })),
+    })
+    setFormError('')
+    setDialogOpen(true)
+  }
+
+  const addArg = () => setForm((f) => ({ ...f, args: [...f.args, { id: crypto.randomUUID(), name: '', description: '', required: false }] }))
+  const removeArg = (id: string) => setForm((f) => ({ ...f, args: f.args.filter((a) => a.id !== id) }))
+  const updateArg = (id: string, field: string, value: string | boolean) =>
+    setForm((f) => ({ ...f, args: f.args.map((a) => a.id === id ? { ...a, [field]: value } : a) }))
+
+  const handleSave = async () => {
+    if (!form.name.trim()) { setFormError('Name is required.'); return }
+    if (form.source === 'template' && !form.template.trim()) { setFormError('Template is required.'); return }
+    if (form.source === 'endpoint' && !form.endpointUrl.trim()) { setFormError('API URL is required.'); return }
+    setSaving(true); setFormError('')
+    try {
+      const dto: Omit<McpPrompt, 'id'> = {
+        name: form.name.trim(),
+        description: form.description.trim() || undefined,
+        template: form.source === 'template' ? form.template : undefined,
+        endpoint: form.source === 'endpoint' ? { method: form.endpointMethod, url: form.endpointUrl.trim() } : undefined,
+        arguments: form.args.filter((a) => a.name.trim()).map((a) => ({
+          name: a.name.trim(),
+          description: a.description.trim() || undefined,
+          required: a.required,
+        })),
+      }
+      if (editTarget) {
+        await api.put(`/swagger/projects/${projectId}/prompts/${editTarget.id}`, dto)
+        const updated = prompts.map((p) => p.id === editTarget.id ? { ...p, ...dto } : p)
+        setPrompts(updated); onChange(updated)
+      } else {
+        const { data } = await api.post<McpPrompt>(`/swagger/projects/${projectId}/prompts`, dto)
+        const updated = [...prompts, data]
+        setPrompts(updated); onChange(updated)
+      }
+      setDialogOpen(false)
+    } catch (err: any) {
+      setFormError(err?.response?.data?.message ?? 'Failed to save.')
+    } finally { setSaving(false) }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await api.delete(`/swagger/projects/${projectId}/prompts/${deleteTarget.id}`)
+      const updated = prompts.filter((p) => p.id !== deleteTarget.id)
+      setPrompts(updated); onChange(updated)
+    } finally { setDeleting(false); setDeleteTarget(null) }
+  }
+
+  return (
+    <Box>
+      <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+        <Box display="flex" alignItems="center" gap={1}>
+          <Typography variant="h6" fontWeight={700}>Prompts</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Reusable prompt templates with variable substitution
+          </Typography>
+        </Box>
+        <Button variant="contained" size="small" startIcon={<IconPlus size={18} />} onClick={openAdd}>
+          Add prompt
+        </Button>
+      </Box>
+
+      {prompts.length === 0 ? (
+        <Alert severity="info">No prompts yet. Prompts are reusable message templates the AI can use with variable substitution (use {'{{variable}}'} syntax).</Alert>
+      ) : (
+        <Box display="flex" flexDirection="column" gap={1.5}>
+          {prompts.map((p) => (
+            <Paper key={p.id} variant="outlined" sx={{ p: 2 }}>
+              <Box display="flex" alignItems="flex-start" gap={1.5}>
+                <Box sx={{ color: 'secondary.main', mt: 0.25, flexShrink: 0 }}>
+                  <IconBulb size={18} />
+                </Box>
+                <Box flexGrow={1} minWidth={0}>
+                  <Box display="flex" alignItems="center" gap={1} flexWrap="wrap" mb={0.25}>
+                    <Typography fontWeight={700} fontSize="0.925rem">{p.name}</Typography>
+                    {(p.arguments?.length ?? 0) > 0 && (
+                      <Chip
+                        label={`${p.arguments!.length} arg${p.arguments!.length !== 1 ? 's' : ''}`}
+                        size="small" color="primary" sx={{ fontSize: '0.68rem', height: 18 }} />
+                    )}
+                  </Box>
+                  {p.description && (
+                    <Typography variant="body2" color="text.secondary" mb={0.5}>{p.description}</Typography>
+                  )}
+                  {p.endpoint ? (
+                    <Box display="flex" alignItems="center" gap={0.75} sx={{
+                      bgcolor: '#f0f4ff', border: '1px solid #c7d7f5', borderRadius: 1,
+                      px: 1.5, py: 0.75,
+                    }}>
+                      <Chip label={p.endpoint.method} size="small" sx={{ fontFamily: 'monospace', fontSize: '0.68rem', fontWeight: 700, height: 20, bgcolor: METHOD_COLOR[p.endpoint.method.toUpperCase()] ?? '#888', color: '#fff' }} />
+                      <Typography fontFamily="monospace" fontSize="0.78rem" color="text.secondary" sx={{ wordBreak: 'break-all' }}>
+                        {p.endpoint.url}
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <Box component="pre" sx={{
+                      bgcolor: '#f5f5f5', border: '1px solid #e0e0e0', borderRadius: 1,
+                      px: 1.5, py: 1, fontSize: '0.75rem', fontFamily: 'monospace',
+                      whiteSpace: 'pre-wrap', wordBreak: 'break-word', m: 0,
+                      maxHeight: 100, overflow: 'hidden',
+                    }}>
+                      {(p.template ?? '').length > 300 ? p.template!.slice(0, 300) + '…' : (p.template ?? '(no template)')}
+                    </Box>
+                  )}
+                </Box>
+                <Box display="flex" gap={0.5} flexShrink={0}>
+                  <Tooltip title="Edit">
+                    <IconButton size="small" onClick={() => openEdit(p)}><IconEdit size={16} /></IconButton>
+                  </Tooltip>
+                  <Tooltip title="Delete">
+                    <IconButton size="small" color="error" onClick={() => setDeleteTarget(p)}><IconTrash size={16} /></IconButton>
+                  </Tooltip>
+                </Box>
+              </Box>
+            </Paper>
+          ))}
+        </Box>
+      )}
+
+      {/* Add / Edit dialog */}
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth scroll="paper">
+        <DialogTitle>{editTarget ? `Edit prompt — ${editTarget.name}` : 'New prompt'}</DialogTitle>
+        <DialogContent dividers>
+          {formError && <Alert severity="error" sx={{ mb: 2 }}>{formError}</Alert>}
+          <Box display="flex" flexDirection="column" gap={2}>
+            <TextField size="small" fullWidth label="Name" required value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+            <TextField size="small" fullWidth label="Description" value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
+
+            {/* Arguments */}
+            <Box>
+              <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+                <Typography variant="subtitle2" fontWeight={700}>Arguments</Typography>
+                <Button size="small" startIcon={<IconPlus size={16} />} onClick={addArg}>Add</Button>
+              </Box>
+              {form.args.length === 0 ? (
+                <Typography variant="body2" color="text.disabled">No arguments. Click "Add" to create one.</Typography>
+              ) : (
+                <Box display="flex" flexDirection="column" gap={1}>
+                  {form.args.map((a) => (
+                    <Box key={a.id} display="flex" gap={1} alignItems="center">
+                      <TextField size="small" label="Name" sx={{ flex: 1 }} value={a.name}
+                        onChange={(e) => updateArg(a.id, 'name', e.target.value)}
+                        InputProps={{ sx: { fontFamily: 'monospace' } }} />
+                      <TextField size="small" label="Description" sx={{ flex: 2 }} value={a.description}
+                        onChange={(e) => updateArg(a.id, 'description', e.target.value)} />
+                      <FormControlLabel
+                        control={<Switch size="small" checked={a.required}
+                          onChange={(e) => updateArg(a.id, 'required', e.target.checked)} />}
+                        label={<Typography variant="caption">Req.</Typography>}
+                        sx={{ m: 0, flexShrink: 0 }} />
+                      <IconButton size="small" color="error" onClick={() => removeArg(a.id)}>
+                        <IconTrash size={16} />
+                      </IconButton>
+                    </Box>
+                  ))}
+                </Box>
+              )}
+            </Box>
+
+            {/* Source toggle */}
+            <Box>
+              <Typography variant="subtitle2" fontWeight={700} mb={1}>Prompt source</Typography>
+              <Box display="flex" gap={1}>
+                {(['template', 'endpoint'] as const).map((s) => (
+                  <Button key={s} size="small"
+                    variant={form.source === s ? 'contained' : 'outlined'}
+                    onClick={() => setForm((f) => ({ ...f, source: s }))}>
+                    {s === 'template' ? 'Static template' : 'API endpoint'}
+                  </Button>
+                ))}
+              </Box>
+            </Box>
+
+            {form.source === 'template' ? (
+              <TextField
+                size="small" fullWidth multiline minRows={8} maxRows={20} label="Template" required
+                value={form.template}
+                onChange={(e) => setForm((f) => ({ ...f, template: e.target.value }))}
+                helperText="Use {{variable_name}} for dynamic substitution"
+                InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.82rem' } }}
+              />
+            ) : (
+              <Box display="flex" gap={1}>
+                <FormControl size="small" sx={{ minWidth: 110 }}>
+                  <InputLabel>Method</InputLabel>
+                  <Select label="Method" value={form.endpointMethod}
+                    onChange={(e) => setForm((f) => ({ ...f, endpointMethod: e.target.value }))}>
+                    {['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map((m) => (
+                      <MenuItem key={m} value={m} sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.82rem' }}>{m}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <TextField size="small" fullWidth required label="API URL"
+                  placeholder="https://api.example.com/prompt"
+                  value={form.endpointUrl}
+                  onChange={(e) => setForm((f) => ({ ...f, endpointUrl: e.target.value }))}
+                  helperText={form.endpointMethod === 'GET' ? 'Arguments sent as query parameters' : 'Arguments sent as JSON body'}
+                  InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.82rem' } }}
+                />
+              </Box>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleSave} disabled={saving}
+            startIcon={saving ? <CircularProgress size={14} color="inherit" /> : undefined}>
+            {saving ? 'Saving…' : editTarget ? 'Save changes' : 'Create prompt'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={`Delete "${deleteTarget?.name}"?`}
+        message="This prompt will be permanently removed."
+        confirmLabel="Delete"
+        confirmColor="error"
+        loading={deleting}
+        onConfirm={handleDelete}
+        onClose={() => setDeleteTarget(null)}
+      />
+    </Box>
+  )
+}
+
 // ─── Stat card ────────────────────────────────────────────────────────────────
 
 function StatCard({ label, value, color }: { label: string; value: number | string; color?: string }) {
@@ -2788,8 +3434,14 @@ export default function ProjectDetail() {
       {/* Tabs */}
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
         <Tab icon={<IconWorld size={16} />} iconPosition="start" label="Connect" />
+        <Tab icon={<IconRoute size={16} />} iconPosition="start"
+          label={`API Endpoints${project.tools.length > 0 ? ` (${project.tools.length})` : ''}`} />
         <Tab icon={<IconTool size={16} />} iconPosition="start"
           label={`Tools${project.tools.length > 0 ? ` (${project.tools.length})` : ''}`} />
+        <Tab icon={<IconDatabase size={16} />} iconPosition="start"
+          label={`Resources${(project.resources ?? []).length > 0 ? ` (${project.resources!.length})` : ''}`} />
+        <Tab icon={<IconBulb size={16} />} iconPosition="start"
+          label={`Prompts${(project.prompts ?? []).length > 0 ? ` (${project.prompts!.length})` : ''}`} />
         <Tab icon={<IconAdjustments size={16} />} iconPosition="start" label="Settings" />
         <Tab icon={<IconChartBar size={16} />} iconPosition="start" label="Activity" />
         <Tab icon={<IconBook size={16} />} iconPosition="start" label="AI View" />
@@ -2814,8 +3466,13 @@ export default function ProjectDetail() {
         </>
       )}
 
-      {/* ── Tab 1: Tools ──────────────────────────────────────────────────────── */}
+      {/* ── Tab 1: API Endpoints ──────────────────────────────────────────────── */}
       {tab === 1 && (
+        <ApiEndpointsTab tools={project.tools} />
+      )}
+
+      {/* ── Tab 2: Tools ──────────────────────────────────────────────────────── */}
+      {tab === 2 && (
         <>
           <Grid container spacing={2} mb={3}>
             <Grid item xs={6} sm={3}>
@@ -2894,8 +3551,26 @@ export default function ProjectDetail() {
         </>
       )}
 
-      {/* ── Tab 2: Settings ───────────────────────────────────────────────────── */}
-      {tab === 2 && (
+      {/* ── Tab 3: Resources ──────────────────────────────────────────────────── */}
+      {tab === 3 && (
+        <ResourcesTab
+          projectId={id!}
+          initialResources={project.resources ?? []}
+          onChange={(resources) => setProject((prev) => prev ? { ...prev, resources } : prev)}
+        />
+      )}
+
+      {/* ── Tab 4: Prompts ────────────────────────────────────────────────────── */}
+      {tab === 4 && (
+        <PromptsTab
+          projectId={id!}
+          initialPrompts={project.prompts ?? []}
+          onChange={(prompts) => setProject((prev) => prev ? { ...prev, prompts } : prev)}
+        />
+      )}
+
+      {/* ── Tab 5: Settings ───────────────────────────────────────────────────── */}
+      {tab === 5 && (
         <>
           <BaseUrlPanel projectId={id!} initialValue={baseUrl} onChange={setBaseUrl} />
           <AuthConfigPanel
@@ -2919,8 +3594,8 @@ export default function ProjectDetail() {
         </>
       )}
 
-      {/* ── Tab 3: Activity ───────────────────────────────────────────────────── */}
-      {tab === 3 && (
+      {/* ── Tab 6: Activity ───────────────────────────────────────────────────── */}
+      {tab === 6 && (
         <>
           <Box display="flex" alignItems="center" gap={1} mb={2}>
             <Typography variant="h6" fontWeight={700}>Activity Log</Typography>
@@ -2942,8 +3617,8 @@ export default function ProjectDetail() {
         </>
       )}
 
-      {/* ── Tab 4: AI View ────────────────────────────────────────────────────── */}
-      {tab === 4 && (
+      {/* ── Tab 7: AI View ────────────────────────────────────────────────────── */}
+      {tab === 7 && (
         <>
           <Box display="flex" alignItems="center" gap={1} mb={2}>
             <Typography variant="h6" fontWeight={700}>What your AI sees</Typography>

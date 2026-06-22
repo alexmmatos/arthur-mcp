@@ -1,4 +1,4 @@
-import type { AuthConfig, GeneratedTool } from '../dynamic-mcp/types';
+import type { AuthConfig, GeneratedTool, McpPrompt, McpResource } from '../dynamic-mcp/types';
 
 export interface McpApiKeyEntry {
   id: string;
@@ -20,6 +20,8 @@ export interface SwaggerProjectRecord {
   errorMessage?: string;
   mcpApiKey?: string | null;
   mcpApiKeys: McpApiKeyEntry[];
+  resources: McpResource[];
+  prompts: McpPrompt[];
   oauthClientId?: string | null;
   oauthClientSecret?: string | null;
   tags: string[];

@@ -277,6 +277,44 @@ export class SwaggerController {
     return this.swaggerService.setAlertConfig(id, dto);
   }
 
+  // ── Resources ─────────────────────────────────────────────────────────────────
+
+  @Post('projects/:id/resources')
+  @HttpCode(201)
+  addResource(@Param('id') id: string, @Body() dto: any) {
+    return this.swaggerService.addResource(id, dto);
+  }
+
+  @Put('projects/:id/resources/:resourceId')
+  updateResource(@Param('id') id: string, @Param('resourceId') resourceId: string, @Body() dto: any) {
+    return this.swaggerService.updateResource(id, resourceId, dto);
+  }
+
+  @Delete('projects/:id/resources/:resourceId')
+  @HttpCode(204)
+  deleteResource(@Param('id') id: string, @Param('resourceId') resourceId: string) {
+    return this.swaggerService.deleteResource(id, resourceId);
+  }
+
+  // ── Prompts ───────────────────────────────────────────────────────────────────
+
+  @Post('projects/:id/prompts')
+  @HttpCode(201)
+  addPrompt(@Param('id') id: string, @Body() dto: any) {
+    return this.swaggerService.addPrompt(id, dto);
+  }
+
+  @Put('projects/:id/prompts/:promptId')
+  updatePrompt(@Param('id') id: string, @Param('promptId') promptId: string, @Body() dto: any) {
+    return this.swaggerService.updatePrompt(id, promptId, dto);
+  }
+
+  @Delete('projects/:id/prompts/:promptId')
+  @HttpCode(204)
+  deletePrompt(@Param('id') id: string, @Param('promptId') promptId: string) {
+    return this.swaggerService.deletePrompt(id, promptId);
+  }
+
   // ── Tool comments ─────────────────────────────────────────────────────────────
 
   @Post('projects/:id/tools/:toolName/comments')

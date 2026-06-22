@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
-import type { AuthConfig, EndpointRef, GeneratedTool, JsonSchema } from '../dynamic-mcp/types';
+import type { AuthConfig, EndpointRef, GeneratedTool, JsonSchema, McpPrompt, McpResource } from '../dynamic-mcp/types';
 
 export type SwaggerProjectDocument = SwaggerProject & Document;
 
@@ -49,6 +49,12 @@ export class SwaggerProject {
   /** Multi-key list */
   @Prop({ type: [Object], default: [] })
   mcpApiKeys: McpApiKeyEntry[];
+
+  @Prop({ type: [Object], default: [] })
+  resources: McpResource[];
+
+  @Prop({ type: [Object], default: [] })
+  prompts: McpPrompt[];
 
   @Prop()
   oauthClientId?: string;

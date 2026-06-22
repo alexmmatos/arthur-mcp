@@ -38,6 +38,12 @@ export class SwaggerProjectEntity {
   @Column('text', { default: '[]' })
   mcpApiKeys: string;
 
+  @Column('text', { default: '[]' })
+  resources: string;
+
+  @Column('text', { default: '[]' })
+  prompts: string;
+
   @Column({ nullable: true })
   oauthClientId?: string;
 

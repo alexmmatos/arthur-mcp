@@ -24,6 +24,8 @@ export class SqliteSwaggerProjectRepository implements ISwaggerProjectRepository
       errorMessage: e.errorMessage,
       mcpApiKey: e.mcpApiKey,
       mcpApiKeys: e.mcpApiKeys ? JSON.parse(e.mcpApiKeys) : [],
+      resources: e.resources ? JSON.parse(e.resources) : [],
+      prompts: e.prompts ? JSON.parse(e.prompts) : [],
       oauthClientId: e.oauthClientId,
       oauthClientSecret: e.oauthClientSecret,
       tags: e.tags ? JSON.parse(e.tags) : [],
@@ -54,6 +56,8 @@ export class SqliteSwaggerProjectRepository implements ISwaggerProjectRepository
     if (data.errorMessage !== undefined) e.errorMessage = data.errorMessage;
     if ('mcpApiKey' in data) e.mcpApiKey = data.mcpApiKey as string | undefined;
     if (data.mcpApiKeys !== undefined) e.mcpApiKeys = JSON.stringify(data.mcpApiKeys);
+    if (data.resources !== undefined) e.resources = JSON.stringify(data.resources);
+    if (data.prompts !== undefined) e.prompts = JSON.stringify(data.prompts);
     if ('oauthClientId' in data) e.oauthClientId = data.oauthClientId as string | undefined;
     if ('oauthClientSecret' in data) e.oauthClientSecret = data.oauthClientSecret as string | undefined;
     if (data.tags !== undefined) e.tags = JSON.stringify(data.tags);
