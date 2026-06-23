@@ -20,16 +20,16 @@ export class RateLimitGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest();
     const res = context.switchToHttp().getResponse();
-    const projectId: string = req.params['projectId'];
+    const serverId: string = req.params['serverId'];
 
-    const project = await this.projectRepo.findById(projectId);
-    if (!project?.rateLimit?.enabled) return true;
+    const server = await this.projectRepo.findById(serverId);
+    if (!server?.rateLimit?.enabled) return true;
 
-    const { requestsPerMinute } = project.rateLimit;
+    const { requestsPerMinute } = server.rateLimit;
     const windowMs = 60_000;
     const now = Date.now();
 
-    const prev = this.windows.get(projectId) ?? [];
+    const prev = this.windows.get(serverId) ?? [];
     const recent = prev.filter((t) => now - t < windowMs);
 
     const remaining = Math.max(0, requestsPerMinute - recent.length);
@@ -52,7 +52,7 @@ export class RateLimitGuard implements CanActivate {
     }
 
     recent.push(now);
-    this.windows.set(projectId, recent);
+    this.windows.set(serverId, recent);
     return true;
   }
 }

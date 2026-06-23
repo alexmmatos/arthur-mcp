@@ -31,29 +31,29 @@ export class ProjectStateGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<Request>();
     const res = context.switchToHttp().getResponse<Response>();
-    const projectId = req.params['projectId'];
+    const serverId = req.params['serverId'];
 
-    const project = await this.projectRepo.findById(projectId);
-    if (!project) return true;
+    const server = await this.projectRepo.findById(serverId);
+    if (!server) return true;
 
-    if (project.isPaused) {
+    if (server.isPaused) {
       res.status(503).json({
         error: 'Project paused',
-        message: `The project "${project.name}" is temporarily paused by its manager. Please try again later.`,
+        message: `The server "${server.name}" is temporarily paused by its manager. Please try again later.`,
       });
       return false;
     }
 
-    if (project.maintenanceMode?.enabled) {
+    if (server.maintenanceMode?.enabled) {
       const msg =
-        project.maintenanceMode.message?.trim() ||
-        `The project "${project.name}" is under maintenance. Please try again later.`;
+        server.maintenanceMode.message?.trim() ||
+        `The server "${server.name}" is under maintenance. Please try again later.`;
       res.status(503).json({ error: 'Maintenance mode', message: msg });
       return false;
     }
 
-    if (project.availabilityWindow?.enabled) {
-      const { timezone, schedule } = project.availabilityWindow;
+    if (server.availabilityWindow?.enabled) {
+      const { timezone, schedule } = server.availabilityWindow;
       const tz = timezone ?? 'UTC';
       const { hour, day } = nowInTz(tz);
       const entries = Array.isArray(schedule) ? schedule : [];

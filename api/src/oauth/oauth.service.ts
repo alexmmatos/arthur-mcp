@@ -10,7 +10,7 @@ interface AuthCode {
   userId: string;
   username: string;
   role: string;
-  projectId: string;
+  serverId: string;
   clientId: string;
   redirectUri: string;
   state: string;
@@ -26,12 +26,12 @@ export class OAuthService {
     @Inject(PROJECT_REPO) private readonly projectRepo: ISwaggerProjectRepository,
   ) {}
 
-  async validateClient(projectId: string, clientId: string, clientSecret?: string): Promise<void> {
-    const project = await this.projectRepo.findById(projectId);
-    if (!project) throw new UnauthorizedException('Project not found');
-    if (!project.oauthClientId) throw new UnauthorizedException('OAuth not configured for this project');
-    if (project.oauthClientId !== clientId) throw new UnauthorizedException('invalid_client');
-    if (clientSecret !== undefined && project.oauthClientSecret !== clientSecret) {
+  async validateClient(serverId: string, clientId: string, clientSecret?: string): Promise<void> {
+    const server = await this.projectRepo.findById(serverId);
+    if (!server) throw new UnauthorizedException('Server not found');
+    if (!server.oauthClientId) throw new UnauthorizedException('OAuth not configured for this server');
+    if (server.oauthClientId !== clientId) throw new UnauthorizedException('invalid_client');
+    if (clientSecret !== undefined && server.oauthClientSecret !== clientSecret) {
       throw new UnauthorizedException('invalid_client');
     }
   }
@@ -48,41 +48,41 @@ export class OAuthService {
     userId: string,
     username: string,
     role: string,
-    projectId: string,
+    serverId: string,
     clientId: string,
     redirectUri: string,
     state: string,
   ): string {
     const code = crypto.randomBytes(32).toString('hex');
     this.codes.set(code, {
-      userId, username, role, projectId, clientId, redirectUri, state,
+      userId, username, role, serverId, clientId, redirectUri, state,
       expiresAt: Date.now() + 10 * 60 * 1000,
     });
     return code;
   }
 
-  consumeCode(code: string, projectId: string, clientId: string, redirectUri: string): AuthCode | null {
+  consumeCode(code: string, serverId: string, clientId: string, redirectUri: string): AuthCode | null {
     const entry = this.codes.get(code);
     if (!entry) return null;
     if (entry.expiresAt < Date.now()) { this.codes.delete(code); return null; }
-    if (entry.projectId !== projectId) return null;
+    if (entry.serverId !== serverId) return null;
     if (entry.clientId !== clientId) return null;
     if (entry.redirectUri !== redirectUri) return null;
     this.codes.delete(code);
     return entry;
   }
 
-  issueToken(userId: string, username: string, role: string, projectId: string): string {
+  issueToken(userId: string, username: string, role: string, serverId: string): string {
     return jwt.sign(
-      { sub: userId, username, role, projectId },
+      { sub: userId, username, role, serverId },
       config.jwtSecret,
       { expiresIn: '24h' },
     );
   }
 
-  verifyToken(token: string): { sub: string; username: string; role: string; projectId?: string } | null {
+  verifyToken(token: string): { sub: string; username: string; role: string; serverId?: string } | null {
     try {
-      return jwt.verify(token, config.jwtSecret) as { sub: string; username: string; role: string; projectId?: string };
+      return jwt.verify(token, config.jwtSecret) as { sub: string; username: string; role: string; serverId?: string };
     } catch {
       return null;
     }

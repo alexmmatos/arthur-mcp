@@ -117,19 +117,19 @@ function ProjectCard({ p, health, onDelete, onDuplicate }: {
           transition: 'opacity 0.15s',
         }}
       >
-        <Tooltip title="Duplicate project">
+        <Tooltip title="Duplicate server">
           <IconButton size="small" onClick={() => onDuplicate(p._id)} sx={{ p: 0.5, bgcolor: 'background.paper', '&:hover': { bgcolor: 'action.hover' } }}>
             <IconCopy size={15} />
           </IconButton>
         </Tooltip>
-        <Tooltip title="Delete project">
+        <Tooltip title="Delete server">
           <IconButton size="small" color="error" onClick={() => onDelete(p._id)} sx={{ p: 0.5, bgcolor: 'background.paper', '&:hover': { bgcolor: 'action.hover' } }}>
             <IconTrash size={15} />
           </IconButton>
         </Tooltip>
       </Box>
 
-      <CardActionArea sx={{ height: '100%', alignItems: 'flex-start' }} onClick={() => navigate(`/projects/${p._id}`)}>
+      <CardActionArea sx={{ height: '100%', alignItems: 'flex-start' }} onClick={() => navigate(`/servers/${p._id}`)}>
         <CardContent sx={{ pb: 1.5, pr: 5 /* leave room for abs buttons */ }}>
           <Box display="flex" alignItems="center" gap={1} mb={0.5} minWidth={0}>
             <TrafficLight health={health} isPaused={p.isPaused} />
@@ -235,7 +235,7 @@ interface HealthSummaryEntry {
   totalCalls: number
 }
 
-export default function Projects() {
+export default function Servers() {
   const [projects, setProjects] = useState<Project[]>([])
   const [health, setHealth] = useState<Map<string, HealthEntry>>(new Map())
   const [loading, setLoading] = useState(true)
@@ -258,7 +258,7 @@ export default function Projects() {
     setLoading(true)
     setError(null)
     Promise.all([
-      api.get<Project[]>('/swagger/projects'),
+      api.get<Project[]>('/swagger/servers'),
       api.get<HealthSummaryEntry[]>('/dashboard/health-summary').catch(() => ({ data: [] as HealthSummaryEntry[] })),
     ])
       .then(([projectsRes, healthRes]) => {
@@ -269,7 +269,7 @@ export default function Projects() {
         }
         setHealth(map)
       })
-      .catch((err) => setError(err?.response?.data?.message || 'Failed to load projects.'))
+      .catch((err) => setError(err?.response?.data?.message || 'Failed to load servers.'))
       .finally(() => setLoading(false))
   }
 
@@ -284,13 +284,13 @@ export default function Projects() {
     if (!confirmTarget) return
     setConfirmLoading(true)
     try {
-      await api.delete(`/swagger/projects/${confirmTarget}`)
+      await api.delete(`/swagger/servers/${confirmTarget}`)
       setProjects((prev) => prev.filter((p) => p._id !== confirmTarget))
-      setSnackMsg('Project deleted.')
+      setSnackMsg('Server deleted.')
       setSnackSeverity('success')
       setSnackOpen(true)
     } catch {
-      setSnackMsg('Could not delete the project.')
+      setSnackMsg('Could not delete the server.')
       setSnackSeverity('error')
       setSnackOpen(true)
     } finally {
@@ -302,13 +302,13 @@ export default function Projects() {
 
   const handleDuplicate = async (id: string) => {
     try {
-      const res = await api.post<Project>(`/swagger/projects/${id}/duplicate`)
+      const res = await api.post<Project>(`/swagger/servers/${id}/duplicate`)
       setProjects((prev) => [res.data, ...prev])
       setSnackMsg(`"${res.data.name}" created successfully.`)
       setSnackSeverity('success')
       setSnackOpen(true)
     } catch {
-      setSnackMsg('Could not duplicate the project.')
+      setSnackMsg('Could not duplicate the server.')
       setSnackSeverity('error')
       setSnackOpen(true)
     }
@@ -324,23 +324,23 @@ export default function Projects() {
     return matchSearch && matchTag
   })
 
-  const confirmProjectName = projects.find((p) => p._id === confirmTarget)?.name ?? 'this project'
+  const confirmProjectName = projects.find((p) => p._id === confirmTarget)?.name ?? 'this server'
 
   return (
     <Box py={3} px={0}>
       {/* Header */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
         <Box display="flex" alignItems="center" gap={1}>
-          <Typography variant="h5" fontWeight={700} letterSpacing="-0.2px">Projects</Typography>
-          <HelpButton title="Projects">
+          <Typography variant="h5" fontWeight={700} letterSpacing="-0.2px">Servers</Typography>
+          <HelpButton title="Servers">
             <Typography variant="body2" gutterBottom>
-              A <strong>project</strong> is the central concept in Arthur MCP Adapter. Each project represents one external API (e.g. your CRM, payment provider, internal microservice) adapted to the MCP protocol so that AI clients can interact with it naturally.
+              A <strong>server</strong> is the central concept in Arthur MCP Adapter. Each server represents one external API (e.g. your CRM, payment provider, internal microservice) adapted to the MCP protocol so that AI clients can interact with it naturally.
             </Typography>
             <Typography variant="body2" gutterBottom>
               <strong>How it works end-to-end:</strong>
             </Typography>
             <Box component="ol" sx={{ mt: 0, mb: 1, pl: 2.5 }}>
-              <Box component="li"><Typography variant="body2">Create a project and point it at an API's base URL.</Typography></Box>
+              <Box component="li"><Typography variant="body2">Create a server and point it at an API's base URL.</Typography></Box>
               <Box component="li"><Typography variant="body2">Add tools — manually or by importing an OpenAPI spec. Each tool maps one API endpoint to a callable function.</Typography></Box>
               <Box component="li"><Typography variant="body2">Configure authentication so Arthur knows how to prove its identity to the API.</Typography></Box>
               <Box component="li"><Typography variant="body2">Copy the MCP endpoint URL and paste it into your AI client's server configuration.</Typography></Box>
@@ -351,12 +351,12 @@ export default function Projects() {
             </Typography>
             <Box component="ul" sx={{ mt: 0, mb: 1, pl: 2.5 }}>
               <Box component="li"><Typography variant="body2"><strong>Coloured dot:</strong> traffic light for the last hour — green (all ok), yellow (some errors), red (high error rate), grey (no activity or paused).</Typography></Box>
-              <Box component="li"><Typography variant="body2"><strong>Active / Paused chip:</strong> whether the project is accepting requests right now.</Typography></Box>
-              <Box component="li"><Typography variant="body2"><strong>Tool count:</strong> how many MCP tools are registered. 0 tools means no AI can use this project yet.</Typography></Box>
+              <Box component="li"><Typography variant="body2"><strong>Active / Paused chip:</strong> whether the server is accepting requests right now.</Typography></Box>
+              <Box component="li"><Typography variant="body2"><strong>Tool count:</strong> how many MCP tools are registered. 0 tools means no AI can use this server yet.</Typography></Box>
               <Box component="li"><Typography variant="body2"><strong>Tags:</strong> custom labels for organisation and filtering.</Typography></Box>
             </Box>
             <Typography variant="body2">
-              Click <strong>New project</strong> to open the creation wizard where you can fill in the project details and optionally import an OpenAPI/Swagger spec to auto-generate all tools.
+              Click <strong>New server</strong> to open the creation wizard where you can fill in the server details and optionally import an OpenAPI/Swagger spec to auto-generate all tools.
             </Typography>
           </HelpButton>
         </Box>
@@ -364,8 +364,8 @@ export default function Projects() {
           <Button variant="outlined" startIcon={<IconSparkles size={18} />} onClick={() => navigate('/templates')}>
             Browse templates
           </Button>
-          <Button variant="contained" startIcon={<IconPlus size={18} />} onClick={() => navigate('/projects/new')}>
-            New project
+          <Button variant="contained" startIcon={<IconPlus size={18} />} onClick={() => navigate('/servers/new')}>
+            New server
           </Button>
         </Box>
       </Box>
@@ -373,7 +373,7 @@ export default function Projects() {
       {/* Filters */}
       <Box display="flex" gap={1.5} mb={3} flexWrap="wrap" alignItems="center">
         <TextField
-          size="small" placeholder="Search projects…"
+          size="small" placeholder="Search servers…"
           value={search} onChange={(e) => setSearch(e.target.value)}
           sx={{ minWidth: 220 }}
           InputProps={{ startAdornment: <InputAdornment position="start"><IconSearch size={16} /></InputAdornment> }}
@@ -401,13 +401,13 @@ export default function Projects() {
         <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={10}>
           {projects.length === 0 ? (
             <>
-              <Typography color="text.secondary" variant="h6">No projects yet</Typography>
-              <Button variant="contained" startIcon={<IconPlus size={18} />} onClick={() => navigate('/projects/new')}>
-                Create your first project
+              <Typography color="text.secondary" variant="h6">No servers yet</Typography>
+              <Button variant="contained" startIcon={<IconPlus size={18} />} onClick={() => navigate('/servers/new')}>
+                Create your first server
               </Button>
             </>
           ) : (
-            <Typography color="text.secondary">No projects match the filters.</Typography>
+            <Typography color="text.secondary">No servers match the filters.</Typography>
           )}
         </Box>
       ) : (
@@ -422,7 +422,7 @@ export default function Projects() {
 
       <ConfirmDialog
         open={confirmOpen}
-        title="Delete project?"
+        title="Delete server?"
         message={`"${confirmProjectName}" will be permanently deleted. This action cannot be undone.`}
         confirmLabel="Delete"
         confirmColor="error"

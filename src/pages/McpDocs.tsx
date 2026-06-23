@@ -202,7 +202,7 @@ function ToolCard({ tool, projectId, mcpApiKey }: { tool: GeneratedTool; project
       const payload = { jsonrpc: '2.0', method: 'tools/call', id: Date.now(), params: { name: tool.name, arguments: args } }
       const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' }
       if (mcpApiKey) headers['auth'] = mcpApiKey
-      const res = await api.post(`/mcp/project/${projectId}`, payload, { headers })
+      const res = await api.post(`/mcp/server/${projectId}`, payload, { headers })
       const rpc = parseMcpResponse(res.data)
       if (rpc?.error) { setResponse(JSON.stringify(rpc.error, null, 2)); setResponseIsError(true); return }
       const content = rpc?.result?.content ?? rpc?.content
@@ -343,7 +343,7 @@ export function McpDocsContent({ project, projectId }: { project: DocsProject; p
   const [search, setSearch] = useState('')
   const [urlCopied, setUrlCopied] = useState(false)
 
-  const mcpUrl = `${window.location.origin}/api/mcp/project/${projectId}`
+  const mcpUrl = `${window.location.origin}/api/mcp/server/${projectId}`
 
   const enabledTools = (project.tools ?? []).filter((t) => t.enabled !== false)
   const filteredTools = enabledTools.filter((t) =>
@@ -389,7 +389,7 @@ export function McpDocsContent({ project, projectId }: { project: DocsProject; p
           </Box>
           {project.mcpApiKey && (
             <Typography variant="caption" color="warning.main" mt={0.75} display="block" fontWeight={600}>
-              This project requires authentication — send the header <code>auth: &lt;your-key&gt;</code>
+              This server requires authentication — send the header <code>auth: &lt;your-key&gt;</code>
             </Typography>
           )}
           {!project.mcpApiKey && (
@@ -426,19 +426,19 @@ export default function McpDocs() {
 
   useEffect(() => {
     if (!id) return
-    api.get<DocsProject>(`/swagger/projects/${id}`)
+    api.get<DocsProject>(`/swagger/servers/${id}`)
       .then((r) => setProject(r.data))
-      .catch(() => setError('Project not found.'))
+      .catch(() => setError('Server not found.'))
       .finally(() => setLoading(false))
   }, [id])
 
   if (loading) return <Box display="flex" justifyContent="center" alignItems="center" height="50vh"><CircularProgress /></Box>
-  if (error || !project) return <Box p={3}><Alert severity="error">{error || 'Error loading project.'}</Alert></Box>
+  if (error || !project) return <Box p={3}><Alert severity="error">{error || 'Error loading server.'}</Alert></Box>
 
   return (
     <Box p={3}>
-      <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(`/projects/${id}`)} sx={{ mb: 2 }}>
-        Back to project
+      <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(`/servers/${id}`)} sx={{ mb: 2 }}>
+        Back to server
       </Button>
       <McpDocsContent project={project} projectId={id!} />
     </Box>

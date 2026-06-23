@@ -6,7 +6,7 @@ function escapeHtml(s: string): string {
   return (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function loginPage(projectId: string, clientId: string, redirectUri: string, state: string, error?: string): string {
+function loginPage(serverId: string, clientId: string, redirectUri: string, state: string, error?: string): string {
   const e = escapeHtml;
   return `<!DOCTYPE html>
 <html lang="en">
@@ -32,7 +32,7 @@ function loginPage(projectId: string, clientId: string, redirectUri: string, sta
   <h2>Sign in to MCP Server</h2>
   <p class="sub">A third-party app is requesting access.</p>
   ${error ? `<div class="error">${e(error)}</div>` : ''}
-  <form method="POST" action="/oauth/project/${e(projectId)}/authorize">
+  <form method="POST" action="/oauth/server/${e(serverId)}/authorize">
     <input type="hidden" name="client_id" value="${e(clientId)}" />
     <input type="hidden" name="redirect_uri" value="${e(redirectUri)}" />
     <input type="hidden" name="state" value="${e(state)}" />
@@ -57,35 +57,35 @@ export class OAuthController {
     const base = `${req.protocol}://${req.get('host')}`;
     return {
       issuer: base,
-      authorization_endpoint: `${base}/oauth/project/{projectId}/authorize`,
-      token_endpoint: `${base}/oauth/project/{projectId}/token`,
+      authorization_endpoint: `${base}/oauth/server/{serverId}/authorize`,
+      token_endpoint: `${base}/oauth/server/{serverId}/token`,
       response_types_supported: ['code'],
       grant_types_supported: ['authorization_code'],
       token_endpoint_auth_methods_supported: ['client_secret_post', 'none'],
     };
   }
 
-  @Get('oauth/project/:projectId/authorize')
+  @Get('oauth/server/:serverId/authorize')
   async showLoginForm(
-    @Param('projectId') projectId: string,
+    @Param('serverId') serverId: string,
     @Query('client_id') clientId: string,
     @Query('redirect_uri') redirectUri: string,
     @Query('state') state: string,
     @Res() res: Response,
   ) {
     try {
-      await this.oauthService.validateClient(projectId, clientId);
+      await this.oauthService.validateClient(serverId, clientId);
     } catch {
-      return res.status(400).send('Invalid client_id or OAuth not configured for this project.');
+      return res.status(400).send('Invalid client_id or OAuth not configured for this server.');
     }
     res.setHeader('Content-Type', 'text/html');
-    res.send(loginPage(projectId, clientId, redirectUri, state ?? ''));
+    res.send(loginPage(serverId, clientId, redirectUri, state ?? ''));
   }
 
-  @Post('oauth/project/:projectId/authorize')
+  @Post('oauth/server/:serverId/authorize')
   @HttpCode(200)
   async handleLogin(
-    @Param('projectId') projectId: string,
+    @Param('serverId') serverId: string,
     @Body('username') username: string,
     @Body('password') password: string,
     @Body('client_id') clientId: string,
@@ -96,20 +96,20 @@ export class OAuthController {
     const user = await this.oauthService.validateUser(username, password);
     if (!user) {
       res.setHeader('Content-Type', 'text/html');
-      return res.status(401).send(loginPage(projectId, clientId, redirectUri, state ?? '', 'Incorrect username or password.'));
+      return res.status(401).send(loginPage(serverId, clientId, redirectUri, state ?? '', 'Incorrect username or password.'));
     }
 
-    const code = this.oauthService.createCode(user._id, user.username, user.role, projectId, clientId, redirectUri, state ?? '');
+    const code = this.oauthService.createCode(user._id, user.username, user.role, serverId, clientId, redirectUri, state ?? '');
     const url = new URL(redirectUri);
     url.searchParams.set('code', code);
     if (state) url.searchParams.set('state', state);
     res.redirect(url.toString());
   }
 
-  @Post('oauth/project/:projectId/token')
+  @Post('oauth/server/:serverId/token')
   @HttpCode(200)
   async token(
-    @Param('projectId') projectId: string,
+    @Param('serverId') serverId: string,
     @Body('grant_type') grantType: string,
     @Body('code') code: string,
     @Body('client_id') clientId: string,
@@ -124,17 +124,17 @@ export class OAuthController {
     }
 
     try {
-      await this.oauthService.validateClient(projectId, clientId, clientSecret);
+      await this.oauthService.validateClient(serverId, clientId, clientSecret);
     } catch {
       return res.status(401).json({ error: 'invalid_client' });
     }
 
-    const entry = this.oauthService.consumeCode(code, projectId, clientId, redirectUri);
+    const entry = this.oauthService.consumeCode(code, serverId, clientId, redirectUri);
     if (!entry) {
       return res.status(400).json({ error: 'invalid_grant' });
     }
 
-    const accessToken = this.oauthService.issueToken(entry.userId, entry.username, entry.role, projectId);
+    const accessToken = this.oauthService.issueToken(entry.userId, entry.username, entry.role, serverId);
     return res.json({
       access_token: accessToken,
       token_type: 'Bearer',

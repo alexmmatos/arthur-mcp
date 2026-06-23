@@ -37,14 +37,14 @@ interface DashStats {
   projects: { total: number; withApiKey: number; active: number }
   tools: { total: number }
   calls: { total: number; errors: number; successRate: number }
-  topTools: { toolName: string; count: number; projectName: string }[]
+  topTools: { toolName: string; count: number; serverName: string }[]
   callsByBucket: { _id: string; calls: number; errors: number }[]
   recentProjects: { _id: string; name: string; toolCount: number; status: string; tags: string[] }[]
 }
 
 interface HealthEntry {
   projectId: string
-  projectName: string
+  serverName: string
   isPaused: boolean
   errorRatePct: number
   totalCalls: number
@@ -108,7 +108,7 @@ function SummaryBanner({ stats, preset }: { stats: DashStats; preset: Preset }) 
 
   if (projects.total === 0) {
     severity = 'info'
-    message = "You have no projects yet. Create your first project to start connecting your AI assistant to an API."
+    message = "You have no servers yet. Create your first server to start connecting your AI assistant to an API."
   }
 
   return <Alert severity={severity} icon={severity === 'success' ? <IconCircleCheck size={20} /> : undefined} sx={{ mb: 3, fontSize: '0.95rem' }}>{message}</Alert>
@@ -465,7 +465,7 @@ export default function Dashboard() {
                           <Typography fontSize="0.72rem" color="text.disabled" width={18} textAlign="right">{i + 1}</Typography>
                           <Box>
                             <Typography fontSize="0.875rem" fontWeight={500}>{t.toolName.replace(/_/g, ' ')}</Typography>
-                            <Typography fontSize="0.72rem" color="text.secondary">{t.projectName}</Typography>
+                            <Typography fontSize="0.72rem" color="text.secondary">{t.serverName}</Typography>
                           </Box>
                         </Box>
                         <Chip
@@ -511,12 +511,12 @@ export default function Dashboard() {
                         key={h.projectId}
                         display="flex" alignItems="center" justifyContent="space-between"
                         sx={{ cursor: 'pointer', '&:hover': { opacity: 0.75 } }}
-                        onClick={() => navigate(`/projects/${h.projectId}`)}
+                        onClick={() => navigate(`/servers/${h.projectId}`)}
                       >
                         <Box display="flex" alignItems="center" gap={1.5}>
                           <HealthDot errorRatePct={h.errorRatePct} isPaused={h.isPaused} totalCalls={h.totalCalls} />
                           <Box>
-                            <Typography fontSize="0.875rem" fontWeight={500}>{h.projectName}</Typography>
+                            <Typography fontSize="0.875rem" fontWeight={500}>{h.serverName}</Typography>
                             <Typography fontSize="0.72rem" color="text.secondary">{healthStatusText(h)}</Typography>
                           </Box>
                         </Box>

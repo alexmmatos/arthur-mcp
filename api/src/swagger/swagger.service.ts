@@ -6,7 +6,7 @@ import * as jwt from 'jsonwebtoken';
 import { parseSpec } from '../dynamic-mcp/openapi-parser';
 import { generateTools } from '../dynamic-mcp/tool-generator';
 import { DynamicMcpService } from '../dynamic-mcp/dynamic-mcp.service';
-import type { AuthConfig, EndpointRef, McpResource, ToolComment } from '../dynamic-mcp/types';
+import type { AuthConfig, EndpointRef, McpResource, ToolChain, ToolComment } from '../dynamic-mcp/types';
 import { buildRequest } from '../dynamic-mcp/request-builder';
 import { applyAuth } from '../dynamic-mcp/auth-provider';
 import { executeRequest } from '../dynamic-mcp/http-client';
@@ -130,6 +130,7 @@ export class SwaggerService {
       mcpApiKeys: [],
       resources: [],
       prompts: [],
+      chains: [],
       tags: [],
       rateLimit: { enabled: false, requestsPerMinute: 60 },
       isPaused: false,
@@ -144,9 +145,9 @@ export class SwaggerService {
   }
 
   async updateTags(id: string, tags: string[]): Promise<SwaggerProjectRecord> {
-    const project = await this.projectRepo.update(id, { tags: tags.map((t) => t.trim()).filter(Boolean) });
-    if (!project) throw new NotFoundException('Project not found.');
-    return project;
+    const server = await this.projectRepo.update(id, { tags: tags.map((t) => t.trim()).filter(Boolean) });
+    if (!server) throw new NotFoundException('Project not found.');
+    return server;
   }
 
   async updateRateLimit(
@@ -156,9 +157,9 @@ export class SwaggerService {
     if (dto.requestsPerMinute < 1 || dto.requestsPerMinute > 10_000) {
       throw new BadRequestException('requestsPerMinute deve estar entre 1 e 10000.');
     }
-    const project = await this.projectRepo.update(id, { rateLimit: dto });
-    if (!project) throw new NotFoundException('Project not found.');
-    return project;
+    const server = await this.projectRepo.update(id, { rateLimit: dto });
+    if (!server) throw new NotFoundException('Project not found.');
+    return server;
   }
 
   async duplicate(id: string): Promise<SwaggerProjectRecord> {
@@ -174,9 +175,9 @@ export class SwaggerService {
   }
 
   async findOne(id: string): Promise<SwaggerProjectRecord> {
-    const project = await this.projectRepo.findById(id);
-    if (!project) throw new NotFoundException('Project not found.');
-    return project;
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Project not found.');
+    return server;
   }
 
   async remove(id: string): Promise<void> {
@@ -187,19 +188,19 @@ export class SwaggerService {
 
   async generateApiKey(id: string): Promise<{ mcpApiKey: string }> {
     const key = crypto.randomBytes(32).toString('hex');
-    const project = await this.projectRepo.update(id, { mcpApiKey: key });
-    if (!project) throw new NotFoundException('Project not found.');
+    const server = await this.projectRepo.update(id, { mcpApiKey: key });
+    if (!server) throw new NotFoundException('Project not found.');
     return { mcpApiKey: key };
   }
 
   async revokeApiKey(id: string): Promise<void> {
-    const project = await this.projectRepo.update(id, { mcpApiKey: null });
-    if (!project) throw new NotFoundException('Project not found.');
+    const server = await this.projectRepo.update(id, { mcpApiKey: null });
+    if (!server) throw new NotFoundException('Project not found.');
   }
 
   async addApiKey(id: string, name: string): Promise<McpApiKeyEntry> {
-    const project = await this.projectRepo.findById(id);
-    if (!project) throw new NotFoundException('Project not found.');
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Project not found.');
 
     const entry: McpApiKeyEntry = {
       id: crypto.randomUUID(),
@@ -208,20 +209,20 @@ export class SwaggerService {
       createdAt: new Date(),
     };
 
-    project.mcpApiKeys.push(entry);
-    await this.projectRepo.save(project);
+    server.mcpApiKeys.push(entry);
+    await this.projectRepo.save(server);
     return entry;
   }
 
   async removeApiKey(id: string, keyId: string): Promise<void> {
-    const project = await this.projectRepo.findById(id);
-    if (!project) throw new NotFoundException('Project not found.');
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Project not found.');
 
-    const idx = project.mcpApiKeys.findIndex((k) => k.id === keyId);
+    const idx = server.mcpApiKeys.findIndex((k) => k.id === keyId);
     if (idx === -1) throw new NotFoundException('Key not found.');
 
-    project.mcpApiKeys.splice(idx, 1);
-    await this.projectRepo.save(project);
+    server.mcpApiKeys.splice(idx, 1);
+    await this.projectRepo.save(server);
   }
 
   async reimportSpec(
@@ -230,8 +231,8 @@ export class SwaggerService {
     filename: string,
     baseUrlOverride?: string,
   ): Promise<{ added: number; updated: number; baseUrl: string }> {
-    const project = await this.projectRepo.findById(id);
-    if (!project) throw new NotFoundException('Project not found.');
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Project not found.');
 
     const rawSpec = this.parseContent(content, filename);
     this.validateSpec(rawSpec);
@@ -243,30 +244,30 @@ export class SwaggerService {
       throw new BadRequestException(`Erro ao processar o spec: ${err?.message ?? err}`);
     }
 
-    const baseUrl = baseUrlOverride?.trim() || normalizedSpec.servers[0]?.url || project.baseUrl;
+    const baseUrl = baseUrlOverride?.trim() || normalizedSpec.servers[0]?.url || server.baseUrl;
     const newTools = generateTools(normalizedSpec, baseUrl);
 
     let added = 0;
     let updated = 0;
 
     for (const newTool of newTools) {
-      const existingIdx = project.tools.findIndex((t) => t.name === newTool.name);
+      const existingIdx = server.tools.findIndex((t) => t.name === newTool.name);
       if (existingIdx === -1) {
-        project.tools.push(newTool);
+        server.tools.push(newTool);
         added++;
       } else {
-        (project.tools[existingIdx] as any).inputSchema = newTool.inputSchema;
-        (project.tools[existingIdx] as any).endpointRef = newTool.endpointRef;
+        (server.tools[existingIdx] as any).inputSchema = newTool.inputSchema;
+        (server.tools[existingIdx] as any).endpointRef = newTool.endpointRef;
         updated++;
       }
     }
 
-    project.rawSpec = rawSpec;
-    project.baseUrl = baseUrl;
-    await this.projectRepo.save(project);
+    server.rawSpec = rawSpec;
+    server.baseUrl = baseUrl;
+    await this.projectRepo.save(server);
     this.dynamicMcp.invalidate(id);
 
-    this.logger.log(`Re-import "${project.name}": +${added} adicionadas, ${updated} atualizadas`);
+    this.logger.log(`Re-import "${server.name}": +${added} adicionadas, ${updated} atualizadas`);
     return { added, updated, baseUrl };
   }
 
@@ -281,6 +282,7 @@ export class SwaggerService {
       mcpApiKeys: [],
       resources: [],
       prompts: [],
+      chains: [],
       tags: [],
       rateLimit: { enabled: false, requestsPerMinute: 60 },
       isPaused: false,
@@ -294,19 +296,19 @@ export class SwaggerService {
     id: string,
     dto: { oauthClientId: string | null; oauthClientSecret: string | null },
   ): Promise<SwaggerProjectRecord> {
-    const project = await this.projectRepo.update(id, {
+    const server = await this.projectRepo.update(id, {
       oauthClientId: dto.oauthClientId ?? undefined,
       oauthClientSecret: dto.oauthClientSecret ?? undefined,
     });
-    if (!project) throw new NotFoundException('Project not found.');
-    return project;
+    if (!server) throw new NotFoundException('Project not found.');
+    return server;
   }
 
   async updateAuth(id: string, auth: AuthConfig): Promise<SwaggerProjectRecord> {
-    const project = await this.projectRepo.update(id, { auth });
-    if (!project) throw new NotFoundException('Project not found.');
+    const server = await this.projectRepo.update(id, { auth });
+    if (!server) throw new NotFoundException('Project not found.');
     this.dynamicMcp.invalidate(id);
-    return project;
+    return server;
   }
 
   async updateInfo(id: string, dto: { name?: string; description?: string }): Promise<SwaggerProjectRecord> {
@@ -314,9 +316,9 @@ export class SwaggerService {
     if (dto.name?.trim()) updates.name = dto.name.trim();
     if (dto.description !== undefined) updates.description = dto.description.trim() || undefined;
 
-    const project = await this.projectRepo.update(id, updates);
-    if (!project) throw new NotFoundException('Project not found.');
-    return project;
+    const server = await this.projectRepo.update(id, updates);
+    if (!server) throw new NotFoundException('Project not found.');
+    return server;
   }
 
   async updateToolMeta(
@@ -324,17 +326,17 @@ export class SwaggerService {
     currentName: string,
     dto: { name?: string; description?: string; enabled?: boolean },
   ): Promise<SwaggerProjectRecord> {
-    const project = await this.projectRepo.findById(id);
-    if (!project) throw new NotFoundException('Project not found.');
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Project not found.');
 
-    const tool = project.tools.find((t) => t.name === currentName) as any;
+    const tool = server.tools.find((t) => t.name === currentName) as any;
     if (!tool) throw new NotFoundException(`Tool "${currentName}" not found.`);
 
     if (dto.name?.trim()) tool.name = dto.name.trim();
     if (dto.description !== undefined) tool.description = dto.description.trim() || undefined;
     if (typeof dto.enabled === 'boolean') tool.enabled = dto.enabled;
 
-    const saved = await this.projectRepo.save(project);
+    const saved = await this.projectRepo.save(server);
     this.dynamicMcp.invalidate(id);
     return saved;
   }
@@ -344,28 +346,28 @@ export class SwaggerService {
     toolName: string,
     outputSchema: Record<string, unknown> | null,
   ): Promise<SwaggerProjectRecord> {
-    const project = await this.projectRepo.findById(id);
-    if (!project) throw new NotFoundException('Project not found.');
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Project not found.');
 
-    const tool = project.tools.find((t) => t.name === toolName) as any;
+    const tool = server.tools.find((t) => t.name === toolName) as any;
     if (!tool) throw new NotFoundException(`Tool "${toolName}" not found.`);
 
     tool.outputSchema = outputSchema ?? undefined;
 
-    const saved = await this.projectRepo.save(project);
+    const saved = await this.projectRepo.save(server);
     this.dynamicMcp.invalidate(id);
     return saved;
   }
 
   async removeTool(id: string, toolName: string): Promise<SwaggerProjectRecord> {
-    const project = await this.projectRepo.findById(id);
-    if (!project) throw new NotFoundException('Project not found.');
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Project not found.');
 
-    const idx = project.tools.findIndex((t) => t.name === toolName);
+    const idx = server.tools.findIndex((t) => t.name === toolName);
     if (idx === -1) throw new NotFoundException(`Tool "${toolName}" not found.`);
 
-    project.tools.splice(idx, 1);
-    const saved = await this.projectRepo.save(project);
+    server.tools.splice(idx, 1);
+    const saved = await this.projectRepo.save(server);
     this.dynamicMcp.invalidate(id);
     return saved;
   }
@@ -384,13 +386,13 @@ export class SwaggerService {
       inputSchema: Record<string, unknown>;
     },
   ): Promise<SwaggerProjectRecord> {
-    const project = await this.projectRepo.findById(id);
-    if (!project) throw new NotFoundException('Project not found.');
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Project not found.');
 
-    const idx = project.tools.findIndex((t) => t.name === currentName);
+    const idx = server.tools.findIndex((t) => t.name === currentName);
     if (idx === -1) throw new NotFoundException(`Tool "${currentName}" not found.`);
 
-    (project.tools as any)[idx] = {
+    (server.tools as any)[idx] = {
       name: dto.name.trim(),
       description: dto.description?.trim() || undefined,
       inputSchema: dto.inputSchema,
@@ -403,7 +405,7 @@ export class SwaggerService {
       },
     };
 
-    const saved = await this.projectRepo.save(project);
+    const saved = await this.projectRepo.save(server);
     this.dynamicMcp.invalidate(id);
     return saved;
   }
@@ -421,15 +423,15 @@ export class SwaggerService {
       inputSchema: Record<string, unknown>;
     },
   ): Promise<SwaggerProjectRecord> {
-    const project = await this.projectRepo.findById(id);
-    if (!project) throw new NotFoundException('Project not found.');
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Project not found.');
 
     const nameClean = dto.name.trim();
-    if (project.tools.find((t) => t.name === nameClean)) {
+    if (server.tools.find((t) => t.name === nameClean)) {
       throw new BadRequestException(`A tool named "${nameClean}" already exists.`);
     }
 
-    project.tools.push({
+    server.tools.push({
       name: nameClean,
       description: dto.description?.trim() || undefined,
       inputSchema: dto.inputSchema as any,
@@ -442,101 +444,101 @@ export class SwaggerService {
       },
     } as any);
 
-    const saved = await this.projectRepo.save(project);
+    const saved = await this.projectRepo.save(server);
     this.dynamicMcp.invalidate(id);
     return saved;
   }
 
   async updateBaseUrl(id: string, baseUrl: string): Promise<SwaggerProjectRecord> {
-    const project = await this.projectRepo.findById(id);
-    if (!project) throw new NotFoundException('Project not found.');
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Project not found.');
 
-    project.baseUrl = baseUrl;
-    project.tools = project.tools.map((t) => ({
+    server.baseUrl = baseUrl;
+    server.tools = server.tools.map((t) => ({
       ...t,
       endpointRef: t.endpointRef ? { ...t.endpointRef, baseUrl } : t.endpointRef,
-    })) as typeof project.tools;
+    })) as typeof server.tools;
 
-    const saved = await this.projectRepo.save(project);
+    const saved = await this.projectRepo.save(server);
     this.dynamicMcp.invalidate(id);
     return saved;
   }
 
   async setPaused(id: string, isPaused: boolean): Promise<SwaggerProjectRecord> {
-    const project = await this.projectRepo.update(id, { isPaused });
-    if (!project) throw new NotFoundException('Project not found.');
-    return project;
+    const server = await this.projectRepo.update(id, { isPaused });
+    if (!server) throw new NotFoundException('Project not found.');
+    return server;
   }
 
   async setMaintenanceMode(id: string, dto: { enabled: boolean; message?: string }): Promise<SwaggerProjectRecord> {
-    const project = await this.projectRepo.update(id, {
+    const server = await this.projectRepo.update(id, {
       maintenanceMode: { enabled: dto.enabled, message: dto.message ?? '' },
     });
-    if (!project) throw new NotFoundException('Project not found.');
-    return project;
+    if (!server) throw new NotFoundException('Project not found.');
+    return server;
   }
 
   async setAvailabilityWindow(
     id: string,
     dto: { enabled: boolean; timezone: string; schedule: Array<{ day: number; startHour: number; endHour: number }> },
   ): Promise<SwaggerProjectRecord> {
-    const project = await this.projectRepo.update(id, { availabilityWindow: dto });
-    if (!project) throw new NotFoundException('Project not found.');
-    return project;
+    const server = await this.projectRepo.update(id, { availabilityWindow: dto });
+    if (!server) throw new NotFoundException('Project not found.');
+    return server;
   }
 
   async setAlertConfig(
     id: string,
     dto: { enabled: boolean; errorThresholdPct: number; notifyEmail: string },
   ): Promise<SwaggerProjectRecord> {
-    const project = await this.projectRepo.update(id, { alertConfig: dto });
-    if (!project) throw new NotFoundException('Project not found.');
-    return project;
+    const server = await this.projectRepo.update(id, { alertConfig: dto });
+    if (!server) throw new NotFoundException('Project not found.');
+    return server;
   }
 
   async addToolComment(id: string, toolName: string, text: string, author: string): Promise<ToolComment> {
-    const project = await this.projectRepo.findById(id);
-    if (!project) throw new NotFoundException('Project not found.');
-    const tool = project.tools.find((t) => t.name === toolName) as any;
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Project not found.');
+    const tool = server.tools.find((t) => t.name === toolName) as any;
     if (!tool) throw new NotFoundException(`Tool "${toolName}" not found.`);
 
     const comment: ToolComment = { id: crypto.randomUUID(), text: text.trim(), author, createdAt: new Date() };
     if (!tool.comments) tool.comments = [];
     tool.comments.push(comment);
-    await this.projectRepo.save(project);
+    await this.projectRepo.save(server);
     return comment;
   }
 
   // ── Resources ─────────────────────────────────────────────────────────────────
 
   async addResource(id: string, dto: Omit<McpResource, 'id'>): Promise<McpResource> {
-    const project = await this.projectRepo.findById(id);
-    if (!project) throw new NotFoundException('Project not found.');
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Project not found.');
     const entry: McpResource = { id: crypto.randomUUID(), ...dto };
-    project.resources.push(entry);
-    await this.projectRepo.save(project);
+    server.resources.push(entry);
+    await this.projectRepo.save(server);
     this.dynamicMcp.invalidate(id);
     return entry;
   }
 
   async updateResource(id: string, resourceId: string, dto: Partial<Omit<McpResource, 'id'>>): Promise<SwaggerProjectRecord> {
-    const project = await this.projectRepo.findById(id);
-    if (!project) throw new NotFoundException('Project not found.');
-    const r = project.resources.find((r) => r.id === resourceId) as any;
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Project not found.');
+    const r = server.resources.find((r) => r.id === resourceId) as any;
     if (!r) throw new NotFoundException('Resource not found.');
     Object.assign(r, dto);
-    const saved = await this.projectRepo.save(project);
+    const saved = await this.projectRepo.save(server);
     this.dynamicMcp.invalidate(id);
     return saved;
   }
 
   async deleteResource(id: string, resourceId: string): Promise<void> {
-    const project = await this.projectRepo.findById(id);
-    if (!project) throw new NotFoundException('Project not found.');
-    const idx = project.resources.findIndex((r) => r.id === resourceId);
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Project not found.');
+    const idx = server.resources.findIndex((r) => r.id === resourceId);
     if (idx === -1) throw new NotFoundException('Resource not found.');
-    project.resources.splice(idx, 1);
-    await this.projectRepo.save(project);
+    server.resources.splice(idx, 1);
+    await this.projectRepo.save(server);
     this.dynamicMcp.invalidate(id);
   }
 
@@ -544,34 +546,69 @@ export class SwaggerService {
 
   async addPromptRef(id: string, promptId: string): Promise<{ promptId: string }> {
     if (!promptId?.trim()) throw new BadRequestException('promptId is required.');
-    const project = await this.projectRepo.findById(id);
-    if (!project) throw new NotFoundException('Project not found.');
-    const refs = project.prompts as Array<{ promptId: string }>;
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Project not found.');
+    const refs = server.prompts as Array<{ promptId: string }>;
     if (refs.some((r) => r.promptId === promptId)) return { promptId };
     refs.push({ promptId });
-    await this.projectRepo.save(project);
+    await this.projectRepo.save(server);
     this.dynamicMcp.invalidate(id);
     return { promptId };
   }
 
   async removePromptRef(id: string, promptId: string): Promise<void> {
-    const project = await this.projectRepo.findById(id);
-    if (!project) throw new NotFoundException('Project not found.');
-    const refs = project.prompts as Array<{ promptId: string }>;
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Project not found.');
+    const refs = server.prompts as Array<{ promptId: string }>;
     const idx = refs.findIndex((r) => r.promptId === promptId);
     if (idx === -1) throw new NotFoundException('Prompt reference not found.');
     refs.splice(idx, 1);
-    await this.projectRepo.save(project);
+    await this.projectRepo.save(server);
+    this.dynamicMcp.invalidate(id);
+  }
+
+  // ── Tool Chains ───────────────────────────────────────────────────────────────
+
+  async addChain(id: string, dto: Omit<ToolChain, 'id'>): Promise<ToolChain> {
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Project not found.');
+    const chainId = crypto.randomUUID();
+    const chain: ToolChain = { ...dto, id: chainId };
+    server.chains = [...(server.chains ?? []), chain];
+    await this.projectRepo.save(server);
+    this.dynamicMcp.invalidate(id);
+    return chain;
+  }
+
+  async updateChain(id: string, chainId: string, dto: Partial<Omit<ToolChain, 'id'>>): Promise<ToolChain> {
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Project not found.');
+    const idx = (server.chains ?? []).findIndex((c) => c.id === chainId);
+    if (idx === -1) throw new NotFoundException('Chain not found.');
+    const updated: ToolChain = { ...server.chains[idx], ...dto, id: chainId };
+    server.chains[idx] = updated;
+    await this.projectRepo.save(server);
+    this.dynamicMcp.invalidate(id);
+    return updated;
+  }
+
+  async deleteChain(id: string, chainId: string): Promise<void> {
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Project not found.');
+    const idx = (server.chains ?? []).findIndex((c) => c.id === chainId);
+    if (idx === -1) throw new NotFoundException('Chain not found.');
+    server.chains.splice(idx, 1);
+    await this.projectRepo.save(server);
     this.dynamicMcp.invalidate(id);
   }
 
   async deleteToolComment(id: string, toolName: string, commentId: string): Promise<void> {
-    const project = await this.projectRepo.findById(id);
-    if (!project) throw new NotFoundException('Project not found.');
-    const tool = project.tools.find((t) => t.name === toolName) as any;
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Project not found.');
+    const tool = server.tools.find((t) => t.name === toolName) as any;
     if (!tool) throw new NotFoundException(`Tool "${toolName}" not found.`);
     tool.comments = (tool.comments ?? []).filter((c: ToolComment) => c.id !== commentId);
-    await this.projectRepo.save(project);
+    await this.projectRepo.save(server);
   }
 
   async discoverSpec(baseUrl: string): Promise<{ found: boolean; specUrl?: string; paths: { url: string; status: number }[] }> {
@@ -656,6 +693,7 @@ export class SwaggerService {
       mcpApiKeys: [],
       resources: [],
       prompts: [],
+      chains: [],
       tags: [],
       rateLimit: { enabled: false, requestsPerMinute: 60 },
       isPaused: false,
@@ -693,13 +731,13 @@ export class SwaggerService {
     };
   }
 
-  async getHealthSummary(): Promise<{ projectId: string; errorRatePct: number; lastCallAt?: Date; totalCalls: number }[]> {
+  async getHealthSummary(): Promise<{ serverId: string; errorRatePct: number; lastCallAt?: Date; totalCalls: number }[]> {
     const ids = await this.projectRepo.findAllIds();
-    return ids.map((id) => ({ projectId: id, errorRatePct: 0, totalCalls: 0 }));
+    return ids.map((id) => ({ serverId: id, errorRatePct: 0, totalCalls: 0 }));
   }
 
-  generateShareToken(projectId: string): string {
-    return jwt.sign({ projectId, type: 'share' }, SHARE_SECRET, { expiresIn: '30d' });
+  generateShareToken(serverId: string): string {
+    return jwt.sign({ serverId, type: 'share' }, SHARE_SECRET, { expiresIn: '30d' });
   }
 
   async getProjectForShare(
@@ -712,15 +750,15 @@ export class SwaggerService {
       throw new BadRequestException('Invalid or expired share link.');
     }
 
-    const project = await this.projectRepo.findById(payload.projectId);
-    if (!project) throw new NotFoundException('Project not found.');
+    const server = await this.projectRepo.findById(payload.serverId);
+    if (!server) throw new NotFoundException('Project not found.');
 
     return {
-      name: project.name,
-      description: project.description,
-      mcpUrl: `/api/mcp/project/${project._id}`,
-      hasKey: (project.mcpApiKeys?.length ?? 0) > 0 || !!project.mcpApiKey,
-      toolCount: project.tools?.length ?? 0,
+      name: server.name,
+      description: server.description,
+      mcpUrl: `/api/mcp/project/${server._id}`,
+      hasKey: (server.mcpApiKeys?.length ?? 0) > 0 || !!server.mcpApiKey,
+      toolCount: server.tools?.length ?? 0,
     };
   }
 
@@ -729,10 +767,10 @@ export class SwaggerService {
     endpointRef: EndpointRef,
     args: Record<string, unknown>,
   ): Promise<{ status: number; body: string; contentType: string }> {
-    const project = await this.projectRepo.findById(id);
-    if (!project) throw new NotFoundException('Project not found.');
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Project not found.');
     let httpReq = buildRequest(args, endpointRef);
-    httpReq = await applyAuth(httpReq, project.auth);
+    httpReq = await applyAuth(httpReq, server.auth);
     const res = await executeRequest(httpReq);
     return { status: res.status, body: res.body, contentType: res.contentType };
   }

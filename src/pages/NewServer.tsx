@@ -45,7 +45,7 @@ import api from '../api'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const STEPS = ['Project details', 'Import API spec', 'Preview tools', 'API Authentication', 'MCP Protection']
+const STEPS = ['Server details', 'Import API spec', 'Preview tools', 'API Authentication', 'MCP Protection']
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const
 
@@ -93,7 +93,7 @@ function uid() { return Math.random().toString(36).slice(2) }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function NewProject() {
+export default function NewServer() {
   const navigate = useNavigate()
   const [activeStep, setActiveStep] = useState(0)
 
@@ -276,7 +276,7 @@ export default function NewProject() {
         projectId = data._id
         projectBaseUrl = data.baseUrl
       } else {
-        const { data } = await api.post<{ _id: string; baseUrl: string }>('/swagger/projects', {
+        const { data } = await api.post<{ _id: string; baseUrl: string }>('/swagger/servers', {
           name: name.trim(),
           baseUrl: baseUrl.trim(),
           description: description.trim() || undefined,
@@ -291,17 +291,17 @@ export default function NewProject() {
       if (file) {
         // Delete tools the user removed
         for (const toolName of deletedSpecTools) {
-          await api.delete(`/swagger/projects/${projectId}/tools/${encodeURIComponent(toolName)}`)
+          await api.delete(`/swagger/servers/${projectId}/tools/${encodeURIComponent(toolName)}`)
         }
         // Disable tools the user toggled off
         for (const tool of localTools.filter(t => t.fromSpec && !t.enabled)) {
-          await api.patch(`/swagger/projects/${projectId}/tools/${encodeURIComponent(tool.name)}`, { enabled: false })
+          await api.patch(`/swagger/servers/${projectId}/tools/${encodeURIComponent(tool.name)}`, { enabled: false })
         }
       }
 
       // Add all manually created tools (from spec or empty project)
       for (const tool of localTools.filter(t => !t.fromSpec)) {
-        await api.post(`/swagger/projects/${projectId}/tools`, {
+        await api.post(`/swagger/servers/${projectId}/tools`, {
           name: tool.name,
           description: tool.description,
           method: tool.method,
@@ -312,31 +312,31 @@ export default function NewProject() {
           inputSchema: { type: 'object', properties: {} },
         })
         if (!tool.enabled) {
-          await api.patch(`/swagger/projects/${projectId}/tools/${encodeURIComponent(tool.name)}`, { enabled: false })
+          await api.patch(`/swagger/servers/${projectId}/tools/${encodeURIComponent(tool.name)}`, { enabled: false })
         }
       }
 
       // 3. Apply auth
       if (authType !== 'none') {
-        await api.patch(`/swagger/projects/${projectId}/auth`, buildAuth())
+        await api.patch(`/swagger/servers/${projectId}/auth`, buildAuth())
       }
 
       // 4. MCP keys
       if (mcpAuthEnabled) {
         const names = mcpKeyNames.map(n => n.trim()).filter(Boolean)
         for (const name of names.length > 0 ? names : ['Default']) {
-          await api.post(`/swagger/projects/${projectId}/api-keys`, { name })
+          await api.post(`/swagger/servers/${projectId}/api-keys`, { name })
         }
       }
 
       // 5. Rate limit
       if (rateLimitEnabled) {
-        await api.patch(`/swagger/projects/${projectId}/rate-limit`, { enabled: true, requestsPerMinute: rateLimitRpm })
+        await api.patch(`/swagger/servers/${projectId}/rate-limit`, { enabled: true, requestsPerMinute: rateLimitRpm })
       }
 
-      navigate(`/projects/${projectId}`)
+      navigate(`/servers/${projectId}`)
     } catch (err: any) {
-      const msg = err?.response?.data?.message ?? 'Error creating project.'
+      const msg = err?.response?.data?.message ?? 'Error creating server.'
       setError(Array.isArray(msg) ? msg.join(', ') : msg)
       setCreating(false)
     }
@@ -376,9 +376,9 @@ export default function NewProject() {
       {/* Header */}
       <Box display="flex" alignItems="center" gap={1.5} mb={4}>
         <Button size="small" startIcon={<ArrowBackIcon fontSize="small" />} onClick={() => navigate('/')} sx={{ mr: 0.5 }}>
-          Projects
+          Servers
         </Button>
-        <Typography variant="h5" fontWeight={700}>New project</Typography>
+        <Typography variant="h5" fontWeight={700}>New server</Typography>
       </Box>
 
       {/* Stepper */}
@@ -395,12 +395,12 @@ export default function NewProject() {
       {/* ── Step 0: Project details ─────────────────────────────────────── */}
       {activeStep === 0 && (
         <Paper variant="outlined" sx={{ p: 3 }}>
-          <Typography variant="subtitle1" fontWeight={700} mb={0.5}>Project details</Typography>
+          <Typography variant="subtitle1" fontWeight={700} mb={0.5}>Server details</Typography>
           <Typography variant="body2" color="text.secondary" mb={3}>
-            Give your project a name so you can identify it later. Everything else can be configured after creation.
+            Give your server a name so you can identify it later. Everything else can be configured after creation.
           </Typography>
           <Box display="flex" flexDirection="column" gap={2.5}>
-            <TextField label="Project name" required fullWidth autoFocus
+            <TextField label="Server name" required fullWidth autoFocus
               placeholder="e.g. Stripe Payments, Internal CRM"
               value={name}
               onChange={(e) => { setName(e.target.value); setError('') }}
@@ -408,9 +408,9 @@ export default function NewProject() {
               helperText="A short name that identifies this API integration"
             />
             <TextField label="Description" fullWidth multiline minRows={4} maxRows={10}
-              placeholder="What does this project do? What API does it connect to?"
+              placeholder="What does this server do? What API does it connect to?"
               value={description} onChange={(e) => setDescription(e.target.value)}
-              helperText="Optional — helps team members understand the purpose of this project"
+              helperText="Optional — helps team members understand the purpose of this server"
             />
           </Box>
         </Paper>
@@ -451,7 +451,7 @@ export default function NewProject() {
                 <Typography fontWeight={500}>Drag your OpenAPI / Swagger spec here</Typography>
                 <Typography variant="body2" color="text.secondary">or click to browse · .yaml · .yml · .json</Typography>
                 <Typography variant="caption" color="text.disabled" mt={1} display="block">
-                  Optional — skip this step to start with an empty project and add tools manually
+                  Optional — skip this step to start with an empty server and add tools manually
                 </Typography>
               </Box>
             )}
@@ -478,8 +478,8 @@ export default function NewProject() {
 
           {file && (
             <Alert severity="info" sx={{ fontSize: '0.82rem' }}>
-              When importing a spec, the <strong>project name</strong> will be taken from the spec's <code>info.title</code> field
-              instead of the name you entered. You can rename it from the project detail page.
+              When importing a spec, the <strong>server name</strong> will be taken from the spec's <code>info.title</code> field
+              instead of the name you entered. You can rename it from the server detail page.
             </Alert>
           )}
         </Box>
@@ -535,7 +535,7 @@ export default function NewProject() {
               </Typography>
               <Typography variant="body2" color="text.disabled" mb={2}>
                 Click <strong>Add tool</strong> to create MCP tools manually.
-                You can add parameters and configure endpoints from the project detail page after creation.
+                You can add parameters and configure endpoints from the server detail page after creation.
               </Typography>
               <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setAddOpen(true)}>Add first tool</Button>
             </Paper>
@@ -748,7 +748,7 @@ export default function NewProject() {
                   }}
                   color="success" />
               }
-              label={<Typography variant="body2">{mcpAuthEnabled ? 'Keys will be created after project is saved.' : 'No key — endpoint will be publicly accessible.'}</Typography>}
+              label={<Typography variant="body2">{mcpAuthEnabled ? 'Keys will be created after server is saved.' : 'No key — endpoint will be publicly accessible.'}</Typography>}
             />
             {mcpAuthEnabled && (
               <Box mt={2} display="flex" flexDirection="column" gap={1}>
@@ -830,7 +830,7 @@ export default function NewProject() {
             startIcon={creating ? <CircularProgress size={15} color="inherit" /> : <AddIcon />}
             onClick={handleCreate} disabled={creating}
           >
-            {creating ? 'Creating project…' : 'Create project'}
+            {creating ? 'Creating server…' : 'Create server'}
           </Button>
         )}
       </Box>
@@ -842,7 +842,7 @@ export default function NewProject() {
         </DialogTitle>
         <DialogContent dividers>
           <Typography variant="body2" color="text.secondary" mb={2.5}>
-            Define the basic endpoint for this tool. You can add parameters and fine-tune the configuration from the project detail page after creation.
+            Define the basic endpoint for this tool. You can add parameters and fine-tune the configuration from the server detail page after creation.
           </Typography>
           {addError && <Alert severity="error" sx={{ mb: 2 }}>{addError}</Alert>}
           <Box display="flex" flexDirection="column" gap={2}>
@@ -877,7 +877,7 @@ export default function NewProject() {
               placeholder="/users/{id}"
               value={newPath}
               onChange={(e) => { setNewPath(e.target.value); setAddError('') }}
-              helperText="API endpoint path — will be appended to the project's base URL"
+              helperText="API endpoint path — will be appended to the server's base URL"
               InputProps={{ sx: { fontFamily: 'monospace' } }}
             />
 

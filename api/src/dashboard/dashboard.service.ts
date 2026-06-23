@@ -17,14 +17,14 @@ export class DashboardService {
     const callsInPeriod = logs.length;
     const errorsInPeriod = logs.filter((e) => e.isError).length;
 
-    const toolMap = new Map<string, { count: number; projectName: string }>();
+    const toolMap = new Map<string, { count: number; serverName: string }>();
     for (const e of logs) {
-      const t = toolMap.get(e.toolName) ?? { count: 0, projectName: e.projectName };
+      const t = toolMap.get(e.toolName) ?? { count: 0, serverName: e.serverName };
       t.count++;
       toolMap.set(e.toolName, t);
     }
     const topTools = [...toolMap.entries()]
-      .map(([toolName, v]) => ({ toolName, count: v.count, projectName: v.projectName }))
+      .map(([toolName, v]) => ({ toolName, count: v.count, serverName: v.serverName }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
@@ -98,7 +98,7 @@ export class DashboardService {
   }
 
   async getHealthSummary(): Promise<
-    { projectId: string; projectName: string; isPaused: boolean; errorRatePct: number; totalCalls: number; lastCallAt?: Date }[]
+    { serverId: string; serverName: string; isPaused: boolean; errorRatePct: number; totalCalls: number; lastCallAt?: Date }[]
   > {
     const projects = await this.projectRepo.findAll();
     const ids = projects.map((p) => p._id);
@@ -107,8 +107,8 @@ export class DashboardService {
     return projects.map((p) => {
       const h = healthMap.get(p._id);
       return {
-        projectId: p._id,
-        projectName: p.name,
+        serverId: p._id,
+        serverName: p.name,
         isPaused: p.isPaused ?? false,
         errorRatePct: h?.errorRatePct ?? -1,
         totalCalls: h?.totalCalls ?? 0,

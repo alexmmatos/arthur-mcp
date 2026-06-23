@@ -47,7 +47,7 @@ export class EmailService {
   }
 
   buildWeeklyDigest(data: {
-    projectName: string;
+    serverName: string;
     totalCalls: number;
     errors: number;
     successRate: number;
@@ -60,7 +60,7 @@ export class EmailService {
 
     return `
 <!DOCTYPE html><html><body style="font-family:sans-serif;color:#333;max-width:560px;margin:0 auto;padding:24px">
-<h2 style="margin:0 0 4px">📊 Weekly summary — ${data.projectName}</h2>
+<h2 style="margin:0 0 4px">📊 Weekly summary — ${data.serverName}</h2>
 <p style="color:#666;margin:0 0 24px">${data.periodLabel}</p>
 <table style="width:100%;border-collapse:collapse;margin-bottom:24px">
   <tr>
@@ -92,7 +92,7 @@ ${data.topTools.length > 0 ? `
   }
 
   buildAlertEmail(data: {
-    projectName: string;
+    serverName: string;
     errorRate: number;
     threshold: number;
     recentErrors: { toolName: string; message?: string; time: string }[];
@@ -105,7 +105,7 @@ ${data.topTools.length > 0 ? `
     return `
 <!DOCTYPE html><html><body style="font-family:sans-serif;color:#333;max-width:560px;margin:0 auto;padding:24px">
 <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;margin-bottom:24px">
-  <h2 style="margin:0 0 8px;color:#dc2626">⚠️ Alert — ${data.projectName}</h2>
+  <h2 style="margin:0 0 8px;color:#dc2626">⚠️ Alert — ${data.serverName}</h2>
   <p style="margin:0">Error rate reached <strong>${data.errorRate}%</strong> (threshold: ${data.threshold}%) in the last 15 minutes.</p>
 </div>
 ${data.recentErrors.length > 0 ? `

@@ -60,7 +60,7 @@ export class SwaggerController {
       throw new BadRequestException('Invalid format. Please upload a .yaml, .yml, or .json file.');
     }
 
-    const project = await this.swaggerService.create(
+    const server = await this.swaggerService.create(
       file.buffer.toString('utf-8'),
       file.originalname,
       baseUrl,
@@ -68,36 +68,36 @@ export class SwaggerController {
 
     // Retorna resumo sem o rawSpec e parameterMap completo
     return {
-      _id: project._id,
-      name: project.name,
-      baseUrl: project.baseUrl,
-      description: project.description,
-      version: project.version,
-      status: project.status,
-      toolCount: project.tools.length,
-      tools: project.tools.map((t) => ({ name: t.name, description: t.description })),
+      _id: server._id,
+      name: server.name,
+      baseUrl: server.baseUrl,
+      description: server.description,
+      version: server.version,
+      status: server.status,
+      toolCount: server.tools.length,
+      tools: server.tools.map((t) => ({ name: t.name, description: t.description })),
     };
   }
 
-  @Post('projects')
+  @Post('servers')
   createEmpty(@Body() dto: { name?: string; description?: string; baseUrl?: string }) {
     if (!dto.name?.trim()) throw new BadRequestException('Name is required.');
     if (!dto.baseUrl?.trim()) throw new BadRequestException('Base URL is required.');
     return this.swaggerService.createEmpty(dto as any);
   }
 
-  @Get('projects')
+  @Get('servers')
   findAll(@Query('tags') tags?: string) {
     const tagList = tags ? tags.split(',').map((t) => t.trim()).filter(Boolean) : undefined;
     return this.swaggerService.findAll(tagList);
   }
 
-  @Get('projects/:id')
+  @Get('servers/:id')
   findOne(@Param('id') id: string) {
     return this.swaggerService.findOne(id);
   }
 
-  @Patch('projects/:id/info')
+  @Patch('servers/:id/info')
   updateInfo(
     @Param('id') id: string,
     @Body() dto: { name?: string; description?: string },
@@ -105,7 +105,7 @@ export class SwaggerController {
     return this.swaggerService.updateInfo(id, dto);
   }
 
-  @Patch('projects/:id/tools/:toolName')
+  @Patch('servers/:id/tools/:toolName')
   updateToolMeta(
     @Param('id') id: string,
     @Param('toolName') toolName: string,
@@ -114,7 +114,7 @@ export class SwaggerController {
     return this.swaggerService.updateToolMeta(id, toolName, dto);
   }
 
-  @Patch('projects/:id/tools/:toolName/output-schema')
+  @Patch('servers/:id/tools/:toolName/output-schema')
   updateToolOutputSchema(
     @Param('id') id: string,
     @Param('toolName') toolName: string,
@@ -123,7 +123,7 @@ export class SwaggerController {
     return this.swaggerService.updateToolOutputSchema(id, decodeURIComponent(toolName), outputSchema);
   }
 
-  @Put('projects/:id/tools/:toolName')
+  @Put('servers/:id/tools/:toolName')
   updateTool(
     @Param('id') id: string,
     @Param('toolName') toolName: string,
@@ -132,12 +132,12 @@ export class SwaggerController {
     return this.swaggerService.updateTool(id, toolName, dto);
   }
 
-  @Post('projects/:id/tools')
+  @Post('servers/:id/tools')
   addTool(@Param('id') id: string, @Body() dto: any) {
     return this.swaggerService.addTool(id, dto);
   }
 
-  @Delete('projects/:id/tools/:toolName')
+  @Delete('servers/:id/tools/:toolName')
   removeTool(
     @Param('id') id: string,
     @Param('toolName') toolName: string,
@@ -147,12 +147,12 @@ export class SwaggerController {
 
   // ── Legacy single-key endpoints (backward-compat) ─────────────────────────
 
-  @Post('projects/:id/api-key')
+  @Post('servers/:id/api-key')
   generateApiKey(@Param('id') id: string) {
     return this.swaggerService.generateApiKey(id);
   }
 
-  @Delete('projects/:id/api-key')
+  @Delete('servers/:id/api-key')
   @HttpCode(204)
   revokeApiKey(@Param('id') id: string) {
     return this.swaggerService.revokeApiKey(id);
@@ -160,7 +160,7 @@ export class SwaggerController {
 
   // ── Multi-key endpoints ────────────────────────────────────────────────────
 
-  @Post('projects/:id/api-keys')
+  @Post('servers/:id/api-keys')
   addApiKey(
     @Param('id') id: string,
     @Body('name') name: string,
@@ -169,7 +169,7 @@ export class SwaggerController {
     return this.swaggerService.addApiKey(id, name);
   }
 
-  @Delete('projects/:id/api-keys/:keyId')
+  @Delete('servers/:id/api-keys/:keyId')
   @HttpCode(204)
   removeApiKey(
     @Param('id') id: string,
@@ -180,7 +180,7 @@ export class SwaggerController {
 
   // ── Re-import spec ─────────────────────────────────────────────────────────
 
-  @Post('projects/:id/reimport')
+  @Post('servers/:id/reimport')
   @UseInterceptors(
     FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }),
   )
@@ -202,12 +202,12 @@ export class SwaggerController {
     );
   }
 
-  @Patch('projects/:id/auth')
+  @Patch('servers/:id/auth')
   updateAuth(@Param('id') id: string, @Body() auth: AuthConfig) {
     return this.swaggerService.updateAuth(id, auth);
   }
 
-  @Patch('projects/:id/base-url')
+  @Patch('servers/:id/base-url')
   updateBaseUrl(
     @Param('id') id: string,
     @Body('baseUrl') baseUrl: string,
@@ -216,7 +216,7 @@ export class SwaggerController {
     return this.swaggerService.updateBaseUrl(id, baseUrl.trim());
   }
 
-  @Patch('projects/:id/oauth-client')
+  @Patch('servers/:id/oauth-client')
   updateOAuthClient(
     @Param('id') id: string,
     @Body() dto: { oauthClientId: string | null; oauthClientSecret: string | null },
@@ -224,7 +224,7 @@ export class SwaggerController {
     return this.swaggerService.updateOAuthClient(id, dto);
   }
 
-  @Patch('projects/:id/rate-limit')
+  @Patch('servers/:id/rate-limit')
   updateRateLimit(
     @Param('id') id: string,
     @Body() dto: { enabled: boolean; requestsPerMinute: number },
@@ -232,18 +232,18 @@ export class SwaggerController {
     return this.swaggerService.updateRateLimit(id, dto);
   }
 
-  @Post('projects/:id/duplicate')
+  @Post('servers/:id/duplicate')
   duplicate(@Param('id') id: string) {
     return this.swaggerService.duplicate(id);
   }
 
-  @Patch('projects/:id/tags')
+  @Patch('servers/:id/tags')
   updateTags(@Param('id') id: string, @Body('tags') tags: string[]) {
     if (!Array.isArray(tags)) throw new BadRequestException('tags deve ser um array de strings.');
     return this.swaggerService.updateTags(id, tags);
   }
 
-  @Delete('projects/:id')
+  @Delete('servers/:id')
   @HttpCode(204)
   remove(@Param('id') id: string) {
     return this.swaggerService.remove(id);
@@ -251,46 +251,46 @@ export class SwaggerController {
 
   // ── Pause ────────────────────────────────────────────────────────────────────
 
-  @Patch('projects/:id/pause')
+  @Patch('servers/:id/pause')
   setPaused(@Param('id') id: string, @Body('isPaused') isPaused: boolean) {
     return this.swaggerService.setPaused(id, !!isPaused);
   }
 
   // ── Maintenance mode ─────────────────────────────────────────────────────────
 
-  @Patch('projects/:id/maintenance')
+  @Patch('servers/:id/maintenance')
   setMaintenanceMode(@Param('id') id: string, @Body() dto: { enabled: boolean; message?: string }) {
     return this.swaggerService.setMaintenanceMode(id, dto);
   }
 
   // ── Availability window ───────────────────────────────────────────────────────
 
-  @Patch('projects/:id/availability')
+  @Patch('servers/:id/availability')
   setAvailabilityWindow(@Param('id') id: string, @Body() dto: { enabled: boolean; timezone: string; schedule: Array<{ day: number; startHour: number; endHour: number }> }) {
     return this.swaggerService.setAvailabilityWindow(id, dto);
   }
 
   // ── Alert config ─────────────────────────────────────────────────────────────
 
-  @Patch('projects/:id/alert-config')
+  @Patch('servers/:id/alert-config')
   setAlertConfig(@Param('id') id: string, @Body() dto: { enabled: boolean; errorThresholdPct: number; notifyEmail: string }) {
     return this.swaggerService.setAlertConfig(id, dto);
   }
 
   // ── Resources ─────────────────────────────────────────────────────────────────
 
-  @Post('projects/:id/resources')
+  @Post('servers/:id/resources')
   @HttpCode(201)
   addResource(@Param('id') id: string, @Body() dto: any) {
     return this.swaggerService.addResource(id, dto);
   }
 
-  @Put('projects/:id/resources/:resourceId')
+  @Put('servers/:id/resources/:resourceId')
   updateResource(@Param('id') id: string, @Param('resourceId') resourceId: string, @Body() dto: any) {
     return this.swaggerService.updateResource(id, resourceId, dto);
   }
 
-  @Delete('projects/:id/resources/:resourceId')
+  @Delete('servers/:id/resources/:resourceId')
   @HttpCode(204)
   deleteResource(@Param('id') id: string, @Param('resourceId') resourceId: string) {
     return this.swaggerService.deleteResource(id, resourceId);
@@ -298,21 +298,44 @@ export class SwaggerController {
 
   // ── Prompt references (link global prompts to a project) ─────────────────────
 
-  @Post('projects/:id/prompts')
+  @Post('servers/:id/prompts')
   @HttpCode(201)
   addPromptRef(@Param('id') id: string, @Body('promptId') promptId: string) {
     return this.swaggerService.addPromptRef(id, promptId);
   }
 
-  @Delete('projects/:id/prompts/:promptId')
+  @Delete('servers/:id/prompts/:promptId')
   @HttpCode(204)
   removePromptRef(@Param('id') id: string, @Param('promptId') promptId: string) {
     return this.swaggerService.removePromptRef(id, promptId);
   }
 
+  // ── Tool Chains ───────────────────────────────────────────────────────────────
+
+  @Post('servers/:id/chains')
+  @HttpCode(201)
+  addChain(@Param('id') id: string, @Body() dto: any) {
+    return this.swaggerService.addChain(id, dto);
+  }
+
+  @Patch('servers/:id/chains/:chainId')
+  updateChain(
+    @Param('id') id: string,
+    @Param('chainId') chainId: string,
+    @Body() dto: any,
+  ) {
+    return this.swaggerService.updateChain(id, chainId, dto);
+  }
+
+  @Delete('servers/:id/chains/:chainId')
+  @HttpCode(204)
+  deleteChain(@Param('id') id: string, @Param('chainId') chainId: string) {
+    return this.swaggerService.deleteChain(id, chainId);
+  }
+
   // ── Tool comments ─────────────────────────────────────────────────────────────
 
-  @Post('projects/:id/tools/:toolName/comments')
+  @Post('servers/:id/tools/:toolName/comments')
   addToolComment(
     @Param('id') id: string,
     @Param('toolName') toolName: string,
@@ -323,7 +346,7 @@ export class SwaggerController {
     return this.swaggerService.addToolComment(id, toolName, text, author ?? 'Unknown');
   }
 
-  @Delete('projects/:id/tools/:toolName/comments/:commentId')
+  @Delete('servers/:id/tools/:toolName/comments/:commentId')
   @HttpCode(204)
   deleteToolComment(
     @Param('id') id: string,
@@ -362,13 +385,13 @@ export class SwaggerController {
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
   async importPostman(@UploadedFile() file: Express.Multer.File, @Query('baseUrl') baseUrl?: string) {
     if (!file) throw new BadRequestException('No file uploaded.');
-    const project = await this.swaggerService.fromPostman(file.buffer.toString('utf-8'), baseUrl);
-    return { _id: project._id, name: project.name, baseUrl: project.baseUrl, toolCount: project.tools.length };
+    const server = await this.swaggerService.fromPostman(file.buffer.toString('utf-8'), baseUrl);
+    return { _id: server._id, name: server.name, baseUrl: server.baseUrl, toolCount: server.tools.length };
   }
 
   // ── Test endpoint (for dynamic resource wizard) ───────────────────────────────
 
-  @Post('projects/:id/test-endpoint')
+  @Post('servers/:id/test-endpoint')
   testEndpoint(
     @Param('id') id: string,
     @Body('endpointRef') endpointRef: EndpointRef,
@@ -380,7 +403,7 @@ export class SwaggerController {
 
   // ── Share link ────────────────────────────────────────────────────────────────
 
-  @Post('projects/:id/share-link')
+  @Post('servers/:id/share-link')
   generateShareLink(@Param('id') id: string) {
     const token = this.swaggerService.generateShareToken(id);
     return { token, url: `/share/${token}` };

@@ -23,23 +23,23 @@ export class DigestService {
 
     const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const allProjects = await this.projectRepo.findAll();
-    const projects = allProjects.filter((p) => p.alertConfig?.notifyEmail);
+    const servers = allProjects.filter((p) => p.alertConfig?.notifyEmail);
 
-    for (const project of projects) {
-      const email = project.alertConfig?.notifyEmail;
+    for (const server of servers) {
+      const email = server.alertConfig?.notifyEmail;
       if (!email) continue;
 
       try {
-        const projectStats = await this.logs.getProjectStats(project._id, since);
+        const projectStats = await this.logs.getProjectStats(server._id, since);
 
         const from = since.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         const to = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
         await this.email.send({
           to: email,
-          subject: `Weekly summary — ${project.name}`,
+          subject: `Weekly summary — ${server.name}`,
           html: this.email.buildWeeklyDigest({
-            projectName: project.name,
+            serverName: server.name,
             totalCalls: projectStats.total,
             errors: projectStats.errors,
             successRate:
@@ -51,26 +51,26 @@ export class DigestService {
           }),
         });
       } catch (err: any) {
-        this.logger.error(`Failed weekly digest for project ${project.name}: ${err?.message}`);
+        this.logger.error(`Failed weekly digest for server ${server.name}: ${err?.message}`);
       }
     }
   }
 
   /** Called after each tool execution to check if alert should fire */
-  async checkAlertThreshold(projectId: string, projectName: string): Promise<void> {
+  async checkAlertThreshold(serverId: string, serverName: string): Promise<void> {
     if (!this.email.isConfigured) return;
 
-    const project = await this.projectRepo.findById(projectId);
-    if (!project?.alertConfig?.enabled || !project.alertConfig.notifyEmail) return;
+    const server = await this.projectRepo.findById(serverId);
+    if (!server?.alertConfig?.enabled || !server.alertConfig.notifyEmail) return;
 
     const since15m = new Date(Date.now() - 15 * 60 * 1000);
-    const stats = await this.logs.getProjectStats(projectId, since15m);
+    const stats = await this.logs.getProjectStats(serverId, since15m);
     if (stats.total < 5) return;
 
     const errorPct = Math.round((stats.errors / stats.total) * 100);
-    if (errorPct < project.alertConfig.errorThresholdPct) return;
+    if (errorPct < server.alertConfig.errorThresholdPct) return;
 
-    const key = `alert:${projectId}`;
+    const key = `alert:${serverId}`;
     if ((this as any)[key] && Date.now() - (this as any)[key] < 30 * 60 * 1000) return;
     (this as any)[key] = Date.now();
 
@@ -81,14 +81,14 @@ export class DigestService {
 
     const appUrl = process.env.APP_URL ?? 'http://localhost:3000';
     await this.email.send({
-      to: project.alertConfig.notifyEmail,
-      subject: `⚠️ Alert — ${projectName} error rate ${errorPct}%`,
+      to: server.alertConfig.notifyEmail,
+      subject: `⚠️ Alert — ${serverName} error rate ${errorPct}%`,
       html: this.email.buildAlertEmail({
-        projectName,
+        serverName,
         errorRate: errorPct,
-        threshold: project.alertConfig.errorThresholdPct,
+        threshold: server.alertConfig.errorThresholdPct,
         recentErrors,
-        projectUrl: `${appUrl}/projects/${projectId}`,
+        projectUrl: `${appUrl}/servers/${serverId}`,
       }),
     });
   }

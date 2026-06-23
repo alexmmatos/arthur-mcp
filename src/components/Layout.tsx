@@ -36,6 +36,7 @@ import {
   IconSettings,
   IconClipboardList,
   IconMessage2,
+  IconLock,
 } from '@tabler/icons-react'
 import api from '../api'
 import { avatarLetter, avatarColor } from '../pages/Profile'
@@ -52,8 +53,9 @@ const NAV_SECTIONS = [
   {
     subheader: 'MAIN',
     items: [
-      { title: 'Projects', icon: IconFolder, path: '/' },
+      { title: 'Servers', icon: IconFolder, path: '/' },
       { title: 'Prompts', icon: IconMessage2, path: '/prompts' },
+      { title: 'Secrets', icon: IconLock, path: '/secrets' },
     ],
   },
   {

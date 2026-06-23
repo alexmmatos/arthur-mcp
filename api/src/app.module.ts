@@ -19,6 +19,7 @@ import { ShareModule } from './share/share.module';
 import { EmailFeaturesModule } from './email/email-features.module';
 import { OAuthModule } from './oauth/oauth.module';
 import { PromptsModule } from './prompts/prompts.module';
+import { SecretsModule } from './secrets/secrets.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { PromptsModule } from './prompts/prompts.module';
     EmailFeaturesModule,
     OAuthModule,
     PromptsModule,
+    SecretsModule,
   ],
   providers: [
     {

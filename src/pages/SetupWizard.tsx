@@ -20,7 +20,7 @@ const SLIDES = [
     title: 'How it works',
     body: (
       <Box component="ol" sx={{ pl: 2.5, m: 0, '& li': { mb: 1.5 } }}>
-        <li><strong>Create a project</strong> — give it a name and upload your API documentation (OpenAPI / Swagger) or paste the URL. If you don't have the file, try pasting the API base URL and clicking "Discover".</li>
+        <li><strong>Create a server</strong> — give it a name and upload your API documentation (OpenAPI / Swagger) or paste the URL. If you don't have the file, try pasting the API base URL and clicking "Discover".</li>
         <li><strong>Configure access</strong> — add the API credentials (token, key, password). They are stored securely and injected automatically on every request.</li>
         <li><strong>Copy the MCP URL</strong> — paste it in your AI client's settings. That's it — your assistant can now use the API.</li>
       </Box>
@@ -35,7 +35,7 @@ const SLIDES = [
           Your MCP endpoint is accessible to anyone who has the URL. Before sharing it with external clients, we recommend:
         </Typography>
         <Box component="ul" sx={{ pl: 2.5, m: 0, '& li': { mb: 1 } }}>
-          <li><strong>Add an MCP API key</strong> — found in each project under "MCP Authentication". Every client must include it in their configuration.</li>
+          <li><strong>Add an MCP API key</strong> — found in each server under "MCP Authentication". Every client must include it in their configuration.</li>
           <li><strong>Use the Share with client button</strong> — generates step-by-step setup instructions for your clients, with the key already filled in.</li>
           <li><strong>Enable Rate Limiting</strong> — prevents your API from being overwhelmed.</li>
         </Box>
@@ -45,7 +45,7 @@ const SLIDES = [
   {
     icon: <CheckCircleIcon sx={{ fontSize: 64, color: 'success.main' }} />,
     title: "You're all set!",
-    body: 'Start by creating your first project. If you run into trouble, every panel has a help button (?) with detailed explanations. You can always come back to this guide from the Help menu.',
+    body: 'Start by creating your first server. If you run into trouble, every panel has a help button (?) with detailed explanations. You can always come back to this guide from the Help menu.',
   },
 ]
 
@@ -90,7 +90,7 @@ export default function SetupWizard() {
           )}
           {isLast && (
             <Button variant="contained" color="success" startIcon={<RocketLaunchIcon />} onClick={finish}>
-              Create my first project
+              Create my first server
             </Button>
           )}
         </Box>

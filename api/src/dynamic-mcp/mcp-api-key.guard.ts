@@ -25,9 +25,9 @@ export class McpApiKeyGuard implements CanActivate {
     if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
       const token = authHeader.slice(7);
       try {
-        const payload = jwt.verify(token, config.jwtSecret) as { projectId?: string };
-        const projectId = req.params['projectId'];
-        if (payload.projectId && projectId && payload.projectId !== projectId) {
+        const payload = jwt.verify(token, config.jwtSecret) as { serverId?: string };
+        const serverId = req.params['serverId'];
+        if (payload.serverId && serverId && payload.serverId !== serverId) {
           throw new UnauthorizedException('Token not valid for this project');
         }
         return true;
@@ -36,13 +36,13 @@ export class McpApiKeyGuard implements CanActivate {
       }
     }
 
-    const projectId = req.params['projectId'];
+    const serverId = req.params['serverId'];
 
-    const project = await this.projectRepo.findById(projectId);
-    if (!project) return true;
+    const server = await this.projectRepo.findById(serverId);
+    if (!server) return true;
 
-    const hasNewKeys = project.mcpApiKeys && project.mcpApiKeys.length > 0;
-    const hasLegacyKey = !!project.mcpApiKey;
+    const hasNewKeys = server.mcpApiKeys && server.mcpApiKeys.length > 0;
+    const hasLegacyKey = !!server.mcpApiKey;
 
     if (!hasNewKeys && !hasLegacyKey) return true;
 
@@ -54,12 +54,12 @@ export class McpApiKeyGuard implements CanActivate {
     }
 
     if (hasNewKeys) {
-      const match = project.mcpApiKeys.some((k) => k.key === provided);
+      const match = server.mcpApiKeys.some((k) => k.key === provided);
       if (!match) throw new UnauthorizedException('Invalid API key.');
       return true;
     }
 
-    if (provided !== project.mcpApiKey) throw new UnauthorizedException('Invalid API key.');
+    if (provided !== server.mcpApiKey) throw new UnauthorizedException('Invalid API key.');
     return true;
   }
 }

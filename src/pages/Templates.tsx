@@ -13,7 +13,6 @@ import {
   DialogContent,
   DialogTitle,
   Grid,
-  IconButton,
   InputAdornment,
   LinearProgress,
   TextField,
@@ -23,10 +22,9 @@ import SearchIcon from '@mui/icons-material/Search'
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
-import VisibilityIcon from '@mui/icons-material/Visibility'
-import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import api from '../api'
 import { API_TEMPLATES, ApiTemplate, TEMPLATE_CATEGORIES, buildToolPayload } from '../data/api-templates'
+import SecretAutocomplete, { useSecrets } from '../components/SecretAutocomplete'
 
 // ─── Auth badge ───────────────────────────────────────────────────────────────
 
@@ -135,19 +133,19 @@ function UseTemplateDialog({
   onClose: () => void
 }) {
   const navigate = useNavigate()
-  const [projectName, setProjectName] = useState(template.name)
+  const [serverName, setProjectName] = useState(template.name)
   const [authValue, setAuthValue] = useState('')
-  const [showAuth, setShowAuth] = useState(false)
   const [creating, setCreating] = useState(false)
   const [progress, setProgress] = useState(0)
   const [progressLabel, setProgressLabel] = useState('')
   const [error, setError] = useState('')
+  const { secrets, loading: loadingSecrets } = useSecrets()
 
   const needsAuth = template.auth.type !== 'none'
-  const canCreate = !!projectName.trim() && !creating && (!needsAuth || !!authValue.trim())
+  const canCreate = !!serverName.trim() && !creating && (!needsAuth || !!authValue.trim())
 
   const handleCreate = async () => {
-    if (!projectName.trim() || creating) return
+    if (!serverName.trim() || creating) return
     setCreating(true)
     setError('')
 
@@ -161,10 +159,10 @@ function UseTemplateDialog({
     }
 
     try {
-      // 1. Create project
-      tick('Creating project…')
-      const { data: project } = await api.post('/swagger/projects', {
-        name: projectName.trim(),
+      // 1. Create server
+      tick('Creating server…')
+      const { data: project } = await api.post('/swagger/servers', {
+        name: serverName.trim(),
         baseUrl: template.baseUrl,
         description: template.description,
       })
@@ -178,7 +176,7 @@ function UseTemplateDialog({
             : template.auth.type === 'api-key'
             ? { type: 'api-key', name: template.auth.keyName ?? 'X-Api-Key', value: authValue, in: template.auth.keyIn ?? 'header' }
             : { type: 'none' }
-        await api.patch(`/swagger/projects/${project._id}/auth`, authPayload)
+        await api.patch(`/swagger/servers/${project._id}/auth`, authPayload)
       } else {
         tick('No auth required…')
       }
@@ -187,13 +185,13 @@ function UseTemplateDialog({
       for (const toolDef of template.tools) {
         tick(`Adding tool: ${toolDef.name}…`)
         const payload = buildToolPayload(toolDef, template.baseUrl)
-        await api.post(`/swagger/projects/${project._id}/tools`, payload)
+        await api.post(`/swagger/servers/${project._id}/tools`, payload)
       }
 
-      navigate(`/projects/${project._id}`)
+      navigate(`/servers/${project._id}`)
     } catch (err: any) {
       setCreating(false)
-      setError(err?.response?.data?.message ?? 'Something went wrong creating the project.')
+      setError(err?.response?.data?.message ?? 'Something went wrong creating the server.')
     }
   }
 
@@ -223,43 +221,31 @@ function UseTemplateDialog({
               size="small"
               fullWidth
               autoFocus
-              label="Project name"
-              value={projectName}
+              label="Server name"
+              value={serverName}
               onChange={(e) => setProjectName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && canCreate && handleCreate()}
               sx={{ mb: 2 }}
             />
 
             {needsAuth ? (
-              <TextField
-                size="small"
-                fullWidth
-                required
-                label={template.auth.type === 'api-key' ? 'API Key' : 'Access Token'}
-                placeholder={template.auth.type === 'api-key' ? 'Paste your API key here' : 'Paste your access token here'}
-                type={showAuth ? 'text' : 'password'}
-                value={authValue}
-                onChange={(e) => setAuthValue(e.target.value)}
-                helperText={
-                  <span>
+              <Box>
+                <SecretAutocomplete
+                  value={authValue}
+                  onChange={setAuthValue}
+                  label={template.auth.type === 'api-key' ? 'API Key' : 'Access Token'}
+                  secrets={secrets}
+                  loadingSecrets={loadingSecrets}
+                />
+                {template.auth.hint && (
+                  <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
                     {template.auth.hint}{' '}
                     {template.signupUrl && (
-                      <a href={template.signupUrl} target="_blank" rel="noreferrer">
-                        Get one here ↗
-                      </a>
+                      <a href={template.signupUrl} target="_blank" rel="noreferrer">Get one here ↗</a>
                     )}
-                  </span>
-                }
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton size="small" edge="end" onClick={() => setShowAuth((v) => !v)} tabIndex={-1}>
-                        {showAuth ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-              />
+                  </Typography>
+                )}
+              </Box>
             ) : (
               <Alert severity="success" sx={{ fontSize: '0.82rem' }}>
                 No API key or login needed — ready to use immediately after creation.
@@ -288,7 +274,7 @@ function UseTemplateDialog({
           disabled={!canCreate}
           startIcon={creating ? <CircularProgress size={14} color="inherit" /> : <RocketLaunchIcon fontSize="small" />}
         >
-          {creating ? 'Creating…' : 'Create project'}
+          {creating ? 'Creating…' : 'Create server'}
         </Button>
       </DialogActions>
     </Dialog>
@@ -317,7 +303,7 @@ export default function Templates() {
     <Box py={3} px={0}>
       <Box mb={2}>
         <Button startIcon={<ArrowBackIcon />} size="small" onClick={() => navigate('/')}>
-          Back to projects
+          Back to servers
         </Button>
       </Box>
 
@@ -328,7 +314,7 @@ export default function Templates() {
             API Templates
           </Typography>
           <Typography color="text.secondary" maxWidth={560}>
-            Start with a pre-built integration. Pick a template, name your project, and your AI will have working tools in under a minute.
+            Start with a pre-built integration. Pick a template, name your server, and your AI will have working tools in under a minute.
           </Typography>
         </Box>
         <TextField

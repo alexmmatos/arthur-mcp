@@ -44,6 +44,9 @@ export class SwaggerProjectEntity {
   @Column('text', { default: '[]' })
   prompts: string;
 
+  @Column('text', { default: '[]' })
+  chains: string;
+
   @Column({ nullable: true })
   oauthClientId?: string;
 

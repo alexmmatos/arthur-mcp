@@ -1,8 +1,8 @@
 import { ExecutionLogsService } from './execution-logs.service';
 
 const dto = {
-  projectId: 'proj1',
-  projectName: 'Test Project',
+  serverId: 'proj1',
+  serverName: 'Test Project',
   toolName: 'getTodo',
   source: 'mcp' as const,
   statusCode: 200,
@@ -22,11 +22,11 @@ describe('ExecutionLogsService', () => {
     const entries = await service.findByProject('proj1');
     expect(entries).toHaveLength(1);
     expect(entries[0].toolName).toBe('getTodo');
-    expect(entries[0].projectId).toBe('proj1');
+    expect(entries[0].serverId).toBe('proj1');
   });
 
   it('assigns defaults when optional fields are absent', async () => {
-    service.log({ projectId: 'p', projectName: 'P', toolName: 'tool' });
+    service.log({ serverId: 'p', serverName: 'P', toolName: 'tool' });
     const [entry] = await service.findByProject('p');
     expect(entry.source).toBe('mcp');
     expect(entry.statusCode).toBe(200);
@@ -90,7 +90,7 @@ describe('ExecutionLogsService', () => {
 
   it('deleteByProject removes only that project entries', async () => {
     service.log(dto);
-    service.log({ ...dto, projectId: 'other', projectName: 'Other' });
+    service.log({ ...dto, serverId: 'other', serverName: 'Other' });
     service.deleteByProject('proj1');
     expect(await service.countByProject('proj1')).toBe(0);
     expect(await service.countByProject('other')).toBe(1);

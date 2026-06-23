@@ -71,12 +71,16 @@ import {
   IconDatabase,
   IconBulb,
   IconRoute,
+  IconArrowsShuffle,
+  IconShieldLock,
+  IconChevronUp,
 } from '@tabler/icons-react'
 import { QRCodeSVG } from 'qrcode.react'
 import api from '../api'
 import HelpButton from '../components/HelpButton'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { McpDocsContent } from './McpDocs'
+import SecretAutocomplete, { SecretEntry, useSecrets } from '../components/SecretAutocomplete'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -147,6 +151,32 @@ interface McpPrompt {
   promptId: string
 }
 
+type ChainInputSource =
+  | { source: 'literal'; value: string }
+  | { source: 'chain_input'; paramName: string }
+  | { source: 'step_output'; stepId: string; jsonPath: string }
+
+interface ChainInputMapping {
+  paramName: string
+  input: ChainInputSource
+}
+
+interface ChainStep {
+  id: string
+  toolName: string
+  inputMapping: ChainInputMapping[]
+}
+
+interface ToolChain {
+  id: string
+  name: string
+  description?: string
+  inputSchema: JsonSchema
+  steps: ChainStep[]
+  enabled?: boolean
+}
+
+
 interface GlobalPrompt {
   id: string
   name: string
@@ -169,6 +199,7 @@ interface Project {
   tools: GeneratedTool[]
   resources?: McpResource[]
   prompts?: McpPrompt[]
+  chains?: ToolChain[]
   mcpApiKey?: string
   mcpApiKeys?: McpApiKeyEntry[]
   oauthClientId?: string
@@ -366,7 +397,7 @@ function BaseUrlPanel({ projectId, initialValue, onChange }: {
     try { new URL(trimmed) } catch { setError('Invalid URL. Include protocol (e.g. https://api.example.com)'); return }
     setSaving(true); setError('')
     try {
-      await api.patch(`/swagger/projects/${projectId}/base-url`, { baseUrl: trimmed })
+      await api.patch(`/swagger/servers/${projectId}/base-url`, { baseUrl: trimmed })
       onChange(trimmed); setEditing(false)
     } catch { setError('Failed to save. Please try again.') } finally { setSaving(false) }
   }
@@ -408,7 +439,7 @@ function BaseUrlPanel({ projectId, initialValue, onChange }: {
             size="small" fullWidth autoFocus
             label="ExternalAPI Base URL" value={value}
             onChange={(e) => { setValue(e.target.value); setError('') }}
-            error={!!error} helperText={error || 'Base URL used for all HTTP calls in this project'}
+            error={!!error} helperText={error || 'Base URL used for all HTTP calls in this server'}
             placeholder="https://api.example.com"
             onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') handleCancel() }}
             InputProps={{
@@ -452,14 +483,14 @@ function McpEndpointBar({ projectId, hasKeys }: { projectId: string; hasKeys: bo
   const [shareLink, setShareLink] = useState('')
   const [shareLinkCopied, setShareLinkCopied] = useState(false)
   const [shareLoading, setShareLoading] = useState(false)
-  const url = `${window.location.origin}/api/mcp/project/${projectId}`
+  const url = `${window.location.origin}/api/mcp/server/${projectId}`
 
   const handleShareOpen = async () => {
     setShareOpen(true)
     if (shareLink) return
     setShareLoading(true)
     try {
-      const { data } = await api.post<{ url: string }>(`/swagger/projects/${projectId}/share-link`)
+      const { data } = await api.post<{ url: string }>(`/swagger/servers/${projectId}/share-link`)
       setShareLink(data.url)
     } catch { setShareLink('') } finally { setShareLoading(false) }
   }
@@ -478,7 +509,7 @@ function McpEndpointBar({ projectId, hasKeys }: { projectId: string; hasKeys: bo
         </Tooltip>
         <HelpButton title="MCP Endpoint">
           <Typography variant="body2" gutterBottom>
-            The URL that MCP clients (Claude Desktop, Cursor, or any compatible client) use to connect to <em>this specific project's</em> tools.
+            The URL that MCP clients (Claude Desktop, Cursor, or any compatible client) use to connect to <em>this specific server's</em> tools.
           </Typography>
           <Typography variant="body2" gutterBottom>
             <strong>Share with client</strong> — generates a step-by-step setup page you can send to your client. The page includes a QR code and copy-ready configuration snippets for Claude Desktop, Cursor, and generic MCP clients.
@@ -591,7 +622,7 @@ function ApiKeysPanel({ projectId, initialKeys, onChange }: {
     setAdding(true)
     setAddError('')
     try {
-      const { data } = await api.post<McpApiKeyEntry>(`/swagger/projects/${projectId}/api-keys`, { name: newKeyName.trim() })
+      const { data } = await api.post<McpApiKeyEntry>(`/swagger/servers/${projectId}/api-keys`, { name: newKeyName.trim() })
       const updated = [...keys, data]
       syncKeys(updated)
       setNewlyCreatedId(data.id)
@@ -610,7 +641,7 @@ function ApiKeysPanel({ projectId, initialKeys, onChange }: {
     if (!revokeTarget) return
     setRevoking(true)
     try {
-      await api.delete(`/swagger/projects/${projectId}/api-keys/${revokeTarget.id}`)
+      await api.delete(`/swagger/servers/${projectId}/api-keys/${revokeTarget.id}`)
       const updated = keys.filter((k) => k.id !== revokeTarget.id)
       syncKeys(updated)
       if (newlyCreatedId === revokeTarget.id) setNewlyCreatedId(null)
@@ -646,7 +677,7 @@ function ApiKeysPanel({ projectId, initialKeys, onChange }: {
           <Typography variant="subtitle1" fontWeight={700}>Access Keys</Typography>
           <HelpButton title="Access Keys">
             <Typography variant="body2" gutterBottom>
-              Named keys that control who can connect to this project's AI endpoint.
+              Named keys that control who can connect to this server's AI endpoint.
               Every client must include <code>auth: &lt;key&gt;</code> in their configuration — requests without a valid key are rejected.
             </Typography>
             <Typography variant="body2" gutterBottom>
@@ -797,7 +828,7 @@ function OAuthClientPanel({ projectId, initialClientId, initialClientSecret, ser
     if (!clientId.trim() || !clientSecret.trim()) return
     setSaving(true)
     try {
-      await api.patch(`/swagger/projects/${projectId}/oauth-client`, {
+      await api.patch(`/swagger/servers/${projectId}/oauth-client`, {
         oauthClientId: clientId.trim(),
         oauthClientSecret: clientSecret.trim(),
       })
@@ -808,7 +839,7 @@ function OAuthClientPanel({ projectId, initialClientId, initialClientSecret, ser
   const handleRemove = async () => {
     setRemoving(true)
     try {
-      await api.patch(`/swagger/projects/${projectId}/oauth-client`, {
+      await api.patch(`/swagger/servers/${projectId}/oauth-client`, {
         oauthClientId: null,
         oauthClientSecret: null,
       })
@@ -826,7 +857,7 @@ function OAuthClientPanel({ projectId, initialClientId, initialClientSecret, ser
           <Typography variant="subtitle1" fontWeight={700}>OAuth Client</Typography>
           <HelpButton title="ChatGPT OAuth Client">
             <Typography variant="body2" gutterBottom>
-              Allows ChatGPT (and other OAuth 2.0 clients) to connect to this project's MCP endpoint using your account credentials.
+              Allows ChatGPT (and other OAuth 2.0 clients) to connect to this server's MCP endpoint using your account credentials.
             </Typography>
             <Typography variant="body2" gutterBottom>
               Generate a <strong>Client ID</strong> and <strong>Client Secret</strong>, then paste the Auth and Token URLs into ChatGPT's connector settings.
@@ -1160,7 +1191,7 @@ function ReimportSpecDialog({ projectId, open, onClose, onSuccess }: {
       form.append('file', file)
       const params = baseUrl.trim() ? { baseUrl: baseUrl.trim() } : {}
       const { data } = await api.post<{ added: number; updated: number; baseUrl: string }>(
-        `/swagger/projects/${projectId}/reimport`, form,
+        `/swagger/servers/${projectId}/reimport`, form,
         { params, headers: { 'Content-Type': 'multipart/form-data' } },
       )
       reset()
@@ -1335,7 +1366,7 @@ function RateLimitPanel({ projectId, initialRateLimit, onChange }: RateLimitPane
       }
       setSaveStatus('saving')
       try {
-        await api.patch(`/swagger/projects/${projectId}/rate-limit`, p)
+        await api.patch(`/swagger/servers/${projectId}/rate-limit`, p)
         onChange(p)
         setSaveStatus('saved')
         setTimeout(() => setSaveStatus('idle'), 2500)
@@ -1368,7 +1399,7 @@ function RateLimitPanel({ projectId, initialRateLimit, onChange }: RateLimitPane
             <Typography variant="subtitle2" fontWeight={700}>Request Limit</Typography>
             <HelpButton title="Request Limit">
               <Typography variant="body2" gutterBottom>
-                Caps the number of MCP requests this project accepts per minute. When the limit is exceeded, the server responds with <strong>HTTP 429 (Too Many Requests)</strong> and a <code>Retry-After</code> header — the AI client should wait before retrying.
+                Caps the number of MCP requests this server accepts per minute. When the limit is exceeded, the server responds with <strong>HTTP 429 (Too Many Requests)</strong> and a <code>Retry-After</code> header — the AI client should wait before retrying.
               </Typography>
               <Typography variant="body2" gutterBottom>
                 <strong>Why set a rate limit?</strong>
@@ -1436,7 +1467,7 @@ function AuthConfigPanel({ projectId, initialAuth, onChange }: {
   const [authType, setAuthType] = useState<AuthType>((initialAuth?.type as AuthType) ?? 'none')
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [saveError, setSaveError] = useState('')
-  const [showSecrets, setShowSecrets] = useState(false)
+  const { secrets, loading: loadingSecrets } = useSecrets()
 
   // bearer
   const [token, setToken] = useState((initialAuth as any)?.token ?? '')
@@ -1469,7 +1500,7 @@ function AuthConfigPanel({ projectId, initialAuth, onChange }: {
       const p = pendingRef.current; if (!p) return
       setSaveStatus('saving')
       try {
-        await api.patch(`/swagger/projects/${projectId}/auth`, p)
+        await api.patch(`/swagger/servers/${projectId}/auth`, p)
         onChange(p)
         setSaveStatus('saved')
         setTimeout(() => setSaveStatus('idle'), 2500)
@@ -1495,20 +1526,12 @@ function AuthConfigPanel({ projectId, initialAuth, onChange }: {
   }
 
   const secretInput = (value: string, onChg: (v: string) => void, label: string) => (
-    <TextField
-      size="small" fullWidth label={label}
-      type={showSecrets ? 'text' : 'password'}
+    <SecretAutocomplete
       value={value}
-      onChange={(e) => onChg(e.target.value)}
-      InputProps={{
-        endAdornment: (
-          <InputAdornment position="end">
-            <IconButton size="small" onClick={() => setShowSecrets(s => !s)} edge="end">
-              {showSecrets ? <IconEyeOff size={18} /> : <IconEye size={18} />}
-            </IconButton>
-          </InputAdornment>
-        )
-      }}
+      onChange={onChg}
+      label={label}
+      secrets={secrets}
+      loadingSecrets={loadingSecrets}
     />
   )
 
@@ -1671,23 +1694,20 @@ function AuthConfigPanel({ projectId, initialAuth, onChange }: {
             Add any HTTP header to the request (e.g. <code>X-Tenant-Id</code>, <code>X-Auth-Token</code>).
           </Typography>
           {customHeaders.map((h, i) => (
-            <Box key={i} display="flex" gap={1} alignItems="center">
+            <Box key={i} display="flex" gap={1} alignItems="flex-start">
               <TextField size="small" label="Header" placeholder="X-Custom-Header" sx={{ flex: 1 }}
                 value={h.name} onChange={(e) => updateCustomHeader(i, 'name', e.target.value)} />
-              <TextField size="small" label="Value" sx={{ flex: 2 }}
-                type={showSecrets ? 'text' : 'password'}
-                value={h.value} onChange={(e) => updateCustomHeader(i, 'value', e.target.value)}
-                InputProps={{
-                  endAdornment: i === 0 ? (
-                    <InputAdornment position="end">
-                      <IconButton size="small" onClick={() => setShowSecrets(s => !s)} edge="end">
-                        {showSecrets ? <IconEyeOff size={18} /> : <IconEye size={18} />}
-                      </IconButton>
-                    </InputAdornment>
-                  ) : undefined
-                }}
-              />
-              <IconButton size="small" color="error" onClick={() => removeCustomHeader(i)} disabled={customHeaders.length === 1}>
+              <Box sx={{ flex: 2 }}>
+                <SecretAutocomplete
+                  value={h.value}
+                  onChange={(v) => updateCustomHeader(i, 'value', v)}
+                  label="Value"
+                  secrets={secrets}
+                  loadingSecrets={loadingSecrets}
+                />
+              </Box>
+              <IconButton size="small" color="error" onClick={() => removeCustomHeader(i)}
+                disabled={customHeaders.length === 1} sx={{ mt: 0.5 }}>
                 <IconTrash size={18} />
               </IconButton>
             </Box>
@@ -1744,7 +1764,7 @@ function ProjectControlsPanel({ projectId, initialPaused, initialMaintenance, in
   const handlePause = async (val: boolean) => {
     setPauseSaving(true)
     try {
-      await api.patch(`/swagger/projects/${projectId}/pause`, { isPaused: val })
+      await api.patch(`/swagger/servers/${projectId}/pause`, { isPaused: val })
       setPaused(val)
       onPausedChange(val)
     } finally { setPauseSaving(false) }
@@ -1755,7 +1775,7 @@ function ProjectControlsPanel({ projectId, initialPaused, initialMaintenance, in
     maintTimer.current = setTimeout(async () => {
       setMaintSave('saving')
       try {
-        await api.patch(`/swagger/projects/${projectId}/maintenance`, { enabled, message })
+        await api.patch(`/swagger/servers/${projectId}/maintenance`, { enabled, message })
         setMaintSave('saved'); setTimeout(() => setMaintSave('idle'), 2000)
       } catch { setMaintSave('error') }
     }, 700)
@@ -1767,7 +1787,7 @@ function ProjectControlsPanel({ projectId, initialPaused, initialMaintenance, in
       setAvSave('saving')
       try {
         const payload = { enabled, timezone, schedule: schedule.map(({ day, startHour, endHour }) => ({ day, startHour, endHour })) }
-        await api.patch(`/swagger/projects/${projectId}/availability`, payload)
+        await api.patch(`/swagger/servers/${projectId}/availability`, payload)
         setAvSave('saved'); setTimeout(() => setAvSave('idle'), 2000)
       } catch { setAvSave('error') }
     }, 700)
@@ -1802,13 +1822,13 @@ function ProjectControlsPanel({ projectId, initialPaused, initialMaintenance, in
         {paused ? <IconPlayerPause size={20} style={{ color: '#FFAE1F' }} /> : <IconPlayerPlay size={20} style={{ color: '#13DEB9' }} />}
         <Box flexGrow={1}>
           <Typography variant="subtitle2" fontWeight={700}>
-            {paused ? 'Project is paused — AI cannot use it right now' : 'Project is running normally'}
+            {paused ? 'Server is paused — AI cannot use it right now' : 'Server is running normally'}
           </Typography>
           <Typography variant="caption" color="text.secondary">
             {paused ? 'All MCP requests return a 503 error until you resume.' : 'Your AI assistant can call tools in this project.'}
           </Typography>
         </Box>
-        <Tooltip title={paused ? 'Resume — allow AI to use this project again' : 'Pause — block all AI requests to this project'}>
+        <Tooltip title={paused ? 'Resume — allow AI to use this server again' : 'Pause — block all AI requests to this server'}>
           <span>
             <Button size="small" variant={paused ? 'contained' : 'outlined'}
               color={paused ? 'success' : 'warning'}
@@ -1934,7 +1954,7 @@ function AlertConfigPanel({ projectId, initialConfig }: {
     timerRef.current = setTimeout(async () => {
       setSaveStatus('saving')
       try {
-        await api.patch(`/swagger/projects/${projectId}/alert-config`, { enabled: en, errorThresholdPct: thr, notifyEmail: em })
+        await api.patch(`/swagger/servers/${projectId}/alert-config`, { enabled: en, errorThresholdPct: thr, notifyEmail: em })
         setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000)
       } catch { setSaveStatus('error') }
     }, 700)
@@ -2001,7 +2021,7 @@ function ToolDialog({ open, onClose, onSaved, onDeleted, projectId, projectBaseU
     if (!editTool) return
     setDeleting(true)
     try {
-      await api.delete(`/swagger/projects/${projectId}/tools/${encodeURIComponent(editTool.name)}`)
+      await api.delete(`/swagger/servers/${projectId}/tools/${encodeURIComponent(editTool.name)}`)
       onDeleted?.(editTool.name)
       setDeleteConfirmOpen(false)
       onClose()
@@ -2047,9 +2067,9 @@ function ToolDialog({ open, onClose, onSaved, onDeleted, projectId, projectBaseU
       }
       let res: any
       if (isEdit) {
-        res = await api.put(`/swagger/projects/${projectId}/tools/${encodeURIComponent(editTool!.name)}`, payload)
+        res = await api.put(`/swagger/servers/${projectId}/tools/${encodeURIComponent(editTool!.name)}`, payload)
       } else {
-        res = await api.post(`/swagger/projects/${projectId}/tools`, payload)
+        res = await api.post(`/swagger/servers/${projectId}/tools`, payload)
       }
       const project: Project = res.data
       const savedTool = project.tools.find((t) => t.name === payload.name) ?? (payload as any)
@@ -2209,7 +2229,7 @@ function ToolDialog({ open, onClose, onSaved, onDeleted, projectId, projectBaseU
       <ConfirmDialog
         open={deleteConfirmOpen}
         title="Delete tool?"
-        message={`"${editTool?.name}" will be permanently removed from this project.`}
+        message={`"${editTool?.name}" will be permanently removed from this server.`}
         confirmLabel="Delete"
         confirmColor="error"
         loading={deleting}
@@ -2246,7 +2266,7 @@ function buildCurl(tool: GeneratedTool): string {
 }
 
 function buildMcpCurl(tool: GeneratedTool, projectId: string, hasKeys: boolean): string {
-  const url = `${window.location.origin}/api/mcp/project/${projectId}`
+  const url = `${window.location.origin}/api/mcp/server/${projectId}`
   const properties = tool.inputSchema.properties ?? {}
   const args = Object.fromEntries(
     Object.entries(properties).map(([k, v]) => [k, `<${v.type ?? 'string'}>`])
@@ -2334,7 +2354,7 @@ function ToolCommentsSection({ projectId, toolName, initialComments }: {
     setSaving(true)
     try {
       const { data } = await api.post<ToolComment>(
-        `/swagger/projects/${projectId}/tools/${encodeURIComponent(toolName)}/comments`,
+        `/swagger/servers/${projectId}/tools/${encodeURIComponent(toolName)}/comments`,
         { text: text.trim(), author: 'me' },
       )
       setComments((prev) => [...prev, data])
@@ -2343,7 +2363,7 @@ function ToolCommentsSection({ projectId, toolName, initialComments }: {
   }
 
   const handleDelete = async (id: string) => {
-    await api.delete(`/swagger/projects/${projectId}/tools/${encodeURIComponent(toolName)}/comments/${id}`)
+    await api.delete(`/swagger/servers/${projectId}/tools/${encodeURIComponent(toolName)}/comments/${id}`)
     setComments((prev) => prev.filter((c) => c.id !== id))
   }
 
@@ -2425,7 +2445,7 @@ function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged,
 
   const saveToolMeta = async (field: 'name' | 'description', newValue: string) => {
     const oldName = tool.name
-    await api.patch(`/swagger/projects/${projectId}/tools/${encodeURIComponent(oldName)}`, { [field]: newValue })
+    await api.patch(`/swagger/servers/${projectId}/tools/${encodeURIComponent(oldName)}`, { [field]: newValue })
     const updated = { ...tool, [field]: newValue }
     setTool(updated)
     onToolChanged(oldName, updated)
@@ -2437,7 +2457,7 @@ function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged,
     e.stopPropagation()
     const newEnabled = isDisabled
     const oldName = tool.name
-    await api.patch(`/swagger/projects/${projectId}/tools/${encodeURIComponent(oldName)}`, { enabled: newEnabled })
+    await api.patch(`/swagger/servers/${projectId}/tools/${encodeURIComponent(oldName)}`, { enabled: newEnabled })
     const updated = { ...tool, enabled: newEnabled }
     setTool(updated)
     onToolChanged(oldName, updated)
@@ -2459,7 +2479,7 @@ function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged,
       const payload = { jsonrpc: '2.0', method: 'tools/call', id: Date.now(), params: { name: tool.name, arguments: args } }
       const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' }
       if (anyApiKey) headers['auth'] = anyApiKey
-      const res = await api.post(`/mcp/project/${projectId}`, payload, { headers })
+      const res = await api.post(`/mcp/server/${projectId}`, payload, { headers })
       const rpc = parseMcpResponse(res.data)
       if (rpc?.error) { setResponse(JSON.stringify(rpc.error, null, 2)); setResponseIsError(true); return }
       const content = rpc?.result?.content ?? rpc?.content
@@ -2637,7 +2657,7 @@ function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged,
                         setSavingSchema(true)
                         try {
                           const schema = inferSchema(parsed)
-                          await api.patch(`/swagger/projects/${projectId}/tools/${encodeURIComponent(tool.name)}/output-schema`, { outputSchema: schema })
+                          await api.patch(`/swagger/servers/${projectId}/tools/${encodeURIComponent(tool.name)}/output-schema`, { outputSchema: schema })
                           const updated = { ...tool, outputSchema: schema }
                           setTool(updated)
                           onToolChanged(tool.name, updated)
@@ -2667,7 +2687,7 @@ function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged,
                 onClick={async () => {
                   setSavingSchema(true)
                   try {
-                    await api.patch(`/swagger/projects/${projectId}/tools/${encodeURIComponent(tool.name)}/output-schema`, { outputSchema: null })
+                    await api.patch(`/swagger/servers/${projectId}/tools/${encodeURIComponent(tool.name)}/output-schema`, { outputSchema: null })
                     const updated = { ...tool, outputSchema: undefined }
                     setTool(updated)
                     onToolChanged(tool.name, updated)
@@ -2721,7 +2741,7 @@ function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged,
 
             {/* MCP via POST */}
             <Box>
-              <Typography variant="subtitle2" fontWeight={700} mb={1}>MCP call (POST /mcp/project)</Typography>
+              <Typography variant="subtitle2" fontWeight={700} mb={1}>MCP call (POST /mcp/server)</Typography>
               <Box component="pre" sx={{
                 bgcolor: '#282c34', color: '#abb2bf', p: 2, borderRadius: 1,
                 fontSize: '0.78rem', overflowX: 'auto', position: 'relative', m: 0,
@@ -3006,7 +3026,7 @@ function DynamicResourceDialog({
     try {
       const builtArgs: Record<string, unknown> = {}
       for (const [k, v] of Object.entries(args)) { if (v !== '') builtArgs[k] = v }
-      const { data } = await api.post(`/swagger/projects/${projectId}/test-endpoint`, {
+      const { data } = await api.post(`/swagger/servers/${projectId}/test-endpoint`, {
         endpointRef: selectedTool.endpointRef,
         args: builtArgs,
       })
@@ -3047,7 +3067,7 @@ function DynamicResourceDialog({
         type: 'dynamic', endpointRef: selectedTool.endpointRef, inputDefaults,
         errorConfig: errorMessage.trim() ? { message: errorMessage.trim() } : undefined,
       }
-      const { data } = await api.post<McpResource>(`/swagger/projects/${projectId}/resources`, dto)
+      const { data } = await api.post<McpResource>(`/swagger/servers/${projectId}/resources`, dto)
       onSave(data); reset()
     } catch (err: any) {
       setFormError(err?.response?.data?.message ?? 'Failed to save.')
@@ -3376,11 +3396,11 @@ function ResourcesTab({ projectId, initialResources, tools, onChange }: {
     try {
       const dto = { name: form.name.trim(), uri: form.uri.trim(), description: form.description.trim() || undefined, mimeType: form.mimeType.trim() || undefined, content: form.content, editorData: form.editorData || undefined }
       if (editTarget) {
-        await api.put(`/swagger/projects/${projectId}/resources/${editTarget.id}`, dto)
+        await api.put(`/swagger/servers/${projectId}/resources/${editTarget.id}`, dto)
         const updated = resources.map((r) => r.id === editTarget.id ? { ...r, ...dto } : r)
         setResources(updated); onChange(updated)
       } else {
-        const { data } = await api.post<McpResource>(`/swagger/projects/${projectId}/resources`, dto)
+        const { data } = await api.post<McpResource>(`/swagger/servers/${projectId}/resources`, dto)
         const updated = [...resources, data]
         setResources(updated); onChange(updated)
       }
@@ -3394,7 +3414,7 @@ function ResourcesTab({ projectId, initialResources, tools, onChange }: {
     if (!deleteTarget) return
     setDeleting(true)
     try {
-      await api.delete(`/swagger/projects/${projectId}/resources/${deleteTarget.id}`)
+      await api.delete(`/swagger/servers/${projectId}/resources/${deleteTarget.id}`)
       const updated = resources.filter((r) => r.id !== deleteTarget.id)
       setResources(updated); onChange(updated)
     } finally { setDeleting(false); setDeleteTarget(null) }
@@ -3548,6 +3568,460 @@ function ResourcesTab({ projectId, initialResources, tools, onChange }: {
 
 // ─── PromptsTab ───────────────────────────────────────────────────────────────
 
+// ─── ChainsTab ────────────────────────────────────────────────────────────────
+
+function newStepId() { return `step_${Math.random().toString(36).slice(2, 10)}` }
+
+function StepBuilder({
+  step,
+  index,
+  total,
+  tools,
+  previousSteps,
+  onChange,
+  onRemove,
+  onMoveUp,
+  onMoveDown,
+}: {
+  step: ChainStep
+  index: number
+  total: number
+  tools: GeneratedTool[]
+  previousSteps: ChainStep[]
+  onChange: (s: ChainStep) => void
+  onRemove: () => void
+  onMoveUp: () => void
+  onMoveDown: () => void
+}) {
+  const tool = tools.find((t) => t.name === step.toolName)
+  const params = Object.keys(tool?.inputSchema?.properties ?? {})
+
+  const updateMapping = (paramName: string, input: ChainInputSource) => {
+    const existing = step.inputMapping.filter((m) => m.paramName !== paramName)
+    onChange({ ...step, inputMapping: [...existing, { paramName, input }] })
+  }
+
+  const getMapping = (paramName: string): ChainInputSource =>
+    step.inputMapping.find((m) => m.paramName === paramName)?.input ?? { source: 'literal', value: '' }
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2, mb: 1.5 }}>
+      <Box display="flex" alignItems="center" gap={1} mb={1.5}>
+        <Chip label={`Step ${index + 1}`} size="small" color="primary" sx={{ fontSize: '0.72rem', height: 20 }} />
+        <FormControl size="small" sx={{ flex: 1 }}>
+          <InputLabel>Tool</InputLabel>
+          <Select
+            value={step.toolName}
+            label="Tool"
+            onChange={(e) => {
+              const newTool = tools.find((t) => t.name === e.target.value)
+              const newParams = Object.keys(newTool?.inputSchema?.properties ?? {})
+              onChange({
+                ...step,
+                toolName: e.target.value,
+                inputMapping: newParams.map((p) => ({
+                  paramName: p,
+                  input: { source: 'literal' as const, value: '' },
+                })),
+              })
+            }}
+          >
+            {tools.map((t) => <MenuItem key={t.name} value={t.name}>{t.name}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <Tooltip title="Move up"><span>
+          <IconButton size="small" onClick={onMoveUp} disabled={index === 0}><IconChevronUp size={15} /></IconButton>
+        </span></Tooltip>
+        <Tooltip title="Move down"><span>
+          <IconButton size="small" onClick={onMoveDown} disabled={index === total - 1}><IconChevronDown size={15} /></IconButton>
+        </span></Tooltip>
+        <Tooltip title="Remove step">
+          <IconButton size="small" color="error" onClick={onRemove}><IconX size={15} /></IconButton>
+        </Tooltip>
+      </Box>
+
+      {params.length > 0 && tool && (
+        <Table size="small">
+          <TableHead>
+            <TableRow sx={{ bgcolor: 'action.hover' }}>
+              <TableCell sx={{ py: 0.5, fontWeight: 600, fontSize: '0.72rem', width: '25%' }}>Param</TableCell>
+              <TableCell sx={{ py: 0.5, fontWeight: 600, fontSize: '0.72rem', width: '22%' }}>Source</TableCell>
+              <TableCell sx={{ py: 0.5, fontWeight: 600, fontSize: '0.72rem' }}>Value / Reference</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {params.map((param) => {
+              const mapping = getMapping(param)
+              return (
+                <TableRow key={param} sx={{ '&:last-child td': { border: 0 } }}>
+                  <TableCell sx={{ py: 0.75 }}>
+                    <Typography fontFamily="monospace" fontSize="0.78rem" fontWeight={600}>{param}</Typography>
+                  </TableCell>
+                  <TableCell sx={{ py: 0.75 }}>
+                    <Select
+                      size="small" fullWidth value={mapping.source}
+                      onChange={(e) => {
+                        const src = e.target.value as ChainInputSource['source']
+                        if (src === 'literal') updateMapping(param, { source: 'literal', value: '' })
+                        else if (src === 'chain_input') updateMapping(param, { source: 'chain_input', paramName: '' })
+                        else updateMapping(param, { source: 'step_output', stepId: previousSteps[0]?.id ?? '', jsonPath: '' })
+                      }}
+                      sx={{ fontSize: '0.78rem' }}
+                    >
+                      <MenuItem value="literal" sx={{ fontSize: '0.78rem' }}>Literal</MenuItem>
+                      <MenuItem value="chain_input" sx={{ fontSize: '0.78rem' }}>Chain input</MenuItem>
+                      <MenuItem value="step_output" disabled={previousSteps.length === 0} sx={{ fontSize: '0.78rem' }}>Step output</MenuItem>
+                    </Select>
+                  </TableCell>
+                  <TableCell sx={{ py: 0.75 }}>
+                    {mapping.source === 'literal' && (
+                      <TextField size="small" fullWidth placeholder="value…"
+                        value={mapping.value}
+                        onChange={(e) => updateMapping(param, { source: 'literal', value: e.target.value })}
+                        InputProps={{ sx: { fontSize: '0.78rem' } }}
+                      />
+                    )}
+                    {mapping.source === 'chain_input' && (
+                      <TextField size="small" fullWidth placeholder="chain param name…"
+                        value={mapping.paramName}
+                        onChange={(e) => updateMapping(param, { source: 'chain_input', paramName: e.target.value })}
+                        InputProps={{ sx: { fontSize: '0.78rem' } }}
+                        helperText="Creates an input param on this chain"
+                      />
+                    )}
+                    {mapping.source === 'step_output' && (
+                      <Box display="flex" gap={0.5}>
+                        <FormControl size="small" sx={{ minWidth: 120 }}>
+                          <Select
+                            value={mapping.stepId}
+                            onChange={(e) => updateMapping(param, { ...mapping, source: 'step_output', stepId: e.target.value })}
+                            sx={{ fontSize: '0.78rem' }}
+                          >
+                            {previousSteps.map((s, i) => (
+                              <MenuItem key={s.id} value={s.id} sx={{ fontSize: '0.78rem' }}>Step {i + 1}</MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                        <TextField size="small" placeholder="JSON path (e.g. data.id)"
+                          value={mapping.jsonPath}
+                          onChange={(e) => updateMapping(param, { ...mapping, source: 'step_output', jsonPath: e.target.value })}
+                          InputProps={{ sx: { fontSize: '0.78rem' } }}
+                          sx={{ flex: 1 }}
+                        />
+                      </Box>
+                    )}
+                  </TableCell>
+                </TableRow>
+              )
+            })}
+          </TableBody>
+        </Table>
+      )}
+      {params.length === 0 && step.toolName && (
+        <Typography variant="caption" color="text.secondary">This tool has no parameters.</Typography>
+      )}
+      {!step.toolName && (
+        <Typography variant="caption" color="text.secondary">Select a tool above to configure input mapping.</Typography>
+      )}
+    </Paper>
+  )
+}
+
+function ChainDialog({
+  open,
+  editTarget,
+  tools,
+  onClose,
+  onSaved,
+}: {
+  open: boolean
+  editTarget: ToolChain | null
+  tools: GeneratedTool[]
+  onClose: () => void
+  onSaved: (chain: ToolChain) => void
+}) {
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [enabled, setEnabled] = useState(true)
+  const [steps, setSteps] = useState<ChainStep[]>([])
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (open) {
+      setName(editTarget?.name ?? '')
+      setDescription(editTarget?.description ?? '')
+      setEnabled(editTarget?.enabled !== false)
+      setSteps(editTarget?.steps ?? [])
+      setError('')
+    }
+  }, [open, editTarget])
+
+  const chainInputParams = useMemo(() => {
+    const params = new Set<string>()
+    for (const step of steps) {
+      for (const m of step.inputMapping) {
+        if (m.input.source === 'chain_input' && m.input.paramName.trim()) {
+          params.add(m.input.paramName.trim())
+        }
+      }
+    }
+    return [...params]
+  }, [steps])
+
+  const inputSchema: JsonSchema = useMemo(() => ({
+    type: 'object',
+    properties: Object.fromEntries(chainInputParams.map((p) => [p, { type: 'string', description: `Chain input: ${p}` }])),
+    required: chainInputParams,
+  }), [chainInputParams])
+
+  const addStep = () => {
+    setSteps((prev) => [...prev, { id: newStepId(), toolName: tools[0]?.name ?? '', inputMapping: [] }])
+  }
+
+  const updateStep = (i: number, s: ChainStep) => setSteps((prev) => prev.map((x, idx) => idx === i ? s : x))
+  const removeStep = (i: number) => setSteps((prev) => prev.filter((_, idx) => idx !== i))
+  const moveStep = (i: number, dir: -1 | 1) => {
+    setSteps((prev) => {
+      const arr = [...prev]
+      const j = i + dir
+      if (j < 0 || j >= arr.length) return arr;
+      [arr[i], arr[j]] = [arr[j], arr[i]]
+      return arr
+    })
+  }
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth scroll="paper">
+      <DialogTitle>{editTarget ? `Edit chain — ${editTarget.name}` : 'New chain'}</DialogTitle>
+      <DialogContent dividers>
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        <Box display="flex" flexDirection="column" gap={2}>
+          <Box display="flex" gap={2} alignItems="flex-start">
+            <TextField
+              size="small" label="Name" required value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. search_and_book"
+              sx={{ flex: 1 }}
+            />
+            <FormControlLabel
+              control={<Switch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />}
+              label="Enabled"
+              sx={{ mt: 0.25, flexShrink: 0 }}
+            />
+          </Box>
+          <TextField
+            size="small" fullWidth multiline minRows={2} label="Description" value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="What this chain does…"
+          />
+
+          <Box>
+            <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+              <Typography variant="subtitle2" fontWeight={700}>Steps</Typography>
+              <Button size="small" startIcon={<IconPlus size={14} />} onClick={addStep}
+                disabled={tools.length === 0}>
+                Add step
+              </Button>
+            </Box>
+
+            {steps.length === 0 ? (
+              <Alert severity="info">
+                Click <strong>Add step</strong> to start building the chain.
+                Each step calls a tool and passes its output to the next step.
+              </Alert>
+            ) : (
+              steps.map((step, i) => (
+                <StepBuilder
+                  key={step.id}
+                  step={step}
+                  index={i}
+                  total={steps.length}
+                  tools={tools}
+                  previousSteps={steps.slice(0, i)}
+                  onChange={(s) => updateStep(i, s)}
+                  onRemove={() => removeStep(i)}
+                  onMoveUp={() => moveStep(i, -1)}
+                  onMoveDown={() => moveStep(i, 1)}
+                />
+              ))
+            )}
+          </Box>
+
+          {chainInputParams.length > 0 && (
+            <Box>
+              <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>
+                Auto-derived chain inputs (exposed to the MCP client)
+              </Typography>
+              <Box display="flex" gap={0.5} flexWrap="wrap">
+                {chainInputParams.map((p) => (
+                  <Chip key={p} label={p} size="small" variant="outlined" color="primary"
+                    sx={{ fontSize: '0.72rem', fontFamily: 'monospace', height: 20 }} />
+                ))}
+              </Box>
+            </Box>
+          )}
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button
+          variant="contained" disabled={saving}
+          startIcon={saving ? <CircularProgress size={14} color="inherit" /> : undefined}
+          onClick={async () => {
+            if (!name.trim()) { setError('Name is required.'); return }
+            if (steps.length === 0) { setError('Add at least one step.'); return }
+            setSaving(true); setError('')
+            onSaved({ id: editTarget?.id ?? '', name: name.trim(), description: description.trim() || undefined, inputSchema, steps, enabled })
+          }}
+        >
+          {saving ? 'Saving…' : editTarget ? 'Save changes' : 'Create chain'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  )
+}
+
+function ChainsTab({ projectId, initialChains, tools, onChange }: {
+  projectId: string
+  initialChains: ToolChain[]
+  tools: GeneratedTool[]
+  onChange: (chains: ToolChain[]) => void
+}) {
+  const [chains, setChains] = useState<ToolChain[]>(initialChains)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editTarget, setEditTarget] = useState<ToolChain | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<ToolChain | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const openCreate = () => { setEditTarget(null); setDialogOpen(true) }
+  const openEdit = (c: ToolChain) => { setEditTarget(c); setDialogOpen(true) }
+
+  const handleSaved = async (chain: ToolChain) => {
+    try {
+      if (editTarget) {
+        const { data } = await api.patch<ToolChain>(`/swagger/servers/${projectId}/chains/${editTarget.id}`, chain)
+        const updated = chains.map((c) => c.id === editTarget.id ? data : c)
+        setChains(updated); onChange(updated)
+      } else {
+        const { data } = await api.post<ToolChain>(`/swagger/servers/${projectId}/chains`, chain)
+        const updated = [data, ...chains]
+        setChains(updated); onChange(updated)
+      }
+      setDialogOpen(false)
+    } catch (err: any) {
+      alert(err?.response?.data?.message ?? 'Failed to save chain.')
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await api.delete(`/swagger/servers/${projectId}/chains/${deleteTarget.id}`)
+      const updated = chains.filter((c) => c.id !== deleteTarget.id)
+      setChains(updated); onChange(updated)
+    } finally {
+      setDeleting(false)
+      setDeleteTarget(null)
+    }
+  }
+
+  return (
+    <Box>
+      <Box display="flex" alignItems="flex-start" justifyContent="space-between" mb={2.5} flexWrap="wrap" gap={1}>
+        <Box>
+          <Typography variant="h6" fontWeight={700} mb={0.25}>Tool chains</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Sequential tool compositions that appear as a single MCP tool.
+            Each step's output is available to the next step.
+          </Typography>
+        </Box>
+        <Button size="small" variant="contained" startIcon={<IconPlus size={16} />} onClick={openCreate}
+          disabled={tools.length === 0}>
+          New chain
+        </Button>
+      </Box>
+
+      {tools.length === 0 && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          No tools available. Upload a spec first to create tool chains.
+        </Alert>
+      )}
+
+      {chains.length === 0 ? (
+        <Alert severity="info">
+          No chains yet. Click <strong>New chain</strong> to create one.
+        </Alert>
+      ) : (
+        <Box display="flex" flexDirection="column" gap={1.5}>
+          {chains.map((chain) => (
+            <Paper key={chain.id} variant="outlined" sx={{
+              p: 2,
+              '&:hover': { borderColor: 'primary.main' },
+              transition: 'border-color 0.15s',
+            }}>
+              <Box display="flex" alignItems="flex-start" gap={1.5}>
+                <Box sx={{ color: 'primary.main', mt: 0.25, flexShrink: 0 }}>
+                  <IconArrowsShuffle size={18} />
+                </Box>
+                <Box flex={1} minWidth={0}>
+                  <Box display="flex" alignItems="center" gap={1} mb={0.25}>
+                    <Typography fontWeight={700} noWrap>{chain.name}</Typography>
+                    {chain.enabled === false && <Chip label="disabled" size="small" color="default" sx={{ fontSize: '0.68rem', height: 18 }} />}
+                    <Chip label={`${chain.steps.length} step${chain.steps.length !== 1 ? 's' : ''}`} size="small" variant="outlined" sx={{ fontSize: '0.68rem', height: 18 }} />
+                  </Box>
+                  {chain.description && (
+                    <Typography variant="body2" color="text.secondary" noWrap>{chain.description}</Typography>
+                  )}
+                  <Box display="flex" gap={0.5} mt={0.5} flexWrap="wrap">
+                    {chain.steps.map((s, i) => (
+                      <Typography key={s.id} variant="caption" fontFamily="monospace" color="text.secondary">
+                        {i > 0 && '→ '}{s.toolName}
+                      </Typography>
+                    ))}
+                  </Box>
+                </Box>
+                <Box display="flex" gap={0.25} flexShrink={0}>
+                  <Tooltip title="Edit">
+                    <IconButton size="small" onClick={() => openEdit(chain)}>
+                      <IconEdit size={15} />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Delete">
+                    <IconButton size="small" color="error" onClick={() => setDeleteTarget(chain)}>
+                      <IconTrash size={15} />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              </Box>
+            </Paper>
+          ))}
+        </Box>
+      )}
+
+      <ChainDialog
+        open={dialogOpen}
+        editTarget={editTarget}
+        tools={tools}
+        onClose={() => setDialogOpen(false)}
+        onSaved={handleSaved}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={`Delete chain "${deleteTarget?.name}"?`}
+        message="This chain will be permanently removed and will no longer appear in the MCP server."
+        confirmLabel="Delete"
+        confirmColor="error"
+        loading={deleting}
+        onConfirm={handleDelete}
+        onClose={() => setDeleteTarget(null)}
+      />
+    </Box>
+  )
+}
+
 function PromptsTab({ projectId, initialPrompts, onChange }: {
   projectId: string
   initialPrompts: McpPrompt[]
@@ -3565,24 +4039,22 @@ function PromptsTab({ projectId, initialPrompts, onChange }: {
   const attachedIds = new Set(refs.map((r) => r.promptId))
   const attachedPrompts = globals.filter((p) => attachedIds.has(p.id))
 
+  useEffect(() => {
+    setLoadingGlobals(true)
+    api.get<GlobalPrompt[]>('/prompts')
+      .then((r) => setGlobals(r.data))
+      .finally(() => setLoadingGlobals(false))
+  }, [])
+
   const openPicker = async () => {
     setPickerSearch('')
     setPickerOpen(true)
-    if (globals.length === 0) {
-      setLoadingGlobals(true)
-      try {
-        const { data } = await api.get<GlobalPrompt[]>('/prompts')
-        setGlobals(data)
-      } finally {
-        setLoadingGlobals(false)
-      }
-    }
   }
 
   const handleAdd = async (promptId: string) => {
     setAdding(promptId)
     try {
-      await api.post(`/swagger/projects/${projectId}/prompts`, { promptId })
+      await api.post(`/swagger/servers/${projectId}/prompts`, { promptId })
       const updated = [...refs, { promptId }]
       setRefs(updated); onChange(updated)
     } finally {
@@ -3593,7 +4065,7 @@ function PromptsTab({ projectId, initialPrompts, onChange }: {
   const handleRemove = async (promptId: string) => {
     setRemoving(promptId)
     try {
-      await api.delete(`/swagger/projects/${projectId}/prompts/${promptId}`)
+      await api.delete(`/swagger/servers/${projectId}/prompts/${promptId}`)
       const updated = refs.filter((r) => r.promptId !== promptId)
       setRefs(updated); onChange(updated)
     } finally {
@@ -3802,7 +4274,7 @@ function ProjectLogs({ projectId }: { projectId: string }) {
 
   const load = (s = 0) => {
     setLoading(true)
-    api.get<{ logs: ExecLog[]; total: number }>(`/projects/${projectId}/logs?limit=${LIMIT}&skip=${s}`)
+    api.get<{ logs: ExecLog[]; total: number }>(`/servers/${projectId}/logs?limit=${LIMIT}&skip=${s}`)
       .then((r) => { setLogs(r.data.logs); setTotal(r.data.total); setSkip(s) })
       .finally(() => setLoading(false))
   }
@@ -3886,7 +4358,7 @@ function ProjectLogs({ projectId }: { projectId: string }) {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-export default function ProjectDetail() {
+export default function ServerDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [project, setProject] = useState<Project | null>(null)
@@ -3904,14 +4376,14 @@ export default function ProjectDetail() {
 
   useEffect(() => {
     if (!id) return
-    api.get<Project>(`/swagger/projects/${id}`)
+    api.get<Project>(`/swagger/servers/${id}`)
       .then((r) => { setProject(r.data); setBaseUrl(r.data.baseUrl); setIsPaused(r.data.isPaused ?? false) })
-      .catch(() => setError('Project not found.'))
+      .catch(() => setError('Server not found.'))
       .finally(() => setLoading(false))
   }, [id])
 
   const saveProjectInfo = async (field: 'name' | 'description', value: string) => {
-    await api.patch(`/swagger/projects/${id}/info`, { [field]: value })
+    await api.patch(`/swagger/servers/${id}/info`, { [field]: value })
     setProject((prev) => prev ? { ...prev, [field]: value } : prev)
   }
 
@@ -3946,7 +4418,7 @@ export default function ProjectDetail() {
     return <Box display="flex" justifyContent="center" alignItems="center" height="50vh"><CircularProgress /></Box>
   }
   if (error || !project) {
-    return <Box p={3}><Alert severity="error">{error || 'Error loading project.'}</Alert></Box>
+    return <Box p={3}><Alert severity="error">{error || 'Error loading server.'}</Alert></Box>
   }
 
   const methodCounts = (project.tools ?? []).reduce<Record<string, number>>((acc, t) => {
@@ -3968,7 +4440,7 @@ export default function ProjectDetail() {
     <Box py={3} px={0}>
       {/* Nav */}
       <Box mb={2}>
-        <Button startIcon={<IconArrowLeft size={18} />} size="small" onClick={() => navigate('/')}>Projects</Button>
+        <Button startIcon={<IconArrowLeft size={18} />} size="small" onClick={() => navigate('/')}>Servers</Button>
       </Box>
 
       {/* Header — always visible */}
@@ -3976,7 +4448,7 @@ export default function ProjectDetail() {
         <Box display="flex" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={2}>
           <Box minWidth={0} flexGrow={1}>
             <InlineEdit value={project.name} onSave={(v) => saveProjectInfo('name', v)}
-              placeholder="Project name" fontSize="1.375rem" fontWeight={700} />
+              placeholder="Server name" fontSize="1.375rem" fontWeight={700} />
             <Box mt={0.5}>
               <InlineEdit value={project.description ?? ''} onSave={(v) => saveProjectInfo('description', v)}
                 multiline placeholder="Add a short description…" emptyLabel="Add a short description…"
@@ -4023,6 +4495,8 @@ export default function ProjectDetail() {
           label={`Resources${(project.resources ?? []).length > 0 ? ` (${project.resources!.length})` : ''}`} />
         <Tab icon={<IconBulb size={16} />} iconPosition="start"
           label={`Prompts${(project.prompts ?? []).length > 0 ? ` (${project.prompts!.length})` : ''}`} />
+        <Tab icon={<IconArrowsShuffle size={16} />} iconPosition="start"
+          label={`Chains${(project.chains ?? []).length > 0 ? ` (${project.chains!.length})` : ''} (WIP)`} disabled />
         <Tab icon={<IconAdjustments size={16} />} iconPosition="start" label="Settings" />
         <Tab icon={<IconChartBar size={16} />} iconPosition="start" label="Activity" />
         <Tab icon={<IconBook size={16} />} iconPosition="start" label="AI View" />
@@ -4151,8 +4625,18 @@ export default function ProjectDetail() {
         />
       )}
 
-      {/* ── Tab 5: Settings ───────────────────────────────────────────────────── */}
+      {/* ── Tab 5: Chains ─────────────────────────────────────────────────────── */}
       {tab === 5 && (
+        <ChainsTab
+          projectId={id!}
+          initialChains={project.chains ?? []}
+          tools={project.tools ?? []}
+          onChange={(chains) => setProject((prev) => prev ? { ...prev, chains } : prev)}
+        />
+      )}
+
+      {/* ── Tab 6: Settings ───────────────────────────────────────────────────── */}
+      {tab === 6 && (
         <>
           <BaseUrlPanel projectId={id!} initialValue={baseUrl} onChange={setBaseUrl} />
           <AuthConfigPanel
@@ -4176,8 +4660,8 @@ export default function ProjectDetail() {
         </>
       )}
 
-      {/* ── Tab 6: Activity ───────────────────────────────────────────────────── */}
-      {tab === 6 && (
+      {/* ── Tab 7: Activity ───────────────────────────────────────────────────── */}
+      {tab === 7 && (
         <>
           <Box display="flex" alignItems="center" gap={1} mb={2}>
             <Typography variant="h6" fontWeight={700}>Activity Log</Typography>
@@ -4199,8 +4683,8 @@ export default function ProjectDetail() {
         </>
       )}
 
-      {/* ── Tab 7: AI View ────────────────────────────────────────────────────── */}
-      {tab === 7 && (
+      {/* ── Tab 8: AI View ────────────────────────────────────────────────────── */}
+      {tab === 8 && (
         <>
           <Box display="flex" alignItems="center" gap={1} mb={2}>
             <Typography variant="h6" fontWeight={700}>What your AI sees</Typography>
@@ -4231,7 +4715,7 @@ export default function ProjectDetail() {
         onSuccess={(result) => {
           setReimportOpen(false)
           setReimportSuccess(result)
-          api.get<Project>(`/swagger/projects/${id}`).then((r) => {
+          api.get<Project>(`/swagger/servers/${id}`).then((r) => {
             setProject(r.data)
             setBaseUrl(r.data.baseUrl)
           })

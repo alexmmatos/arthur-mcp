@@ -118,3 +118,30 @@ export interface McpResource {
 export interface McpPrompt {
   promptId: string;
 }
+
+// ─── Tool Chaining ────────────────────────────────────────────────────────────
+
+export type ChainInputSource =
+  | { source: 'literal'; value: string }
+  | { source: 'chain_input'; paramName: string }
+  | { source: 'step_output'; stepId: string; jsonPath: string };
+
+export interface ChainInputMapping {
+  paramName: string;
+  input: ChainInputSource;
+}
+
+export interface ChainStep {
+  id: string;
+  toolName: string;
+  inputMapping: ChainInputMapping[];
+}
+
+export interface ToolChain {
+  id: string;
+  name: string;
+  description?: string;
+  inputSchema: JsonSchema;
+  steps: ChainStep[];
+  enabled?: boolean;
+}

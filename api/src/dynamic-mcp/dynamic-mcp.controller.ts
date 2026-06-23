@@ -19,42 +19,42 @@ import { ProjectStateGuard } from './project-state.guard';
 
 /**
  * Per-project MCP endpoint — stateless Streamable HTTP.
- * URL: /mcp/project/:projectId
+ * URL: /mcp/server/:serverId
  *
  * Supports MCP clients (Claude Desktop, Cursor, etc.) using:
- *   POST   /mcp/project/:projectId   → ListTools / CallTool
- *   GET    /mcp/project/:projectId   → SSE (connectivity ping)
- *   DELETE /mcp/project/:projectId   → End session (no-op in stateless mode)
+ *   POST   /mcp/server/:serverId   → ListTools / CallTool
+ *   GET    /mcp/server/:serverId   → SSE (connectivity ping)
+ *   DELETE /mcp/server/:serverId   → End session (no-op in stateless mode)
  */
-@Controller('mcp/project')
+@Controller('mcp/server')
 export class DynamicMcpController {
   constructor(private readonly dynamicMcpService: DynamicMcpService) {}
 
   /**
    * Simple REST endpoint for testing a tool directly from the frontend.
    * Calls baseUrl + external endpoint without going through the MCP protocol.
-   * POST /mcp/project/:projectId/execute/:toolName
+   * POST /mcp/server/:serverId/execute/:toolName
    * Body: { arguments: { param1: value1, ... } }
    */
-  @Post(':projectId/execute/:toolName')
+  @Post(':serverId/execute/:toolName')
   @HttpCode(200)
   async executeToolDirect(
-    @Param('projectId') projectId: string,
+    @Param('serverId') serverId: string,
     @Param('toolName') toolName: string,
     @Body('arguments') args: Record<string, unknown>,
   ) {
-    return this.dynamicMcpService.executeTool(projectId, toolName, args ?? {});
+    return this.dynamicMcpService.executeTool(serverId, toolName, args ?? {});
   }
 
   @UseGuards(ProjectStateGuard, McpApiKeyGuard, RateLimitGuard)
-  @Post(':projectId')
+  @Post(':serverId')
   @HttpCode(200)
   async handlePost(
-    @Param('projectId') projectId: string,
+    @Param('serverId') serverId: string,
     @Req() req: Request,
     @Res() res: Response,
   ) {
-    const server = await this.dynamicMcpService.createMcpServer(projectId);
+    const server = await this.dynamicMcpService.createMcpServer(serverId);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true, // returns plain JSON instead of SSE for clients that accept JSON
@@ -67,13 +67,13 @@ export class DynamicMcpController {
   }
 
   @UseGuards(ProjectStateGuard, McpApiKeyGuard, RateLimitGuard)
-  @Get(':projectId')
+  @Get(':serverId')
   async handleGet(
-    @Param('projectId') projectId: string,
+    @Param('serverId') serverId: string,
     @Req() req: Request,
     @Res() res: Response,
   ) {
-    const server = await this.dynamicMcpService.createMcpServer(projectId);
+    const server = await this.dynamicMcpService.createMcpServer(serverId);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
@@ -86,14 +86,14 @@ export class DynamicMcpController {
   }
 
   @UseGuards(McpApiKeyGuard, RateLimitGuard)
-  @Delete(':projectId')
+  @Delete(':serverId')
   @HttpCode(200)
   async handleDelete(
-    @Param('projectId') projectId: string,
+    @Param('serverId') serverId: string,
     @Req() req: Request,
     @Res() res: Response,
   ) {
-    const server = await this.dynamicMcpService.createMcpServer(projectId);
+    const server = await this.dynamicMcpService.createMcpServer(serverId);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,

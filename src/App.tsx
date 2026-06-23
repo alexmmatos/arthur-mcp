@@ -3,9 +3,9 @@ import Layout from './components/Layout'
 import Login from './pages/Login'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
-import Projects from './pages/Projects'
-import NewProject from './pages/NewProject'
-import ProjectDetail from './pages/ProjectDetail'
+import Servers from './pages/Servers'
+import NewServer from './pages/NewServer'
+import ServerDetail from './pages/ServerDetail'
 import McpDocs from './pages/McpDocs'
 import Profile from './pages/Profile'
 import Dashboard from './pages/Dashboard'
@@ -15,6 +15,7 @@ import SetupWizard from './pages/SetupWizard'
 import SharePage from './pages/SharePage'
 import Templates from './pages/Templates'
 import Prompts from './pages/Prompts'
+import Secrets from './pages/Secrets'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem('token')
@@ -47,16 +48,17 @@ export default function App() {
             <RequireSetup>
               <Layout>
                 <Routes>
-                  <Route path="/" element={<Projects />} />
-                  <Route path="/projects/new" element={<NewProject />} />
-                  <Route path="/projects/:id" element={<ProjectDetail />} />
-                  <Route path="/projects/:id/docs" element={<McpDocs />} />
+                  <Route path="/" element={<Servers />} />
+                  <Route path="/servers/new" element={<NewServer />} />
+                  <Route path="/servers/:id" element={<ServerDetail />} />
+                  <Route path="/servers/:id/docs" element={<McpDocs />} />
 <Route path="/profile" element={<Profile />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/audit-logs" element={<AuditLogs />} />
                   <Route path="/templates" element={<Templates />} />
                   <Route path="/prompts" element={<Prompts />} />
+                  <Route path="/secrets" element={<Secrets />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Layout>

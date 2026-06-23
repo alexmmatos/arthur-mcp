@@ -36,6 +36,35 @@ async function fetchOAuth2Token(tokenUrl: string, clientId: string, clientSecret
   return data.access_token;
 }
 
+// ─── Secret resolution ────────────────────────────────────────────────────────
+
+export function resolveSecretRefs(auth: AuthConfig, secrets: Map<string, string>): AuthConfig {
+  const resolve = (val: string): string =>
+    val.replace(/\{\{secret:([^}]+)\}\}/g, (_, name: string) => secrets.get(name.trim()) ?? `{{secret:${name}}}`);
+
+  switch (auth.type) {
+    case 'bearer':
+      return { ...auth, token: resolve(auth.token ?? '') };
+    case 'api-key':
+      return { ...auth, value: resolve(auth.value ?? '') };
+    case 'basic':
+      return { ...auth, password: resolve(auth.password ?? '') };
+    case 'oauth2-client':
+      return {
+        ...auth,
+        clientId: resolve(auth.clientId ?? ''),
+        clientSecret: resolve(auth.clientSecret ?? ''),
+      };
+    case 'custom':
+      return {
+        ...auth,
+        headers: (auth.headers ?? []).map((h) => ({ ...h, value: resolve(h.value ?? '') })),
+      };
+    default:
+      return auth;
+  }
+}
+
 // ─── Main function ────────────────────────────────────────────────────────────
 
 export async function applyAuth(request: PreparedRequest, auth: AuthConfig): Promise<PreparedRequest> {

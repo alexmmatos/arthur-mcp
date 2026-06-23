@@ -187,9 +187,9 @@ export default function Upload() {
             <Button
               color="inherit"
               size="small"
-              onClick={() => navigate(`/projects/${result._id}`)}
+              onClick={() => navigate(`/servers/${result._id}`)}
             >
-              View project
+              View server
             </Button>
           }
         >

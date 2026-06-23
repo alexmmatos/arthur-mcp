@@ -5,8 +5,8 @@ const TTL_7_DAYS = 7 * 24 * 60 * 60;
 
 export interface LogEntry {
   id: string;
-  projectId: string;
-  projectName: string;
+  serverId: string;
+  serverName: string;
   toolName: string;
   source: 'mcp' | 'direct';
   statusCode: number;
@@ -17,8 +17,8 @@ export interface LogEntry {
 }
 
 export interface LogExecutionDto {
-  projectId: string;
-  projectName: string;
+  serverId: string;
+  serverName: string;
   toolName: string;
   source?: 'mcp' | 'direct';
   statusCode?: number;
@@ -35,8 +35,8 @@ export class ExecutionLogsService {
     const id = crypto.randomUUID();
     const entry: LogEntry = {
       id,
-      projectId: dto.projectId,
-      projectName: dto.projectName,
+      serverId: dto.serverId,
+      serverName: dto.serverName,
       toolName: dto.toolName,
       source: dto.source ?? 'mcp',
       statusCode: dto.statusCode ?? 200,
@@ -45,7 +45,7 @@ export class ExecutionLogsService {
       errorMessage: dto.errorMessage,
       createdAt: new Date(),
     };
-    this.cache.set(`${dto.projectId}:${id}`, entry);
+    this.cache.set(`${dto.serverId}:${id}`, entry);
   }
 
   private allEntries(): LogEntry[] {
@@ -53,8 +53,8 @@ export class ExecutionLogsService {
     return Object.values(map).filter((v): v is LogEntry => !!v);
   }
 
-  private projectEntries(projectId: string): LogEntry[] {
-    const prefix = `${projectId}:`;
+  private projectEntries(serverId: string): LogEntry[] {
+    const prefix = `${serverId}:`;
     const keys = this.cache.keys().filter((k) => k.startsWith(prefix));
     const map = this.cache.mget<LogEntry>(keys);
     return Object.values(map)
@@ -62,12 +62,12 @@ export class ExecutionLogsService {
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
-  async findByProject(projectId: string, limit = 100, skip = 0): Promise<LogEntry[]> {
-    return this.projectEntries(projectId).slice(skip, skip + limit);
+  async findByProject(serverId: string, limit = 100, skip = 0): Promise<LogEntry[]> {
+    return this.projectEntries(serverId).slice(skip, skip + limit);
   }
 
-  async countByProject(projectId: string): Promise<number> {
-    return this.projectEntries(projectId).length;
+  async countByProject(serverId: string): Promise<number> {
+    return this.projectEntries(serverId).length;
   }
 
   async getStats(since?: Date): Promise<{
@@ -105,11 +105,11 @@ export class ExecutionLogsService {
     return this.allEntries().filter((e) => e.createdAt >= from && e.createdAt <= to);
   }
 
-  async getProjectStats(projectId: string, since?: Date): Promise<{
+  async getProjectStats(serverId: string, since?: Date): Promise<{
     total: number; errors: number; avgResponseMs: number;
     byTool: { toolName: string; count: number; errors: number }[];
   }> {
-    let logs = this.projectEntries(projectId);
+    let logs = this.projectEntries(serverId);
     if (since) logs = logs.filter((e) => e.createdAt >= since);
     const total = logs.length;
     const errors = logs.filter((e) => e.isError).length;
@@ -138,8 +138,8 @@ export class ExecutionLogsService {
     return result;
   }
 
-  deleteByProject(projectId: string): void {
-    const prefix = `${projectId}:`;
+  deleteByProject(serverId: string): void {
+    const prefix = `${serverId}:`;
     const keys = this.cache.keys().filter((k) => k.startsWith(prefix));
     if (keys.length) this.cache.del(keys);
   }
