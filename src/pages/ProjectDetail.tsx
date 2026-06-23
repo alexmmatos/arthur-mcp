@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import Handlebars from 'handlebars'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Accordion,
@@ -134,26 +135,24 @@ interface McpResource {
   description?: string
   mimeType?: string
   content: string
-}
-
-interface McpPromptArgument {
-  name: string
-  description?: string
-  required?: boolean
-}
-
-interface McpPromptEndpoint {
-  method: string
-  url: string
+  editorData?: string
+  type?: 'static' | 'dynamic'
+  endpointRef?: EndpointRef
+  inputDefaults?: Record<string, unknown>
+  iteratorPath?: string
+  errorConfig?: { message: string }
 }
 
 interface McpPrompt {
+  promptId: string
+}
+
+interface GlobalPrompt {
   id: string
   name: string
   description?: string
-  arguments?: McpPromptArgument[]
-  template?: string
-  endpoint?: McpPromptEndpoint
+  content: string
+  tags: string[]
 }
 
 interface Project {
@@ -824,7 +823,7 @@ function OAuthClientPanel({ projectId, initialClientId, initialClientSecret, ser
       <Box display="flex" alignItems="center" gap={1} mb={2}>
         <IconKey size={18} style={{ color: hasCredentials ? '#5D87FF' : undefined, opacity: hasCredentials ? 1 : 0.38 }} />
         <Box display="flex" alignItems="center" gap={0.5} flexGrow={1}>
-          <Typography variant="subtitle1" fontWeight={700}>ChatGPT / OAuth Client</Typography>
+          <Typography variant="subtitle1" fontWeight={700}>OAuth Client</Typography>
           <HelpButton title="ChatGPT OAuth Client">
             <Typography variant="body2" gutterBottom>
               Allows ChatGPT (and other OAuth 2.0 clients) to connect to this project's MCP endpoint using your account credentials.
@@ -2746,20 +2745,606 @@ function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged,
 
 // ─── ResourcesTab ─────────────────────────────────────────────────────────────
 
-function ResourcesTab({ projectId, initialResources, onChange }: {
+// ─── GrapesJS visual editor ───────────────────────────────────────────────────
+
+function GrapesInner({
+  initialHtml,
+  initialEditorData,
+  editorRef,
+}: {
+  initialHtml: string
+  initialEditorData?: string
+  editorRef: React.MutableRefObject<any>
+}) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+
+    let editor: any = null
+    let destroyed = false
+
+    const init = async () => {
+      const gj = (await import('grapesjs')).default
+      await import('grapesjs/dist/css/grapes.min.css')
+      if (destroyed || !containerRef.current) return
+
+      editor = gj.init({
+        container: containerRef.current,
+        height: '100%',
+        width: 'auto',
+        storageManager: false,
+        fromElement: false,
+      })
+
+      if (initialEditorData) {
+        try { editor.loadProjectData(JSON.parse(initialEditorData)) }
+        catch { editor.setComponents(initialHtml || '') }
+      } else if (initialHtml) {
+        editor.setComponents(initialHtml)
+      }
+
+      editorRef.current = editor
+      setLoading(false)
+    }
+
+    init()
+
+    return () => {
+      destroyed = true
+      if (editor) { editor.destroy(); editorRef.current = null }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return (
+    <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
+      {loading && (
+        <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, bgcolor: 'background.paper' }}>
+          <CircularProgress />
+        </Box>
+      )}
+      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+    </Box>
+  )
+}
+
+function GrapesEditorDialog({
+  open,
+  initialHtml,
+  initialEditorData,
+  onApply,
+  onClose,
+}: {
+  open: boolean
+  initialHtml: string
+  initialEditorData?: string
+  onApply: (html: string, editorData: string) => void
+  onClose: () => void
+}) {
+  const editorRef = useRef<any>(null)
+
+  const handleApply = () => {
+    const editor = editorRef.current
+    if (!editor) return
+    const html = editor.getHtml() as string
+    const css = editor.getCss() as string
+    const fullHtml = css ? `<style>${css}</style>\n${html}` : html
+    const data = JSON.stringify(editor.getProjectData())
+    onApply(fullHtml, data)
+    onClose()
+  }
+
+  return (
+    <Dialog open={open} onClose={onClose} fullScreen>
+      <Box sx={{
+        display: 'flex', alignItems: 'center', gap: 2,
+        px: 2, py: 1.25, bgcolor: 'primary.main', color: '#fff', flexShrink: 0,
+      }}>
+        <Typography variant="subtitle1" fontWeight={700} sx={{ flex: 1 }}>
+          Visual Editor
+        </Typography>
+        <Button size="small" onClick={onClose} sx={{ color: '#fff' }}>Cancel</Button>
+        <Button size="small" variant="outlined" onClick={handleApply}
+          sx={{ color: '#fff', borderColor: 'rgba(255,255,255,0.5)', '&:hover': { borderColor: '#fff' } }}>
+          Apply & close
+        </Button>
+      </Box>
+      <Box sx={{ flex: 1, overflow: 'hidden', height: 'calc(100vh - 52px)' }}>
+        {open && (
+          <GrapesInner
+            initialHtml={initialHtml}
+            initialEditorData={initialEditorData}
+            editorRef={editorRef}
+          />
+        )}
+      </Box>
+    </Dialog>
+  )
+}
+
+// ─── GrapesEditorDialog extended for dynamic resource variables ───────────────
+
+function GrapesEditorDialogWithVars({
+  open, initialHtml, initialEditorData, variables, onApply, onClose,
+}: {
+  open: boolean
+  initialHtml: string
+  initialEditorData?: string
+  variables: string[]
+  onApply: (html: string, editorData: string) => void
+  onClose: () => void
+}) {
+  const editorRef = useRef<any>(null)
+
+  const handleApply = () => {
+    const editor = editorRef.current
+    if (!editor) return
+    const html = editor.getHtml() as string
+    const css = editor.getCss() as string
+    const fullHtml = css ? `<style>${css}</style>\n${html}` : html
+    onApply(fullHtml, JSON.stringify(editor.getProjectData()))
+    onClose()
+  }
+
+  const insertVariable = (v: string) => {
+    const editor = editorRef.current
+    if (!editor) return
+    const sel = editor.getSelected()
+    if (sel) sel.set('content', `{{${v}}}`)
+  }
+
+  return (
+    <Dialog open={open} onClose={onClose} fullScreen>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, px: 2, py: 1.25, bgcolor: 'primary.main', color: '#fff', flexShrink: 0 }}>
+        <Typography variant="subtitle1" fontWeight={700} sx={{ flex: 1 }}>Visual Editor</Typography>
+        {variables.length > 0 && (
+          <Box display="flex" alignItems="center" gap={0.75} flexWrap="wrap" sx={{ maxWidth: '60%' }}>
+            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', mr: 0.5 }}>Insert:</Typography>
+            {variables.map((v) => (
+              <Chip key={v} label={`{{${v}}}`} size="small" onClick={() => insertVariable(v)}
+                sx={{ fontSize: '0.68rem', height: 20, cursor: 'pointer', bgcolor: 'rgba(255,255,255,0.15)', color: '#fff', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' } }} />
+            ))}
+          </Box>
+        )}
+        <Button size="small" onClick={onClose} sx={{ color: '#fff' }}>Cancel</Button>
+        <Button size="small" variant="outlined" onClick={handleApply}
+          sx={{ color: '#fff', borderColor: 'rgba(255,255,255,0.5)', '&:hover': { borderColor: '#fff' } }}>
+          Apply & close
+        </Button>
+      </Box>
+      <Box sx={{ flex: 1, overflow: 'hidden', height: 'calc(100vh - 52px)' }}>
+        {open && <GrapesInner initialHtml={initialHtml} initialEditorData={initialEditorData} editorRef={editorRef} />}
+      </Box>
+    </Dialog>
+  )
+}
+
+// ─── Dynamic Resource Dialog ──────────────────────────────────────────────────
+
+interface HbScalar { path: string; sample: string }
+interface HbArray  { path: string; length: number; itemScalars: string[] }
+
+function extractHbSchema(root: unknown, prefix = '', depth = 0): { scalars: HbScalar[]; arrays: HbArray[] } {
+  const scalars: HbScalar[] = []
+  const arrays: HbArray[] = []
+  if (root == null || typeof root !== 'object' || Array.isArray(root) || depth > 3) return { scalars, arrays }
+  for (const [k, v] of Object.entries(root as Record<string, unknown>)) {
+    const path = prefix ? `${prefix}.${k}` : k
+    if (Array.isArray(v)) {
+      const itemScalars: string[] = []
+      if (v.length > 0 && v[0] != null && typeof v[0] === 'object') {
+        extractHbSchema(v[0], '', 0).scalars.forEach((s) => itemScalars.push(s.path))
+      }
+      arrays.push({ path, length: v.length, itemScalars })
+    } else if (v !== null && typeof v === 'object') {
+      const nested = extractHbSchema(v, path, depth + 1)
+      scalars.push(...nested.scalars)
+      arrays.push(...nested.arrays)
+    } else {
+      scalars.push({ path, sample: v == null ? '' : String(v).slice(0, 120) })
+    }
+  }
+  return { scalars, arrays }
+}
+
+function DynamicResourceDialog({
+  open, projectId, tools, onSave, onClose,
+}: {
+  open: boolean
+  projectId: string
+  tools: GeneratedTool[]
+  onSave: (resource: McpResource) => void
+  onClose: () => void
+}) {
+  const [selectedTool, setSelectedTool] = useState<GeneratedTool | null>(null)
+  const [args, setArgs] = useState<Record<string, string>>({})
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ status: number; body: string } | null>(null)
+  const [parsedBody, setParsedBody] = useState<unknown>(null)
+  const [testError, setTestError] = useState('')
+  const [schemaApplied, setSchemaApplied] = useState(false)
+  const [scalars, setScalars] = useState<HbScalar[]>([])
+  const [arrays, setArrays] = useState<HbArray[]>([])
+  const [content, setContent] = useState('')
+  const [editorData, setEditorData] = useState('')
+  const [grapesOpen, setGrapesOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [uri, setUri] = useState('')
+  const [description, setDescription] = useState('')
+  const [errorMessage, setErrorMessage] = useState('Error loading resource: {{error}}')
+  const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState('')
+
+  const slugify = (s: string) => s.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+
+  const reset = () => {
+    setSelectedTool(null); setArgs({}); setTesting(false)
+    setTestResult(null); setParsedBody(null); setTestError('')
+    setSchemaApplied(false); setScalars([]); setArrays([])
+    setContent(''); setEditorData(''); setGrapesOpen(false)
+    setName(''); setUri(''); setDescription('')
+    setErrorMessage('Error loading resource: {{error}}')
+    setSaving(false); setFormError('')
+  }
+
+  const handleClose = () => { reset(); onClose() }
+
+  const handleToolSelect = (toolName: string) => {
+    const t = tools.find((t) => t.name === toolName) ?? null
+    setSelectedTool(t); setArgs({})
+    setTestResult(null); setParsedBody(null); setTestError('')
+    setSchemaApplied(false); setScalars([]); setArrays([])
+  }
+
+  const handleTest = async () => {
+    if (!selectedTool?.endpointRef) return
+    setTesting(true); setTestError('')
+    setSchemaApplied(false); setScalars([]); setArrays([])
+    try {
+      const builtArgs: Record<string, unknown> = {}
+      for (const [k, v] of Object.entries(args)) { if (v !== '') builtArgs[k] = v }
+      const { data } = await api.post(`/swagger/projects/${projectId}/test-endpoint`, {
+        endpointRef: selectedTool.endpointRef,
+        args: builtArgs,
+      })
+      setTestResult(data)
+      try { setParsedBody(JSON.parse(data.body)) } catch { setParsedBody(null) }
+    } catch (err: any) {
+      setTestError(err?.response?.data?.message ?? 'Request failed')
+      setTestResult(null); setParsedBody(null)
+    } finally { setTesting(false) }
+  }
+
+  const handleUseSchema = () => {
+    if (parsedBody == null) return
+    // If root is array, wrap it so Handlebars context is { items: [...] }
+    const root = Array.isArray(parsedBody) ? { items: parsedBody } : parsedBody
+    const { scalars: s, arrays: a } = extractHbSchema(root)
+    setScalars(s); setArrays(a); setSchemaApplied(true)
+  }
+
+  const handleNameChange = (n: string) => {
+    setName(n); setUri(`resource://${projectId}/${slugify(n)}`)
+  }
+
+  const handleSave = async () => {
+    if (!name.trim()) { setFormError('Name is required.'); return }
+    if (!uri.trim()) { setFormError('URI is required.'); return }
+    if (!content.trim()) { setFormError('Template content is required.'); return }
+    if (!selectedTool?.endpointRef) { setFormError('Select an endpoint first.'); return }
+    const inputDefaults: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(args)) { if (v !== '') inputDefaults[k] = v }
+    setSaving(true); setFormError('')
+    try {
+      const dto: Omit<McpResource, 'id'> = {
+        name: name.trim(), uri: uri.trim(),
+        description: description.trim() || undefined,
+        mimeType: 'text/html', content,
+        editorData: editorData || undefined,
+        type: 'dynamic', endpointRef: selectedTool.endpointRef, inputDefaults,
+        errorConfig: errorMessage.trim() ? { message: errorMessage.trim() } : undefined,
+      }
+      const { data } = await api.post<McpResource>(`/swagger/projects/${projectId}/resources`, dto)
+      onSave(data); reset()
+    } catch (err: any) {
+      setFormError(err?.response?.data?.message ?? 'Failed to save.')
+    } finally { setSaving(false) }
+  }
+
+  const rawPreview = useMemo(() => {
+    try { return testResult ? JSON.stringify(JSON.parse(testResult.body), null, 2) : null }
+    catch { return testResult?.body ?? null }
+  }, [testResult])
+
+  const livePreview = useMemo(() => {
+    if (!content || parsedBody == null) return null
+    try {
+      const ctx = Array.isArray(parsedBody) ? { items: parsedBody } : parsedBody
+      return Handlebars.compile(content)(ctx)
+    } catch (e: any) {
+      return `<!-- Template error: ${e?.message} -->`
+    }
+  }, [content, parsedBody])
+
+  const copyBlock = (arr: HbArray) => {
+    const inner = arr.itemScalars.length > 0
+      ? arr.itemScalars.map((f) => `  {{${f}}}`).join('\n')
+      : '  {{this}}'
+    navigator.clipboard?.writeText(`{{#each ${arr.path}}}\n${inner}\n{{/each}}`)
+  }
+
+  const scalarPaths = scalars.map((s) => s.path)
+
+  return (
+    <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth scroll="paper">
+      <DialogTitle>New dynamic resource</DialogTitle>
+      <DialogContent dividers>
+        {formError && <Alert severity="error" sx={{ mb: 2 }}>{formError}</Alert>}
+        <Box display="flex" flexDirection="column" gap={3}>
+
+          {/* Section 1 — Endpoint & parameters */}
+          <Box>
+            <Typography variant="subtitle2" fontWeight={700} mb={1.5}>1. Endpoint</Typography>
+            <FormControl fullWidth size="small" sx={{ mb: 1.5 }}>
+              <InputLabel>Select endpoint</InputLabel>
+              <Select label="Select endpoint" value={selectedTool?.name ?? ''} onChange={(e) => handleToolSelect(e.target.value)}>
+                {tools.filter((t) => !!t.endpointRef).map((t) => (
+                  <MenuItem key={t.name} value={t.name}>
+                    <Box display="flex" alignItems="center" gap={1}>
+                      <Chip label={t.endpointRef.method.toUpperCase()} size="small" sx={{ fontSize: '0.65rem', height: 18 }} />
+                      <Typography variant="body2" fontFamily="monospace">{t.endpointRef.path}</Typography>
+                      <Typography variant="caption" color="text.secondary">{t.name}</Typography>
+                    </Box>
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            {selectedTool && selectedTool.endpointRef.parameterMap.length > 0 && (
+              <Box display="flex" flexDirection="column" gap={1}>
+                <Typography variant="caption" color="text.secondary" fontWeight={600}>Fixed parameter values</Typography>
+                {selectedTool.endpointRef.parameterMap.map((p) => (
+                  <TextField key={p.toolParamName} size="small" fullWidth
+                    label={p.toolParamName}
+                    helperText={`source: ${p.source}${p.required ? ' · required' : ''}`}
+                    value={args[p.toolParamName] ?? ''}
+                    onChange={(e) => setArgs((a) => ({ ...a, [p.toolParamName]: e.target.value }))} />
+                ))}
+              </Box>
+            )}
+          </Box>
+
+          <Divider />
+
+          {/* Section 2 — Test & schema */}
+          <Box>
+            <Typography variant="subtitle2" fontWeight={700} mb={1.5}>2. Test & map response</Typography>
+            <Box display="flex" gap={1} mb={1.5}>
+              <Button size="small" variant="outlined" onClick={handleTest} disabled={!selectedTool || testing}
+                startIcon={testing ? <CircularProgress size={14} /> : <IconPlayerPlay size={16} />}>
+                {testing ? 'Running…' : 'Test endpoint'}
+              </Button>
+              {testResult && parsedBody != null && (
+                <Button size="small" variant="outlined" color="success" onClick={handleUseSchema}>
+                  {schemaApplied ? 'Refresh schema' : 'Use response schema'}
+                </Button>
+              )}
+            </Box>
+
+            {testError && <Alert severity="error" sx={{ mb: 1 }}>{testError}</Alert>}
+
+            {testResult && (
+              <Box mb={schemaApplied ? 1.5 : 0}>
+                <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
+                  HTTP {testResult.status}
+                </Typography>
+                <Box component="pre" sx={{
+                  bgcolor: 'action.hover', borderRadius: 1, p: 1.5, overflow: 'auto',
+                  maxHeight: 180, fontSize: '0.75rem', fontFamily: 'monospace', m: 0,
+                }}>
+                  {rawPreview?.slice(0, 3000)}
+                  {(rawPreview?.length ?? 0) > 3000 && '\n… (truncated)'}
+                </Box>
+              </Box>
+            )}
+
+            {schemaApplied && (
+              <Box display="flex" flexDirection="column" gap={2}>
+
+                {/* Scalar variables */}
+                {scalars.length > 0 && (
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.75}>
+                      Scalar variables
+                    </Typography>
+                    <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow sx={{ bgcolor: 'action.hover' }}>
+                            <TableCell sx={{ py: 0.5, fontWeight: 700, fontSize: '0.72rem', width: '42%' }}>Variable</TableCell>
+                            <TableCell sx={{ py: 0.5, fontWeight: 700, fontSize: '0.72rem' }}>Sample value</TableCell>
+                            <TableCell sx={{ py: 0.5, width: 36 }} />
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {scalars.map((s) => (
+                            <TableRow key={s.path} hover>
+                              <TableCell sx={{ py: 0.5 }}>
+                                <Typography fontFamily="monospace" fontSize="0.78rem" color="primary.main">
+                                  {`{{${s.path}}}`}
+                                </Typography>
+                              </TableCell>
+                              <TableCell sx={{ py: 0.5 }}>
+                                <Typography variant="caption" color="text.secondary" fontFamily="monospace"
+                                  sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 240 }}>
+                                  {s.sample !== '' ? s.sample : <em style={{ opacity: 0.5 }}>(empty)</em>}
+                                </Typography>
+                              </TableCell>
+                              <TableCell sx={{ py: 0.5 }}>
+                                <Tooltip title="Copy">
+                                  <IconButton size="small" onClick={() => navigator.clipboard?.writeText(`{{${s.path}}}`)}>
+                                    <IconCopy size={13} />
+                                  </IconButton>
+                                </Tooltip>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </Paper>
+                  </Box>
+                )}
+
+                {/* Array variables — Handlebars each blocks */}
+                {arrays.length > 0 && (
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.75}>
+                      Array variables — use <code style={{ fontFamily: 'monospace' }}>{'{{#each}}'}</code> to iterate
+                    </Typography>
+                    <Box display="flex" flexDirection="column" gap={1}>
+                      {arrays.map((a) => {
+                        const inner = a.itemScalars.length > 0
+                          ? a.itemScalars.map((f) => `  {{${f}}}`).join('\n')
+                          : '  {{this}}'
+                        const block = `{{#each ${a.path}}}\n${inner}\n{{/each}}`
+                        return (
+                          <Paper key={a.path} variant="outlined" sx={{ p: 1.25 }}>
+                            <Box display="flex" alignItems="flex-start" justifyContent="space-between" gap={1}>
+                              <Box flexGrow={1} minWidth={0}>
+                                <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+                                  <Typography fontFamily="monospace" fontSize="0.78rem" color="primary.main" fontWeight={700}>
+                                    {`{{#each ${a.path}}}`}
+                                  </Typography>
+                                  <Chip label={`${a.length} item${a.length !== 1 ? 's' : ''}`} size="small"
+                                    sx={{ fontSize: '0.65rem', height: 18 }} />
+                                </Box>
+                                <Box component="pre" sx={{
+                                  m: 0, p: 1, bgcolor: 'action.hover', borderRadius: 0.75,
+                                  fontSize: '0.75rem', fontFamily: 'monospace', overflow: 'auto',
+                                  lineHeight: 1.5,
+                                }}>
+                                  {block}
+                                </Box>
+                                {a.itemScalars.length > 0 && (
+                                  <Box display="flex" flexWrap="wrap" gap={0.5} mt={0.75}>
+                                    <Typography variant="caption" color="text.secondary" alignSelf="center">Fields inside block:</Typography>
+                                    {a.itemScalars.map((f) => (
+                                      <Chip key={f} label={`{{${f}}}`} size="small" variant="outlined"
+                                        onClick={() => navigator.clipboard?.writeText(`{{${f}}}`)}
+                                        sx={{ fontSize: '0.67rem', height: 18, fontFamily: 'monospace', cursor: 'pointer' }} />
+                                    ))}
+                                  </Box>
+                                )}
+                              </Box>
+                              <Tooltip title="Copy block">
+                                <IconButton size="small" onClick={() => copyBlock(a)} sx={{ flexShrink: 0, mt: 0.25 }}>
+                                  <IconCopy size={14} />
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
+                          </Paper>
+                        )
+                      })}
+                    </Box>
+                  </Box>
+                )}
+              </Box>
+            )}
+          </Box>
+
+          <Divider />
+
+          {/* Section 3 — Template */}
+          <Box>
+            <Typography variant="subtitle2" fontWeight={700} mb={1.5}>3. HTML template</Typography>
+            <Box display="flex" alignItems="center" justifyContent="space-between" mb={0.75}>
+              <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                Handlebars template {editorData ? '· edited in visual editor' : ''}
+              </Typography>
+              <Button size="small" variant="outlined" startIcon={<IconEdit size={14} />}
+                onClick={() => setGrapesOpen(true)} sx={{ fontSize: '0.75rem', py: 0.25, px: 1 }}>
+                Open visual editor
+              </Button>
+            </Box>
+            <TextField size="small" fullWidth multiline minRows={7} maxRows={18}
+              placeholder={`{{#each hotels}}\n<div class="card">\n  <h2>{{name}}</h2>\n  <p>{{price}}</p>\n</div>\n{{/each}}`}
+              value={content} onChange={(e) => setContent(e.target.value)}
+              InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.82rem' } }} />
+
+            {livePreview && (
+              <Box mt={1.5}>
+                <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>
+                  Preview
+                </Typography>
+                <Paper variant="outlined" sx={{ p: 1.5, maxHeight: 300, overflow: 'auto', bgcolor: '#fff' }}>
+                  <div dangerouslySetInnerHTML={{ __html: livePreview }} />
+                </Paper>
+              </Box>
+            )}
+          </Box>
+
+          <Divider />
+
+          {/* Section 4 — Metadata & error */}
+          <Box>
+            <Typography variant="subtitle2" fontWeight={700} mb={1.5}>4. Metadata & error</Typography>
+            <Box display="flex" flexDirection="column" gap={2}>
+              <TextField size="small" fullWidth label="Name" required value={name}
+                onChange={(e) => handleNameChange(e.target.value)} />
+              <TextField size="small" fullWidth label="URI" required value={uri}
+                onChange={(e) => setUri(e.target.value)}
+                helperText="Auto-generated from name"
+                InputProps={{ sx: { fontFamily: 'monospace' } }} />
+              <TextField size="small" fullWidth multiline minRows={3} label="Description" value={description}
+                onChange={(e) => setDescription(e.target.value)} />
+              <TextField size="small" fullWidth label="Error message" value={errorMessage}
+                onChange={(e) => setErrorMessage(e.target.value)}
+                helperText='Shown to the MCP client if the API call fails. Use {{error}} to include the original error.' />
+            </Box>
+          </Box>
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Button onClick={handleClose}>Cancel</Button>
+        <Button variant="contained" onClick={handleSave} disabled={saving}
+          startIcon={saving ? <CircularProgress size={14} color="inherit" /> : undefined}>
+          {saving ? 'Saving…' : 'Create resource'}
+        </Button>
+      </DialogActions>
+
+      <GrapesEditorDialogWithVars
+        open={grapesOpen}
+        initialHtml={content}
+        initialEditorData={editorData || undefined}
+        variables={scalarPaths}
+        onApply={(html, data) => { setContent(html); setEditorData(data) }}
+        onClose={() => setGrapesOpen(false)}
+      />
+    </Dialog>
+  )
+}
+
+// ─── Resources tab ─────────────────────────────────────────────────────────────
+
+function ResourcesTab({ projectId, initialResources, tools, onChange }: {
   projectId: string
   initialResources: McpResource[]
+  tools: GeneratedTool[]
   onChange: (resources: McpResource[]) => void
 }) {
   const [resources, setResources] = useState<McpResource[]>(initialResources)
+  const [dynDialogOpen, setDynDialogOpen] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<McpResource | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<McpResource | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const [grapesOpen, setGrapesOpen] = useState(false)
 
-  const emptyForm = () => ({ name: '', uri: '', description: '', mimeType: 'text/plain', content: '' })
+  const emptyForm = () => ({ name: '', uri: '', description: '', mimeType: 'text/html', content: '', editorData: '' })
   const [form, setForm] = useState(emptyForm())
 
   const slugify = (s: string) => s.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
@@ -2773,7 +3358,7 @@ function ResourcesTab({ projectId, initialResources, onChange }: {
 
   const openEdit = (r: McpResource) => {
     setEditTarget(r)
-    setForm({ name: r.name, uri: r.uri, description: r.description ?? '', mimeType: r.mimeType ?? 'text/plain', content: r.content })
+    setForm({ name: r.name, uri: r.uri, description: r.description ?? '', mimeType: r.mimeType ?? 'text/html', content: r.content, editorData: r.editorData ?? '' })
     setFormError('')
     setDialogOpen(true)
   }
@@ -2789,7 +3374,7 @@ function ResourcesTab({ projectId, initialResources, onChange }: {
     if (!form.content.trim()) { setFormError('Content is required.'); return }
     setSaving(true); setFormError('')
     try {
-      const dto = { name: form.name.trim(), uri: form.uri.trim(), description: form.description.trim() || undefined, mimeType: form.mimeType.trim() || undefined, content: form.content }
+      const dto = { name: form.name.trim(), uri: form.uri.trim(), description: form.description.trim() || undefined, mimeType: form.mimeType.trim() || undefined, content: form.content, editorData: form.editorData || undefined }
       if (editTarget) {
         await api.put(`/swagger/projects/${projectId}/resources/${editTarget.id}`, dto)
         const updated = resources.map((r) => r.id === editTarget.id ? { ...r, ...dto } : r)
@@ -2821,16 +3406,21 @@ function ResourcesTab({ projectId, initialResources, onChange }: {
         <Box display="flex" alignItems="center" gap={1}>
           <Typography variant="h6" fontWeight={700}>Resources</Typography>
           <Typography variant="body2" color="text.secondary">
-            Static content exposed to the AI via the MCP protocol
+            Content exposed to the AI via the MCP protocol (static or dynamic from API)
           </Typography>
         </Box>
-        <Button variant="contained" size="small" startIcon={<IconPlus size={18} />} onClick={openAdd}>
-          Add resource
-        </Button>
+        <Box display="flex" gap={1}>
+          <Button variant="outlined" size="small" startIcon={<IconRoute size={16} />} onClick={() => setDynDialogOpen(true)}>
+            From endpoint
+          </Button>
+          <Button variant="contained" size="small" startIcon={<IconPlus size={18} />} onClick={openAdd}>
+            Add resource
+          </Button>
+        </Box>
       </Box>
 
       {resources.length === 0 ? (
-        <Alert severity="info">No resources yet. Resources let you expose static content (documentation, configuration, data files) to the AI client.</Alert>
+        <Alert severity="info">No resources yet. Use "Add resource" for static content or "From endpoint" to create a dynamic resource rendered from an API response.</Alert>
       ) : (
         <Box display="flex" flexDirection="column" gap={1.5}>
           {resources.map((r) => (
@@ -2842,8 +3432,14 @@ function ResourcesTab({ projectId, initialResources, onChange }: {
                 <Box flexGrow={1} minWidth={0}>
                   <Box display="flex" alignItems="center" gap={1} flexWrap="wrap" mb={0.25}>
                     <Typography fontWeight={700} fontSize="0.925rem">{r.name}</Typography>
+                    {r.type === 'dynamic' && (
+                      <Chip label="Dynamic" size="small" color="warning" sx={{ fontSize: '0.68rem', height: 18 }} />
+                    )}
                     {r.mimeType && (
                       <Chip label={r.mimeType} size="small" variant="outlined" sx={{ fontSize: '0.68rem', height: 18 }} />
+                    )}
+                    {r.editorData && (
+                      <Chip label="GrapesJS" size="small" color="secondary" sx={{ fontSize: '0.68rem', height: 18 }} />
                     )}
                   </Box>
                   <Typography fontFamily="monospace" fontSize="0.78rem" color="text.secondary" sx={{ wordBreak: 'break-all' }}>
@@ -2882,15 +3478,27 @@ function ResourcesTab({ projectId, initialResources, onChange }: {
               onChange={(e) => setForm((f) => ({ ...f, uri: e.target.value }))}
               helperText="Unique identifier used by the MCP client to read this resource"
               InputProps={{ sx: { fontFamily: 'monospace' } }} />
-            <TextField size="small" fullWidth label="Description" value={form.description}
+            <TextField size="small" fullWidth multiline minRows={3} label="Description" value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
             <TextField size="small" fullWidth label="MIME Type" value={form.mimeType}
               onChange={(e) => setForm((f) => ({ ...f, mimeType: e.target.value }))}
-              placeholder="text/plain" />
-            <TextField size="small" fullWidth multiline minRows={8} maxRows={20} label="Content" required
-              value={form.content}
-              onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
-              InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.82rem' } }} />
+              placeholder="text/html" />
+            <Box>
+              <Box display="flex" alignItems="center" justifyContent="space-between" mb={0.75}>
+                <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                  Content {form.editorData ? '· edited in visual editor' : ''}
+                </Typography>
+                <Button size="small" variant="outlined" startIcon={<IconEdit size={14} />}
+                  onClick={() => setGrapesOpen(true)}
+                  sx={{ fontSize: '0.75rem', py: 0.25, px: 1 }}>
+                  Open visual editor
+                </Button>
+              </Box>
+              <TextField size="small" fullWidth multiline minRows={8} maxRows={20} label="" required
+                value={form.content}
+                onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
+                InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.82rem' } }} />
+            </Box>
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
@@ -2912,6 +3520,28 @@ function ResourcesTab({ projectId, initialResources, onChange }: {
         onConfirm={handleDelete}
         onClose={() => setDeleteTarget(null)}
       />
+
+      <GrapesEditorDialog
+        open={grapesOpen}
+        initialHtml={form.content}
+        initialEditorData={form.editorData || undefined}
+        onApply={(html, data) => {
+          setForm((f) => ({ ...f, content: html, editorData: data, mimeType: 'text/html' }))
+        }}
+        onClose={() => setGrapesOpen(false)}
+      />
+
+      <DynamicResourceDialog
+        open={dynDialogOpen}
+        projectId={projectId}
+        tools={tools}
+        onSave={(r) => {
+          const updated = [...resources, r]
+          setResources(updated); onChange(updated)
+          setDynDialogOpen(false)
+        }}
+        onClose={() => setDynDialogOpen(false)}
+      />
     </Box>
   )
 }
@@ -2923,267 +3553,218 @@ function PromptsTab({ projectId, initialPrompts, onChange }: {
   initialPrompts: McpPrompt[]
   onChange: (prompts: McpPrompt[]) => void
 }) {
-  const [prompts, setPrompts] = useState<McpPrompt[]>(initialPrompts)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [editTarget, setEditTarget] = useState<McpPrompt | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<McpPrompt | null>(null)
-  const [deleting, setDeleting] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [formError, setFormError] = useState('')
+  const navigate = useNavigate()
+  const [refs, setRefs] = useState<McpPrompt[]>(initialPrompts)
+  const [globals, setGlobals] = useState<GlobalPrompt[]>([])
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [loadingGlobals, setLoadingGlobals] = useState(false)
+  const [removing, setRemoving] = useState<string | null>(null)
+  const [adding, setAdding] = useState<string | null>(null)
+  const [pickerSearch, setPickerSearch] = useState('')
 
-  const emptyForm = () => ({
-    name: '',
-    description: '',
-    source: 'template' as 'template' | 'endpoint',
-    template: '',
-    endpointMethod: 'GET',
-    endpointUrl: '',
-    args: [] as Array<{ id: string; name: string; description: string; required: boolean }>,
+  const attachedIds = new Set(refs.map((r) => r.promptId))
+  const attachedPrompts = globals.filter((p) => attachedIds.has(p.id))
+
+  const openPicker = async () => {
+    setPickerSearch('')
+    setPickerOpen(true)
+    if (globals.length === 0) {
+      setLoadingGlobals(true)
+      try {
+        const { data } = await api.get<GlobalPrompt[]>('/prompts')
+        setGlobals(data)
+      } finally {
+        setLoadingGlobals(false)
+      }
+    }
+  }
+
+  const handleAdd = async (promptId: string) => {
+    setAdding(promptId)
+    try {
+      await api.post(`/swagger/projects/${projectId}/prompts`, { promptId })
+      const updated = [...refs, { promptId }]
+      setRefs(updated); onChange(updated)
+    } finally {
+      setAdding(null)
+    }
+  }
+
+  const handleRemove = async (promptId: string) => {
+    setRemoving(promptId)
+    try {
+      await api.delete(`/swagger/projects/${projectId}/prompts/${promptId}`)
+      const updated = refs.filter((r) => r.promptId !== promptId)
+      setRefs(updated); onChange(updated)
+    } finally {
+      setRemoving(null)
+    }
+  }
+
+  const pickerVisible = globals.filter((p) => {
+    if (attachedIds.has(p.id)) return false
+    if (!pickerSearch) return true
+    const q = pickerSearch.toLowerCase()
+    return p.name.toLowerCase().includes(q) || (p.description ?? '').toLowerCase().includes(q)
   })
-  const [form, setForm] = useState(emptyForm())
-
-  const openAdd = () => {
-    setEditTarget(null); setForm(emptyForm()); setFormError(''); setDialogOpen(true)
-  }
-
-  const openEdit = (p: McpPrompt) => {
-    setEditTarget(p)
-    setForm({
-      name: p.name,
-      description: p.description ?? '',
-      source: p.endpoint ? 'endpoint' : 'template',
-      template: p.template ?? '',
-      endpointMethod: p.endpoint?.method ?? 'GET',
-      endpointUrl: p.endpoint?.url ?? '',
-      args: (p.arguments ?? []).map((a) => ({ id: crypto.randomUUID(), name: a.name, description: a.description ?? '', required: a.required ?? false })),
-    })
-    setFormError('')
-    setDialogOpen(true)
-  }
-
-  const addArg = () => setForm((f) => ({ ...f, args: [...f.args, { id: crypto.randomUUID(), name: '', description: '', required: false }] }))
-  const removeArg = (id: string) => setForm((f) => ({ ...f, args: f.args.filter((a) => a.id !== id) }))
-  const updateArg = (id: string, field: string, value: string | boolean) =>
-    setForm((f) => ({ ...f, args: f.args.map((a) => a.id === id ? { ...a, [field]: value } : a) }))
-
-  const handleSave = async () => {
-    if (!form.name.trim()) { setFormError('Name is required.'); return }
-    if (form.source === 'template' && !form.template.trim()) { setFormError('Template is required.'); return }
-    if (form.source === 'endpoint' && !form.endpointUrl.trim()) { setFormError('API URL is required.'); return }
-    setSaving(true); setFormError('')
-    try {
-      const dto: Omit<McpPrompt, 'id'> = {
-        name: form.name.trim(),
-        description: form.description.trim() || undefined,
-        template: form.source === 'template' ? form.template : undefined,
-        endpoint: form.source === 'endpoint' ? { method: form.endpointMethod, url: form.endpointUrl.trim() } : undefined,
-        arguments: form.args.filter((a) => a.name.trim()).map((a) => ({
-          name: a.name.trim(),
-          description: a.description.trim() || undefined,
-          required: a.required,
-        })),
-      }
-      if (editTarget) {
-        await api.put(`/swagger/projects/${projectId}/prompts/${editTarget.id}`, dto)
-        const updated = prompts.map((p) => p.id === editTarget.id ? { ...p, ...dto } : p)
-        setPrompts(updated); onChange(updated)
-      } else {
-        const { data } = await api.post<McpPrompt>(`/swagger/projects/${projectId}/prompts`, dto)
-        const updated = [...prompts, data]
-        setPrompts(updated); onChange(updated)
-      }
-      setDialogOpen(false)
-    } catch (err: any) {
-      setFormError(err?.response?.data?.message ?? 'Failed to save.')
-    } finally { setSaving(false) }
-  }
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return
-    setDeleting(true)
-    try {
-      await api.delete(`/swagger/projects/${projectId}/prompts/${deleteTarget.id}`)
-      const updated = prompts.filter((p) => p.id !== deleteTarget.id)
-      setPrompts(updated); onChange(updated)
-    } finally { setDeleting(false); setDeleteTarget(null) }
-  }
 
   return (
     <Box>
-      <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
-        <Box display="flex" alignItems="center" gap={1}>
-          <Typography variant="h6" fontWeight={700}>Prompts</Typography>
+      {/* Header */}
+      <Box display="flex" alignItems="flex-start" justifyContent="space-between" mb={2.5} flexWrap="wrap" gap={1}>
+        <Box>
+          <Typography variant="h6" fontWeight={700} mb={0.25}>Prompts</Typography>
           <Typography variant="body2" color="text.secondary">
-            Reusable prompt templates with variable substitution
+            Prompts from your library that are active in this project.
           </Typography>
         </Box>
-        <Button variant="contained" size="small" startIcon={<IconPlus size={18} />} onClick={openAdd}>
-          Add prompt
-        </Button>
+        <Box display="flex" gap={1}>
+          <Button size="small" variant="outlined" startIcon={<IconBulb size={16} />}
+            onClick={() => navigate('/prompts')}>
+            Prompt library
+          </Button>
+          <Button size="small" variant="contained" startIcon={<IconPlus size={16} />}
+            onClick={openPicker}>
+            Add prompt
+          </Button>
+        </Box>
       </Box>
 
-      {prompts.length === 0 ? (
-        <Alert severity="info">No prompts yet. Prompts are reusable message templates the AI can use with variable substitution (use {'{{variable}}'} syntax).</Alert>
+      {/* Attached list */}
+      {attachedPrompts.length === 0 ? (
+        <Alert severity="info">
+          No prompts added yet. Click <strong>Add prompt</strong> to include prompts from your library,
+          or go to <Box component="span" sx={{ cursor: 'pointer', textDecoration: 'underline' }}
+            onClick={() => navigate('/prompts')}>Prompt library</Box> to create new ones.
+        </Alert>
       ) : (
-        <Box display="flex" flexDirection="column" gap={1.5}>
-          {prompts.map((p) => (
-            <Paper key={p.id} variant="outlined" sx={{ p: 2 }}>
-              <Box display="flex" alignItems="flex-start" gap={1.5}>
-                <Box sx={{ color: 'secondary.main', mt: 0.25, flexShrink: 0 }}>
-                  <IconBulb size={18} />
-                </Box>
-                <Box flexGrow={1} minWidth={0}>
-                  <Box display="flex" alignItems="center" gap={1} flexWrap="wrap" mb={0.25}>
-                    <Typography fontWeight={700} fontSize="0.925rem">{p.name}</Typography>
-                    {(p.arguments?.length ?? 0) > 0 && (
-                      <Chip
-                        label={`${p.arguments!.length} arg${p.arguments!.length !== 1 ? 's' : ''}`}
-                        size="small" color="primary" sx={{ fontSize: '0.68rem', height: 18 }} />
-                    )}
+        <Box display="flex" flexDirection="column" gap={1}>
+          {attachedPrompts.map((p) => {
+            const argNames = [...new Set([...p.content.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]))]
+            const isRemoving = removing === p.id
+            return (
+              <Paper key={p.id} variant="outlined" sx={{ p: 2 }}>
+                <Box display="flex" alignItems="flex-start" gap={1.5}>
+                  <Box sx={{ color: 'secondary.main', mt: 0.25, flexShrink: 0 }}>
+                    <IconBulb size={18} />
                   </Box>
-                  {p.description && (
-                    <Typography variant="body2" color="text.secondary" mb={0.5}>{p.description}</Typography>
-                  )}
-                  {p.endpoint ? (
-                    <Box display="flex" alignItems="center" gap={0.75} sx={{
-                      bgcolor: '#f0f4ff', border: '1px solid #c7d7f5', borderRadius: 1,
-                      px: 1.5, py: 0.75,
-                    }}>
-                      <Chip label={p.endpoint.method} size="small" sx={{ fontFamily: 'monospace', fontSize: '0.68rem', fontWeight: 700, height: 20, bgcolor: METHOD_COLOR[p.endpoint.method.toUpperCase()] ?? '#888', color: '#fff' }} />
-                      <Typography fontFamily="monospace" fontSize="0.78rem" color="text.secondary" sx={{ wordBreak: 'break-all' }}>
-                        {p.endpoint.url}
+                  <Box flexGrow={1} minWidth={0}>
+                    <Box display="flex" alignItems="center" gap={1} flexWrap="wrap" mb={0.25}>
+                      <Typography fontWeight={700} fontSize="0.925rem">{p.name}</Typography>
+                      {argNames.map((v) => (
+                        <Chip key={v} label={`{{${v}}}`} size="small"
+                          sx={{ fontFamily: 'monospace', fontSize: '0.65rem', height: 17 }} />
+                      ))}
+                      {(p.tags ?? []).map((tag) => (
+                        <Chip key={tag} label={tag} size="small" variant="outlined"
+                          sx={{ fontSize: '0.66rem', height: 17 }} />
+                      ))}
+                    </Box>
+                    {p.description && (
+                      <Typography variant="body2" color="text.secondary" mb={0.75}>
+                        {p.description}
                       </Typography>
-                    </Box>
-                  ) : (
+                    )}
                     <Box component="pre" sx={{
-                      bgcolor: '#f5f5f5', border: '1px solid #e0e0e0', borderRadius: 1,
-                      px: 1.5, py: 1, fontSize: '0.75rem', fontFamily: 'monospace',
-                      whiteSpace: 'pre-wrap', wordBreak: 'break-word', m: 0,
-                      maxHeight: 100, overflow: 'hidden',
+                      m: 0, p: 1, bgcolor: 'action.hover', border: '1px solid',
+                      borderColor: 'divider', borderRadius: '6px',
+                      fontSize: '0.72rem', fontFamily: 'monospace',
+                      whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                      maxHeight: 80, overflow: 'hidden', color: 'text.secondary',
                     }}>
-                      {(p.template ?? '').length > 300 ? p.template!.slice(0, 300) + '…' : (p.template ?? '(no template)')}
+                      {p.content.length > 280 ? p.content.slice(0, 280) + '…' : p.content}
                     </Box>
-                  )}
-                </Box>
-                <Box display="flex" gap={0.5} flexShrink={0}>
-                  <Tooltip title="Edit">
-                    <IconButton size="small" onClick={() => openEdit(p)}><IconEdit size={16} /></IconButton>
-                  </Tooltip>
-                  <Tooltip title="Delete">
-                    <IconButton size="small" color="error" onClick={() => setDeleteTarget(p)}><IconTrash size={16} /></IconButton>
+                  </Box>
+                  <Tooltip title="Remove from project">
+                    <IconButton size="small" color="error" disabled={isRemoving}
+                      onClick={() => handleRemove(p.id)}>
+                      {isRemoving ? <CircularProgress size={14} /> : <IconTrash size={16} />}
+                    </IconButton>
                   </Tooltip>
                 </Box>
-              </Box>
-            </Paper>
-          ))}
+              </Paper>
+            )
+          })}
         </Box>
       )}
 
-      {/* Add / Edit dialog */}
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth scroll="paper">
-        <DialogTitle>{editTarget ? `Edit prompt — ${editTarget.name}` : 'New prompt'}</DialogTitle>
-        <DialogContent dividers>
-          {formError && <Alert severity="error" sx={{ mb: 2 }}>{formError}</Alert>}
-          <Box display="flex" flexDirection="column" gap={2}>
-            <TextField size="small" fullWidth label="Name" required value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
-            <TextField size="small" fullWidth label="Description" value={form.description}
-              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
-
-            {/* Arguments */}
-            <Box>
-              <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
-                <Typography variant="subtitle2" fontWeight={700}>Arguments</Typography>
-                <Button size="small" startIcon={<IconPlus size={16} />} onClick={addArg}>Add</Button>
-              </Box>
-              {form.args.length === 0 ? (
-                <Typography variant="body2" color="text.disabled">No arguments. Click "Add" to create one.</Typography>
-              ) : (
-                <Box display="flex" flexDirection="column" gap={1}>
-                  {form.args.map((a) => (
-                    <Box key={a.id} display="flex" gap={1} alignItems="center">
-                      <TextField size="small" label="Name" sx={{ flex: 1 }} value={a.name}
-                        onChange={(e) => updateArg(a.id, 'name', e.target.value)}
-                        InputProps={{ sx: { fontFamily: 'monospace' } }} />
-                      <TextField size="small" label="Description" sx={{ flex: 2 }} value={a.description}
-                        onChange={(e) => updateArg(a.id, 'description', e.target.value)} />
-                      <FormControlLabel
-                        control={<Switch size="small" checked={a.required}
-                          onChange={(e) => updateArg(a.id, 'required', e.target.checked)} />}
-                        label={<Typography variant="caption">Req.</Typography>}
-                        sx={{ m: 0, flexShrink: 0 }} />
-                      <IconButton size="small" color="error" onClick={() => removeArg(a.id)}>
-                        <IconTrash size={16} />
-                      </IconButton>
-                    </Box>
-                  ))}
-                </Box>
-              )}
-            </Box>
-
-            {/* Source toggle */}
-            <Box>
-              <Typography variant="subtitle2" fontWeight={700} mb={1}>Prompt source</Typography>
-              <Box display="flex" gap={1}>
-                {(['template', 'endpoint'] as const).map((s) => (
-                  <Button key={s} size="small"
-                    variant={form.source === s ? 'contained' : 'outlined'}
-                    onClick={() => setForm((f) => ({ ...f, source: s }))}>
-                    {s === 'template' ? 'Static template' : 'API endpoint'}
-                  </Button>
-                ))}
-              </Box>
-            </Box>
-
-            {form.source === 'template' ? (
-              <TextField
-                size="small" fullWidth multiline minRows={8} maxRows={20} label="Template" required
-                value={form.template}
-                onChange={(e) => setForm((f) => ({ ...f, template: e.target.value }))}
-                helperText="Use {{variable_name}} for dynamic substitution"
-                InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.82rem' } }}
-              />
-            ) : (
-              <Box display="flex" gap={1}>
-                <FormControl size="small" sx={{ minWidth: 110 }}>
-                  <InputLabel>Method</InputLabel>
-                  <Select label="Method" value={form.endpointMethod}
-                    onChange={(e) => setForm((f) => ({ ...f, endpointMethod: e.target.value }))}>
-                    {['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map((m) => (
-                      <MenuItem key={m} value={m} sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.82rem' }}>{m}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <TextField size="small" fullWidth required label="API URL"
-                  placeholder="https://api.example.com/prompt"
-                  value={form.endpointUrl}
-                  onChange={(e) => setForm((f) => ({ ...f, endpointUrl: e.target.value }))}
-                  helperText={form.endpointMethod === 'GET' ? 'Arguments sent as query parameters' : 'Arguments sent as JSON body'}
-                  InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.82rem' } }}
-                />
-              </Box>
-            )}
+      {/* Picker dialog */}
+      <Dialog open={pickerOpen} onClose={() => setPickerOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Add prompt from library</DialogTitle>
+        <DialogContent dividers sx={{ p: 0 }}>
+          <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+            <TextField
+              size="small" fullWidth autoFocus placeholder="Search prompts…"
+              value={pickerSearch} onChange={(e) => setPickerSearch(e.target.value)}
+              InputProps={{ startAdornment: <InputAdornment position="start"><IconSearch size={16} /></InputAdornment> }}
+            />
           </Box>
+
+          {loadingGlobals ? (
+            <Box display="flex" justifyContent="center" alignItems="center" py={4}>
+              <CircularProgress size={28} />
+            </Box>
+          ) : globals.length === 0 ? (
+            <Box p={3}>
+              <Alert severity="info">
+                No prompts in your library yet.{' '}
+                <Box component="span" sx={{ cursor: 'pointer', textDecoration: 'underline' }}
+                  onClick={() => { setPickerOpen(false); navigate('/prompts') }}>
+                  Create one now
+                </Box>
+              </Alert>
+            </Box>
+          ) : pickerVisible.length === 0 ? (
+            <Box p={3}>
+              <Alert severity="info">
+                {pickerSearch ? 'No prompts match your search.' : 'All prompts are already added to this project.'}
+              </Alert>
+            </Box>
+          ) : (
+            <Box sx={{ maxHeight: 420, overflowY: 'auto' }}>
+              {pickerVisible.map((p) => {
+                const isAdding = adding === p.id
+                const argNames = [...new Set([...p.content.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]))]
+                return (
+                  <Box key={p.id} sx={{
+                    display: 'flex', alignItems: 'flex-start', gap: 1.5,
+                    px: 2.5, py: 1.75,
+                    borderBottom: 1, borderColor: 'divider',
+                    '&:last-child': { borderBottom: 0 },
+                    '&:hover': { bgcolor: 'action.hover' },
+                    transition: 'background 0.12s',
+                  }}>
+                    <Box sx={{ color: 'secondary.main', mt: 0.25, flexShrink: 0 }}>
+                      <IconBulb size={16} />
+                    </Box>
+                    <Box flexGrow={1} minWidth={0}>
+                      <Box display="flex" alignItems="center" gap={0.75} flexWrap="wrap" mb={0.25}>
+                        <Typography fontWeight={600} fontSize="0.875rem">{p.name}</Typography>
+                        {argNames.length > 0 && (
+                          <Chip label={`${argNames.length} var${argNames.length !== 1 ? 's' : ''}`}
+                            size="small" sx={{ fontSize: '0.65rem', height: 16 }} />
+                        )}
+                      </Box>
+                      {p.description && (
+                        <Typography variant="caption" color="text.secondary">{p.description}</Typography>
+                      )}
+                    </Box>
+                    <Button size="small" variant="contained" disabled={isAdding}
+                      startIcon={isAdding ? <CircularProgress size={12} color="inherit" /> : <IconPlus size={14} />}
+                      onClick={() => handleAdd(p.id)}
+                      sx={{ flexShrink: 0 }}>
+                      Add
+                    </Button>
+                  </Box>
+                )
+              })}
+            </Box>
+          )}
         </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleSave} disabled={saving}
-            startIcon={saving ? <CircularProgress size={14} color="inherit" /> : undefined}>
-            {saving ? 'Saving…' : editTarget ? 'Save changes' : 'Create prompt'}
-          </Button>
+        <DialogActions sx={{ px: 2.5, py: 1.5 }}>
+          <Button onClick={() => setPickerOpen(false)}>Done</Button>
         </DialogActions>
       </Dialog>
-
-      <ConfirmDialog
-        open={deleteTarget !== null}
-        title={`Delete "${deleteTarget?.name}"?`}
-        message="This prompt will be permanently removed."
-        confirmLabel="Delete"
-        confirmColor="error"
-        loading={deleting}
-        onConfirm={handleDelete}
-        onClose={() => setDeleteTarget(null)}
-      />
     </Box>
   )
 }
@@ -3556,6 +4137,7 @@ export default function ProjectDetail() {
         <ResourcesTab
           projectId={id!}
           initialResources={project.resources ?? []}
+          tools={project.tools ?? []}
           onChange={(resources) => setProject((prev) => prev ? { ...prev, resources } : prev)}
         />
       )}

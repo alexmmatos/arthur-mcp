@@ -14,6 +14,7 @@ import AuditLogs from './pages/AuditLogs'
 import SetupWizard from './pages/SetupWizard'
 import SharePage from './pages/SharePage'
 import Templates from './pages/Templates'
+import Prompts from './pages/Prompts'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem('token')
@@ -55,6 +56,7 @@ export default function App() {
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/audit-logs" element={<AuditLogs />} />
                   <Route path="/templates" element={<Templates />} />
+                  <Route path="/prompts" element={<Prompts />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Layout>

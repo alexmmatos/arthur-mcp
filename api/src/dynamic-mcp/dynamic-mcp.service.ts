@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import Handlebars from 'handlebars';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
   CallToolRequestSchema,
@@ -8,14 +9,15 @@ import {
   ListToolsRequestSchema,
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import type { AuthConfig, GeneratedTool, JsonSchema, McpPrompt, McpResource } from './types';
+import type { AuthConfig, GeneratedTool, JsonSchema, McpResource } from './types';
 import { buildRequest } from './request-builder';
 import { executeRequest } from './http-client';
 import { mapResponse, McpToolResult } from './response-mapper';
 import { applyAuth } from './auth-provider';
 import { ExecutionLogsService } from '../execution-logs/execution-logs.service';
-import { PROJECT_REPO } from '../database/database.tokens';
+import { PROJECT_REPO, PROMPT_REPO } from '../database/database.tokens';
 import { ISwaggerProjectRepository } from '../swagger/swagger-project.repository';
+import type { IPromptRepository, PromptRecord } from '../prompts/prompt.repository';
 
 interface CachedProject {
   tools: GeneratedTool[];
@@ -23,7 +25,7 @@ interface CachedProject {
   name: string;
   version: string;
   resources: McpResource[];
-  prompts: McpPrompt[];
+  prompts: PromptRecord[];
   expiresAt: number;
 }
 
@@ -59,6 +61,10 @@ function validateToolArgs(args: Record<string, unknown>, schema: JsonSchema): st
   return errors;
 }
 
+function compileAndRender(template: string, data: unknown): string {
+  return Handlebars.compile(template)(data);
+}
+
 @Injectable()
 export class DynamicMcpService {
   private readonly logger = new Logger(DynamicMcpService.name);
@@ -67,6 +73,7 @@ export class DynamicMcpService {
 
   constructor(
     @Inject(PROJECT_REPO) private readonly projectRepo: ISwaggerProjectRepository,
+    @Inject(PROMPT_REPO) private readonly promptRepo: IPromptRepository,
     private readonly executionLogs: ExecutionLogsService,
   ) {}
 
@@ -81,13 +88,21 @@ export class DynamicMcpService {
     const project = await this.projectRepo.findById(projectId);
     if (!project) throw new NotFoundException(`Project ${projectId} not found.`);
 
+    const promptRefs = (project.prompts ?? []) as Array<{ promptId?: string }>;
+    const resolvedPrompts: PromptRecord[] = [];
+    for (const ref of promptRefs) {
+      if (!ref.promptId) continue;
+      const p = await this.promptRepo.findById(ref.promptId);
+      if (p) resolvedPrompts.push(p);
+    }
+
     const entry: CachedProject = {
       tools: project.tools ?? [],
       auth: project.auth ?? { type: 'none' },
       name: project.name,
       version: project.version ?? '1.0.0',
       resources: project.resources ?? [],
-      prompts: project.prompts ?? [],
+      prompts: resolvedPrompts,
       expiresAt: Date.now() + this.CACHE_TTL_MS,
     };
     this.projectCache.set(projectId, entry);
@@ -199,17 +214,35 @@ export class DynamicMcpService {
       const uri = req.params.uri;
       const resource = resources.find((r) => r.uri === uri);
       if (!resource) throw new Error(`Resource not found: ${uri}`);
-      return {
-        contents: [{ uri, text: resource.content, ...(resource.mimeType ? { mimeType: resource.mimeType } : {}) }],
-      };
+
+      if (resource.type !== 'dynamic' || !resource.endpointRef) {
+        return { contents: [{ uri, text: resource.content, ...(resource.mimeType ? { mimeType: resource.mimeType } : {}) }] };
+      }
+
+      try {
+        let httpReq = buildRequest(resource.inputDefaults ?? {}, resource.endpointRef);
+        httpReq = await applyAuth(httpReq, auth);
+        const httpRes = await executeRequest(httpReq);
+        if (httpRes.status >= 400) throw new Error(`HTTP ${httpRes.status}: ${httpRes.body.slice(0, 200)}`);
+        const parsed = JSON.parse(httpRes.body);
+        const rendered = compileAndRender(resource.content, parsed);
+        return { contents: [{ uri, text: rendered, mimeType: resource.mimeType ?? 'text/html' }] };
+      } catch (err: any) {
+        const errorMsg = err?.message ?? 'unknown error';
+        const msg = (resource.errorConfig?.message ?? 'Error loading resource: {{error}}').replace('{{error}}', errorMsg);
+        return { contents: [{ uri, text: msg, mimeType: 'text/plain' }] };
+      }
     });
 
     server.setRequestHandler(ListPromptsRequestSchema, async () => ({
-      prompts: prompts.map((p) => ({
-        name: p.name,
-        ...(p.description ? { description: p.description } : {}),
-        ...(p.arguments?.length ? { arguments: p.arguments } : {}),
-      })),
+      prompts: prompts.map((p) => {
+        const argNames = [...new Set([...p.content.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]))];
+        return {
+          name: p.name,
+          ...(p.description ? { description: p.description } : {}),
+          ...(argNames.length ? { arguments: argNames.map((name) => ({ name, required: false })) } : {}),
+        };
+      }),
     }));
 
     server.setRequestHandler(GetPromptRequestSchema, async (req) => {
@@ -217,29 +250,10 @@ export class DynamicMcpService {
       const prompt = prompts.find((p) => p.name === name);
       if (!prompt) throw new Error(`Prompt not found: ${name}`);
 
-      let text: string;
-
-      if (prompt.endpoint?.url) {
-        const method = (prompt.endpoint.method ?? 'GET').toUpperCase();
-        let reqUrl = prompt.endpoint.url;
-        let body: Record<string, unknown> | undefined;
-
-        if (method === 'GET') {
-          const u = new URL(reqUrl);
-          for (const [k, v] of Object.entries(args as Record<string, string>)) {
-            u.searchParams.set(k, String(v));
-          }
-          reqUrl = u.toString();
-        } else {
-          body = args as Record<string, unknown>;
-        }
-
-        let prepared = await applyAuth({ method, url: reqUrl, headers: {}, ...(body ? { body } : {}) }, auth);
-        const httpRes = await executeRequest(prepared);
-        text = httpRes.body;
-      } else {
-        text = (prompt.template ?? '').replace(/\{\{(\w+)\}\}/g, (_, key) => String((args as Record<string, string>)[key] ?? `{{${key}}}`));
-      }
+      const text = prompt.content.replace(
+        /\{\{(\w+)\}\}/g,
+        (_, key) => String((args as Record<string, string>)[key] ?? `{{${key}}}`),
+      );
 
       return {
         messages: [{ role: 'user' as const, content: { type: 'text' as const, text } }],

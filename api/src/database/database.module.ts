@@ -6,11 +6,13 @@ import { User, UserSchema } from '../users/user.schema';
 import { SwaggerProject, SwaggerProjectSchema } from '../swagger/swagger-project.schema';
 import { Settings, SettingsSchema } from '../settings/settings.schema';
 import { PasswordReset, PasswordResetSchema } from '../auth/password-reset.schema';
+import { Prompt, PromptSchema } from '../prompts/prompt.schema';
 
 import { UserEntity } from '../users/user.entity';
 import { SwaggerProjectEntity } from '../swagger/swagger-project.entity';
 import { SettingsEntity } from '../settings/settings.entity';
 import { PasswordResetEntity } from '../auth/password-reset.entity';
+import { PromptEntity } from '../prompts/prompt.entity';
 
 import { MongoUserRepository } from '../users/repositories/mongo-user.repository';
 import { SqliteUserRepository } from '../users/repositories/sqlite-user.repository';
@@ -20,8 +22,10 @@ import { MongoSettingsRepository } from '../settings/repositories/mongo-settings
 import { SqliteSettingsRepository } from '../settings/repositories/sqlite-settings.repository';
 import { MongoPasswordResetRepository } from '../auth/repositories/mongo-password-reset.repository';
 import { SqlitePasswordResetRepository } from '../auth/repositories/sqlite-password-reset.repository';
+import { MongoPromptRepository } from '../prompts/repositories/mongo-prompt.repository';
+import { SqlitePromptRepository } from '../prompts/repositories/sqlite-prompt.repository';
 
-import { USER_REPO, PROJECT_REPO, SETTINGS_REPO, PASSWORD_RESET_REPO } from './database.tokens';
+import { USER_REPO, PROJECT_REPO, SETTINGS_REPO, PASSWORD_RESET_REPO, PROMPT_REPO } from './database.tokens';
 
 @Module({})
 export class DatabaseModule {
@@ -41,6 +45,7 @@ export class DatabaseModule {
             { name: SwaggerProject.name, schema: SwaggerProjectSchema },
             { name: Settings.name, schema: SettingsSchema },
             { name: PasswordReset.name, schema: PasswordResetSchema },
+            { name: Prompt.name, schema: PromptSchema },
           ]),
         ],
         providers: [
@@ -48,12 +53,14 @@ export class DatabaseModule {
           MongoSwaggerProjectRepository,
           MongoSettingsRepository,
           MongoPasswordResetRepository,
+          MongoPromptRepository,
           { provide: USER_REPO, useExisting: MongoUserRepository },
           { provide: PROJECT_REPO, useExisting: MongoSwaggerProjectRepository },
           { provide: SETTINGS_REPO, useExisting: MongoSettingsRepository },
           { provide: PASSWORD_RESET_REPO, useExisting: MongoPasswordResetRepository },
+          { provide: PROMPT_REPO, useExisting: MongoPromptRepository },
         ],
-        exports: [USER_REPO, PROJECT_REPO, SETTINGS_REPO, PASSWORD_RESET_REPO],
+        exports: [USER_REPO, PROJECT_REPO, SETTINGS_REPO, PASSWORD_RESET_REPO, PROMPT_REPO],
       };
     }
 
@@ -64,22 +71,24 @@ export class DatabaseModule {
         TypeOrmModule.forRoot({
           type: 'sqlite',
           database: process.env.SQLITE_PATH ?? 'database.sqlite',
-          entities: [UserEntity, SwaggerProjectEntity, SettingsEntity, PasswordResetEntity],
+          entities: [UserEntity, SwaggerProjectEntity, SettingsEntity, PasswordResetEntity, PromptEntity],
           synchronize: true,
         }),
-        TypeOrmModule.forFeature([UserEntity, SwaggerProjectEntity, SettingsEntity, PasswordResetEntity]),
+        TypeOrmModule.forFeature([UserEntity, SwaggerProjectEntity, SettingsEntity, PasswordResetEntity, PromptEntity]),
       ],
       providers: [
         SqliteUserRepository,
         SqliteSwaggerProjectRepository,
         SqliteSettingsRepository,
         SqlitePasswordResetRepository,
+        SqlitePromptRepository,
         { provide: USER_REPO, useExisting: SqliteUserRepository },
         { provide: PROJECT_REPO, useExisting: SqliteSwaggerProjectRepository },
         { provide: SETTINGS_REPO, useExisting: SqliteSettingsRepository },
         { provide: PASSWORD_RESET_REPO, useExisting: SqlitePasswordResetRepository },
+        { provide: PROMPT_REPO, useExisting: SqlitePromptRepository },
       ],
-      exports: [USER_REPO, PROJECT_REPO, SETTINGS_REPO, PASSWORD_RESET_REPO],
+      exports: [USER_REPO, PROJECT_REPO, SETTINGS_REPO, PASSWORD_RESET_REPO, PROMPT_REPO],
     };
   }
 }

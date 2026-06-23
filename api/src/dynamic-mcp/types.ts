@@ -107,24 +107,14 @@ export interface McpResource {
   description?: string;
   mimeType?: string;
   content: string;
-}
-
-export interface McpPromptArgument {
-  name: string;
-  description?: string;
-  required?: boolean;
-}
-
-export interface McpPromptEndpoint {
-  method: string;
-  url: string;
+  editorData?: string;
+  type?: 'static' | 'dynamic';
+  endpointRef?: EndpointRef;
+  inputDefaults?: Record<string, unknown>;
+  iteratorPath?: string;
+  errorConfig?: { message: string };
 }
 
 export interface McpPrompt {
-  id: string;
-  name: string;
-  description?: string;
-  arguments?: McpPromptArgument[];
-  template?: string;
-  endpoint?: McpPromptEndpoint;
+  promptId: string;
 }

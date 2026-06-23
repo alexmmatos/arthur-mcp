@@ -6,7 +6,10 @@ import * as jwt from 'jsonwebtoken';
 import { parseSpec } from '../dynamic-mcp/openapi-parser';
 import { generateTools } from '../dynamic-mcp/tool-generator';
 import { DynamicMcpService } from '../dynamic-mcp/dynamic-mcp.service';
-import type { AuthConfig, McpPrompt, McpResource, ToolComment } from '../dynamic-mcp/types';
+import type { AuthConfig, EndpointRef, McpResource, ToolComment } from '../dynamic-mcp/types';
+import { buildRequest } from '../dynamic-mcp/request-builder';
+import { applyAuth } from '../dynamic-mcp/auth-provider';
+import { executeRequest } from '../dynamic-mcp/http-client';
 import { PROJECT_REPO } from '../database/database.tokens';
 import { ISwaggerProjectRepository, McpApiKeyEntry, SwaggerProjectRecord } from './swagger-project.repository';
 import { parsePostmanCollection } from './postman-parser';
@@ -537,35 +540,27 @@ export class SwaggerService {
     this.dynamicMcp.invalidate(id);
   }
 
-  // ── Prompts ───────────────────────────────────────────────────────────────────
+  // ── Prompts (project references to global prompts) ───────────────────────────
 
-  async addPrompt(id: string, dto: Omit<McpPrompt, 'id'>): Promise<McpPrompt> {
+  async addPromptRef(id: string, promptId: string): Promise<{ promptId: string }> {
+    if (!promptId?.trim()) throw new BadRequestException('promptId is required.');
     const project = await this.projectRepo.findById(id);
     if (!project) throw new NotFoundException('Project not found.');
-    const entry: McpPrompt = { id: crypto.randomUUID(), ...dto };
-    project.prompts.push(entry);
+    const refs = project.prompts as Array<{ promptId: string }>;
+    if (refs.some((r) => r.promptId === promptId)) return { promptId };
+    refs.push({ promptId });
     await this.projectRepo.save(project);
     this.dynamicMcp.invalidate(id);
-    return entry;
+    return { promptId };
   }
 
-  async updatePrompt(id: string, promptId: string, dto: Partial<Omit<McpPrompt, 'id'>>): Promise<SwaggerProjectRecord> {
+  async removePromptRef(id: string, promptId: string): Promise<void> {
     const project = await this.projectRepo.findById(id);
     if (!project) throw new NotFoundException('Project not found.');
-    const p = project.prompts.find((p) => p.id === promptId) as any;
-    if (!p) throw new NotFoundException('Prompt not found.');
-    Object.assign(p, dto);
-    const saved = await this.projectRepo.save(project);
-    this.dynamicMcp.invalidate(id);
-    return saved;
-  }
-
-  async deletePrompt(id: string, promptId: string): Promise<void> {
-    const project = await this.projectRepo.findById(id);
-    if (!project) throw new NotFoundException('Project not found.');
-    const idx = project.prompts.findIndex((p) => p.id === promptId);
-    if (idx === -1) throw new NotFoundException('Prompt not found.');
-    project.prompts.splice(idx, 1);
+    const refs = project.prompts as Array<{ promptId: string }>;
+    const idx = refs.findIndex((r) => r.promptId === promptId);
+    if (idx === -1) throw new NotFoundException('Prompt reference not found.');
+    refs.splice(idx, 1);
     await this.projectRepo.save(project);
     this.dynamicMcp.invalidate(id);
   }
@@ -727,5 +722,18 @@ export class SwaggerService {
       hasKey: (project.mcpApiKeys?.length ?? 0) > 0 || !!project.mcpApiKey,
       toolCount: project.tools?.length ?? 0,
     };
+  }
+
+  async testEndpoint(
+    id: string,
+    endpointRef: EndpointRef,
+    args: Record<string, unknown>,
+  ): Promise<{ status: number; body: string; contentType: string }> {
+    const project = await this.projectRepo.findById(id);
+    if (!project) throw new NotFoundException('Project not found.');
+    let httpReq = buildRequest(args, endpointRef);
+    httpReq = await applyAuth(httpReq, project.auth);
+    const res = await executeRequest(httpReq);
+    return { status: res.status, body: res.body, contentType: res.contentType };
   }
 }

@@ -17,7 +17,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt.guard';
-import type { AuthConfig } from '../dynamic-mcp/types';
+import type { AuthConfig, EndpointRef } from '../dynamic-mcp/types';
 import { SwaggerService } from './swagger.service';
 
 @Controller('swagger')
@@ -296,23 +296,18 @@ export class SwaggerController {
     return this.swaggerService.deleteResource(id, resourceId);
   }
 
-  // ── Prompts ───────────────────────────────────────────────────────────────────
+  // ── Prompt references (link global prompts to a project) ─────────────────────
 
   @Post('projects/:id/prompts')
   @HttpCode(201)
-  addPrompt(@Param('id') id: string, @Body() dto: any) {
-    return this.swaggerService.addPrompt(id, dto);
-  }
-
-  @Put('projects/:id/prompts/:promptId')
-  updatePrompt(@Param('id') id: string, @Param('promptId') promptId: string, @Body() dto: any) {
-    return this.swaggerService.updatePrompt(id, promptId, dto);
+  addPromptRef(@Param('id') id: string, @Body('promptId') promptId: string) {
+    return this.swaggerService.addPromptRef(id, promptId);
   }
 
   @Delete('projects/:id/prompts/:promptId')
   @HttpCode(204)
-  deletePrompt(@Param('id') id: string, @Param('promptId') promptId: string) {
-    return this.swaggerService.deletePrompt(id, promptId);
+  removePromptRef(@Param('id') id: string, @Param('promptId') promptId: string) {
+    return this.swaggerService.removePromptRef(id, promptId);
   }
 
   // ── Tool comments ─────────────────────────────────────────────────────────────
@@ -369,6 +364,18 @@ export class SwaggerController {
     if (!file) throw new BadRequestException('No file uploaded.');
     const project = await this.swaggerService.fromPostman(file.buffer.toString('utf-8'), baseUrl);
     return { _id: project._id, name: project.name, baseUrl: project.baseUrl, toolCount: project.tools.length };
+  }
+
+  // ── Test endpoint (for dynamic resource wizard) ───────────────────────────────
+
+  @Post('projects/:id/test-endpoint')
+  testEndpoint(
+    @Param('id') id: string,
+    @Body('endpointRef') endpointRef: EndpointRef,
+    @Body('args') args: Record<string, unknown>,
+  ) {
+    if (!endpointRef) throw new BadRequestException('endpointRef is required.');
+    return this.swaggerService.testEndpoint(id, endpointRef, args ?? {});
   }
 
   // ── Share link ────────────────────────────────────────────────────────────────
