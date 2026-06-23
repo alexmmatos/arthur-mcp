@@ -20,6 +20,7 @@ export class MongoSettingsRepository implements ISettingsRepository {
       smtpUser: obj.smtpUser ?? '',
       smtpPass: obj.smtpPass ?? '',
       smtpFrom: obj.smtpFrom ?? '',
+      globalRequestHeaders: obj.globalRequestHeaders ?? [],
     };
   }
 

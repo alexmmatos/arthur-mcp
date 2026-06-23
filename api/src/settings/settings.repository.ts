@@ -8,6 +8,7 @@ export interface SettingsRecord {
   smtpUser: string;
   smtpPass: string;
   smtpFrom: string;
+  globalRequestHeaders: { name: string; value: string }[];
 }
 
 export interface ISettingsRepository {

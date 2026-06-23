@@ -27,6 +27,7 @@ import {
   IconTrendingUp,
 } from '@tabler/icons-react'
 import api from '../api'
+import { useAuth, Permission } from '../context/AuthContext'
 import HelpButton from '../components/HelpButton'
 import { STATUS_COLORS } from '../theme/index'
 
@@ -94,7 +95,7 @@ function SummaryBanner({ stats, preset }: { stats: DashStats; preset: Preset }) 
 
   if (calls.total === 0) {
     severity = 'info'
-    message = `Your AI assistant has not been used yet ${period}. Once you connect an AI client to a project, its activity will appear here.`
+    message = `Your AI assistant has not been used yet ${period}. Once you connect an AI client to a server, its activity will appear here.`
   } else if (calls.errors === 0) {
     severity = 'success'
     message = `Everything is running smoothly. Your AI completed all ${calls.total.toLocaleString()} task${calls.total !== 1 ? 's' : ''} successfully ${period}.`
@@ -103,7 +104,7 @@ function SummaryBanner({ stats, preset }: { stats: DashStats; preset: Preset }) 
     message = `Your AI ran ${calls.total.toLocaleString()} task${calls.total !== 1 ? 's' : ''} ${period}. ${successes.toLocaleString()} went well — ${calls.errors.toLocaleString()} had issues. Check the projects below for details.`
   } else {
     severity = 'error'
-    message = `Attention needed. ${calls.errors.toLocaleString()} out of ${calls.total.toLocaleString()} task${calls.total !== 1 ? 's' : ''} had problems ${period}. Please review your project settings.`
+    message = `Attention needed. ${calls.errors.toLocaleString()} out of ${calls.total.toLocaleString()} task${calls.total !== 1 ? 's' : ''} had problems ${period}. Please review your server settings.`
   }
 
   if (projects.total === 0) {
@@ -197,6 +198,7 @@ function healthStatusText(h: HealthEntry): string {
 // ─── Main page ─────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
+  const { can, loading: authLoading } = useAuth()
   const [stats, setStats] = useState<DashStats | null>(null)
   const [health, setHealth] = useState<HealthEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -218,11 +220,18 @@ export default function Dashboard() {
         setStats(statsRes.data)
         setHealth(healthRes.data)
       })
-      .catch(() => setError('Failed to load the dashboard. Please refresh the page.'))
+      .catch((err) => {
+        if (err?.response?.status === 403) setError('forbidden')
+        else setError('Failed to load the dashboard. Please refresh the page.')
+      })
       .finally(() => setLoading(false))
   }, [])
 
-  useEffect(() => { load(preset, customFrom, customTo) }, [])
+  useEffect(() => {
+    if (authLoading) return
+    if (!can(Permission.ServersView)) { setLoading(false); return }
+    load(preset, customFrom, customTo)
+  }, [authLoading])
 
   const handlePreset = (p: Preset) => {
     setPreset(p)
@@ -302,7 +311,14 @@ export default function Dashboard() {
         </Paper>
       )}
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {error === 'forbidden' ? (
+        <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={12}>
+          <Typography color="text.secondary" variant="h6">Access restricted</Typography>
+          <Typography color="text.secondary" variant="body2">You don't have permission to view the dashboard.</Typography>
+        </Box>
+      ) : error ? (
+        <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
+      ) : null}
 
       {loading ? (
         <>
@@ -370,7 +386,7 @@ export default function Dashboard() {
                 helpTitle="Actions available to your AI"
                 helpContent={
                   <Typography variant="body2">
-                    Each "action" is something specific your AI can do — like "search for a contact", "create an order", or "get project status". More actions means your AI can help with more tasks.
+                    Each "action" is something specific your AI can do — like "search for a contact", "create an order", or "check server status". More actions means your AI can help with more tasks.
                   </Typography>
                 }
               />
@@ -435,8 +451,8 @@ export default function Dashboard() {
                       <Box sx={{ color: 'warning.main', mt: '1px', flexShrink: 0 }}><IconAlertTriangle size={18} /></Box>
                       <Typography fontSize="0.82rem" color="text.secondary">
                         {stats.calls.errors === 1
-                          ? '1 task had an issue. Open the relevant project and check its logs to see what went wrong.'
-                          : `${stats.calls.errors} tasks had issues. Open the affected projects and check their logs to find out what went wrong.`}
+                          ? '1 task had an issue. Open the relevant server and check its logs to see what went wrong.'
+                          : `${stats.calls.errors} tasks had issues. Open the affected servers and check their logs to find out what went wrong.`}
                       </Typography>
                     </Box>
                   </>
@@ -484,7 +500,7 @@ export default function Dashboard() {
               <Paper variant="outlined" sx={{ p: 2.5 }}>
                 <Box display="flex" alignItems="center" gap={0.5} mb={2}>
                   <Typography variant="subtitle1" fontWeight={700}>Status right now</Typography>
-                  <HelpButton title="Live project status">
+                  <HelpButton title="Live server status">
                     <Typography variant="body2" gutterBottom>
                       Shows the current health of each integration based on the last hour of activity.
                     </Typography>

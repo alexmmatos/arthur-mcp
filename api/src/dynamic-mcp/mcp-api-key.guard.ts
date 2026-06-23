@@ -28,7 +28,7 @@ export class McpApiKeyGuard implements CanActivate {
         const payload = jwt.verify(token, config.jwtSecret) as { serverId?: string };
         const serverId = req.params['serverId'];
         if (payload.serverId && serverId && payload.serverId !== serverId) {
-          throw new UnauthorizedException('Token not valid for this project');
+          throw new UnauthorizedException('Token not valid for this server');
         }
         return true;
       } catch (err: any) {

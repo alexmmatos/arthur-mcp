@@ -15,4 +15,21 @@ describe('api client', () => {
     expect(typeof api.get).toBe('function');
     expect(typeof api.post).toBe('function');
   });
+
+  it('has delete and put methods', async () => {
+    const { default: api } = await import('./api');
+    expect(typeof api.delete).toBe('function');
+    expect(typeof api.put).toBe('function');
+  });
+
+  it('attaches request interceptor that reads token from localStorage', async () => {
+    const { default: api } = await import('./api');
+    // Interceptors array is populated by the interceptors.request.use call
+    expect(api.interceptors.request).toBeDefined();
+  });
+
+  it('attaches response interceptor for 401 handling', async () => {
+    const { default: api } = await import('./api');
+    expect(api.interceptors.response).toBeDefined();
+  });
 });

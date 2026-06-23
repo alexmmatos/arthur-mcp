@@ -6,10 +6,7 @@ import {
   Card,
   CardContent,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
+  Drawer,
   Grid,
   IconButton,
   InputAdornment,
@@ -27,8 +24,10 @@ import {
   IconEyeOff,
   IconLock,
   IconSearch,
+  IconX,
 } from '@tabler/icons-react'
 import api from '../api'
+import { useAuth, Permission } from '../context/AuthContext'
 import ConfirmDialog from '../components/ConfirmDialog'
 import AppSnackbar from '../components/AppSnackbar'
 
@@ -52,6 +51,7 @@ function SecretCard({ secret, onEdit, onDelete, onCopy }: {
   onCopy: (s: Secret) => void
 }) {
   const [revealed, setRevealed] = useState(false)
+  const { can } = useAuth()
 
   return (
     <Card
@@ -82,18 +82,22 @@ function SecretCard({ secret, onEdit, onDelete, onCopy }: {
             <IconCopy size={15} />
           </IconButton>
         </Tooltip>
-        <Tooltip title="Edit">
-          <IconButton size="small" onClick={() => onEdit(secret)}
-            sx={{ p: 0.5, bgcolor: 'background.paper', '&:hover': { bgcolor: 'action.hover' } }}>
-            <IconEdit size={15} />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="Delete">
-          <IconButton size="small" color="error" onClick={() => onDelete(secret)}
-            sx={{ p: 0.5, bgcolor: 'background.paper', '&:hover': { bgcolor: 'action.hover' } }}>
-            <IconTrash size={15} />
-          </IconButton>
-        </Tooltip>
+        {can(Permission.SecretsEdit) && (
+          <Tooltip title="Edit">
+            <IconButton size="small" onClick={() => onEdit(secret)}
+              sx={{ p: 0.5, bgcolor: 'background.paper', '&:hover': { bgcolor: 'action.hover' } }}>
+              <IconEdit size={15} />
+            </IconButton>
+          </Tooltip>
+        )}
+        {can(Permission.SecretsDelete) && (
+          <Tooltip title="Delete">
+            <IconButton size="small" color="error" onClick={() => onDelete(secret)}
+              sx={{ p: 0.5, bgcolor: 'background.paper', '&:hover': { bgcolor: 'action.hover' } }}>
+              <IconTrash size={15} />
+            </IconButton>
+          </Tooltip>
+        )}
       </Box>
 
       <CardContent sx={{ flexGrow: 1, pb: '12px !important', pr: 5 }}>
@@ -123,11 +127,13 @@ function SecretCard({ secret, onEdit, onDelete, onCopy }: {
           <Typography variant="caption" fontFamily="monospace" color="text.secondary">
             {revealed ? secret.value : '••••••••••••'}
           </Typography>
-          <Tooltip title={revealed ? 'Hide' : 'Reveal'}>
-            <IconButton size="small" onClick={() => setRevealed((r) => !r)} sx={{ p: 0.25 }}>
-              {revealed ? <IconEyeOff size={13} /> : <IconEye size={13} />}
-            </IconButton>
-          </Tooltip>
+          {can(Permission.SecretsRevealValues) && (
+            <Tooltip title={revealed ? 'Hide' : 'Reveal'}>
+              <IconButton size="small" onClick={() => setRevealed((r) => !r)} sx={{ p: 0.25 }}>
+                {revealed ? <IconEyeOff size={13} /> : <IconEye size={13} />}
+              </IconButton>
+            </Tooltip>
+          )}
         </Box>
 
         <Box mt={1} sx={{ bgcolor: 'action.hover', borderRadius: '4px', px: 1, py: 0.25, display: 'inline-block' }}>
@@ -209,9 +215,13 @@ function SecretDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{editTarget ? `Edit — ${editTarget.name}` : 'New secret'}</DialogTitle>
-      <DialogContent dividers>
+    <Drawer anchor="right" open={open} onClose={onClose}
+      PaperProps={{ sx: { width: { xs: '100vw', sm: 480 }, display: 'flex', flexDirection: 'column' } }}>
+      <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+        <Typography variant="h6" fontWeight={700} flexGrow={1}>{editTarget ? `Edit — ${editTarget.name}` : 'New secret'}</Typography>
+        <IconButton size="small" onClick={onClose}><IconX size={18} /></IconButton>
+      </Box>
+      <Box sx={{ flex: 1, overflowY: 'auto', px: 3, py: 2.5 }}>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         <Box display="flex" flexDirection="column" gap={2}>
           <TextField
@@ -242,8 +252,8 @@ function SecretDialog({
             placeholder="What this secret is used for…"
           />
         </Box>
-      </DialogContent>
-      <DialogActions sx={{ px: 3, py: 2 }}>
+      </Box>
+      <Box sx={{ px: 3, py: 2, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1, flexShrink: 0 }}>
         <Button onClick={onClose}>Cancel</Button>
         <Button
           variant="contained" onClick={handleSave} disabled={saving}
@@ -251,8 +261,8 @@ function SecretDialog({
         >
           {saving ? 'Saving…' : editTarget ? 'Save changes' : 'Create secret'}
         </Button>
-      </DialogActions>
-    </Dialog>
+      </Box>
+    </Drawer>
   )
 }
 
@@ -267,13 +277,16 @@ export default function Secrets() {
   const [deleteTarget, setDeleteTarget] = useState<Secret | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [snack, setSnack] = useState<{ message: string; severity?: 'success' | 'error' } | null>(null)
+  const { can, loading: authLoading } = useAuth()
 
   useEffect(() => {
+    if (authLoading) return
+    if (!can(Permission.SecretsViewNames)) { setLoading(false); return }
     api.get<Secret[]>('/secrets')
       .then((r) => setSecrets(r.data))
       .catch(() => setSnack({ message: 'Failed to load secrets.', severity: 'error' }))
       .finally(() => setLoading(false))
-  }, [])
+  }, [authLoading])
 
   const visible = search
     ? secrets.filter((s) => {
@@ -325,9 +338,11 @@ export default function Secrets() {
             Store sensitive values and reference them in auth configs with <code>{'{{secret:NAME}}'}</code>.
           </Typography>
         </Box>
-        <Button variant="contained" startIcon={<IconPlus size={18} />} onClick={openCreate}>
-          New secret
-        </Button>
+        {can(Permission.SecretsCreate) && (
+          <Button variant="contained" startIcon={<IconPlus size={18} />} onClick={openCreate}>
+            New secret
+          </Button>
+        )}
       </Box>
 
       <Box display="flex" alignItems="center" gap={1.5} mb={3}>

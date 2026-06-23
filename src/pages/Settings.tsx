@@ -5,19 +5,32 @@ import {
   CircularProgress,
   Divider,
   Grid,
+  IconButton,
   InputAdornment,
   Paper,
+  Tooltip,
   Typography,
 } from '@mui/material'
 import {
   IconSettings,
+  IconDeviceFloppy,
   IconMail,
   IconWorld,
   IconClock,
+  IconPlus,
+  IconTrash,
+  IconHttpConnect,
 } from '@tabler/icons-react'
 import api from '../api'
+import { useAuth, Permission } from '../context/AuthContext'
 import HelpButton from '../components/HelpButton'
 import AppSnackbar from '../components/AppSnackbar'
+
+interface HeaderEntry {
+  id: string
+  name: string
+  value: string
+}
 
 interface SettingsData {
   serverBaseUrl: string
@@ -27,6 +40,7 @@ interface SettingsData {
   smtpUser: string
   smtpFrom: string
   smtpPassSet: boolean
+  globalRequestHeaders?: { name: string; value: string }[]
 }
 
 // ─── Inline-validated TextField wrapper ───────────────────────────────────────
@@ -42,6 +56,7 @@ function portValid(v: number) {
 }
 
 export default function Settings() {
+  const { can, loading: authLoading } = useAuth()
   const [data, setData] = useState<SettingsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -59,9 +74,15 @@ export default function Settings() {
   const [smtpUser, setSmtpUser] = useState('')
   const [smtpPass, setSmtpPass] = useState('')
   const [smtpFrom, setSmtpFrom] = useState('')
+  const [globalHeaders, setGlobalHeaders] = useState<HeaderEntry[]>([])
+
+  const addGlobalHeader = () => setGlobalHeaders((prev) => [...prev, { id: Math.random().toString(36).slice(2), name: '', value: '' }])
+  const removeGlobalHeader = (id: string) => setGlobalHeaders((prev) => prev.filter((h) => h.id !== id))
+  const setGlobalHeader = (id: string, field: 'name' | 'value', val: string) =>
+    setGlobalHeaders((prev) => prev.map((h) => h.id === id ? { ...h, [field]: val } : h))
 
   // Dirty tracking — original values
-  const [orig, setOrig] = useState<Omit<SettingsData, 'smtpPassSet'> & { smtpPass: string } | null>(null)
+  const [orig, setOrig] = useState<Omit<SettingsData, 'smtpPassSet'> & { smtpPass: string; globalRequestHeaders: { name: string; value: string }[] } | null>(null)
 
   useEffect(() => {
     api.get<SettingsData>('/settings')
@@ -73,6 +94,7 @@ export default function Settings() {
         setSmtpPort(r.data.smtpPort || 587)
         setSmtpUser(r.data.smtpUser || '')
         setSmtpFrom(r.data.smtpFrom || '')
+        setGlobalHeaders((r.data.globalRequestHeaders ?? []).map((h) => ({ id: Math.random().toString(36).slice(2), ...h })))
         setOrig({
           serverBaseUrl: r.data.serverBaseUrl || '',
           defaultTimeoutMs: r.data.defaultTimeoutMs || 30000,
@@ -81,6 +103,7 @@ export default function Settings() {
           smtpUser: r.data.smtpUser || '',
           smtpFrom: r.data.smtpFrom || '',
           smtpPass: '',
+          globalRequestHeaders: r.data.globalRequestHeaders ?? [],
         })
       })
       .catch(() => {
@@ -98,7 +121,8 @@ export default function Settings() {
     smtpPort !== orig.smtpPort ||
     smtpUser !== orig.smtpUser ||
     smtpFrom !== orig.smtpFrom ||
-    smtpPass !== ''
+    smtpPass !== '' ||
+    JSON.stringify(globalHeaders.map((h) => ({ name: h.name, value: h.value }))) !== JSON.stringify(orig.globalRequestHeaders)
   )
 
   const smtpFromError = !emailValid(smtpFrom)
@@ -113,6 +137,7 @@ export default function Settings() {
     }
     setSaving(true)
     try {
+      const cleanHeaders = globalHeaders.filter((h) => h.name.trim()).map((h) => ({ name: h.name.trim(), value: h.value }))
       const dto: Record<string, unknown> = {
         serverBaseUrl: serverBaseUrl.trim(),
         defaultTimeoutMs: Number(defaultTimeoutMs),
@@ -120,6 +145,7 @@ export default function Settings() {
         smtpPort: Number(smtpPort),
         smtpUser: smtpUser.trim(),
         smtpFrom: smtpFrom.trim(),
+        globalRequestHeaders: cleanHeaders,
       }
       if (smtpPass) dto.smtpPass = smtpPass
       await api.patch('/settings', dto)
@@ -135,6 +161,7 @@ export default function Settings() {
         smtpUser: smtpUser.trim(),
         smtpFrom: smtpFrom.trim(),
         smtpPass: '',
+        globalRequestHeaders: cleanHeaders,
       })
     } catch (err: unknown) {
       const msg = err && typeof err === 'object' && 'response' in err
@@ -148,7 +175,13 @@ export default function Settings() {
     }
   }
 
-  if (loading) return <Box display="flex" justifyContent="center" alignItems="center" height="40vh"><CircularProgress /></Box>
+  if (loading || authLoading) return <Box display="flex" justifyContent="center" alignItems="center" height="40vh"><CircularProgress /></Box>
+  if (!can(Permission.SettingsManage)) return (
+    <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={12}>
+      <Typography variant="h6" color="text.secondary">Access restricted</Typography>
+      <Typography variant="body2" color="text.secondary">Only administrators can access system settings.</Typography>
+    </Box>
+  )
 
   return (
     <Box py={3} px={0}>
@@ -217,6 +250,53 @@ export default function Settings() {
         </Grid>
       </Paper>
 
+      {/* Global Request Headers */}
+      <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
+        <Box display="flex" alignItems="center" gap={1} mb={2}>
+          <Box sx={{ color: 'primary.main', display: 'flex' }}><IconHttpConnect size={18} /></Box>
+          <Typography variant="subtitle1" fontWeight={700}>Global request headers</Typography>
+        </Box>
+        <Typography variant="body2" color="text.secondary" mb={2}>
+          These headers are sent on every API call made by any server, regardless of the endpoint.
+          Individual endpoints can add their own specific headers on top of these.
+        </Typography>
+
+        {globalHeaders.length === 0 ? (
+          <Box sx={{ border: '1px dashed', borderColor: 'divider', borderRadius: 1, py: 2.5, textAlign: 'center', mb: 1.5 }}>
+            <Typography variant="body2" color="text.disabled">
+              No global headers defined — click <strong>Add header</strong> to set one
+            </Typography>
+          </Box>
+        ) : (
+          <Box display="flex" flexDirection="column" gap={1} mb={1.5}>
+            {globalHeaders.map((h) => (
+              <Box key={h.id} display="flex" alignItems="center" gap={1}>
+                <TextField
+                  size="small" placeholder="Header-Name" value={h.name}
+                  onChange={(e) => setGlobalHeader(h.id, 'name', e.target.value)}
+                  InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.82rem' } }}
+                  sx={{ width: 220, flexShrink: 0 }}
+                />
+                <TextField
+                  size="small" fullWidth placeholder="value" value={h.value}
+                  onChange={(e) => setGlobalHeader(h.id, 'value', e.target.value)}
+                  InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.82rem' } }}
+                />
+                <Tooltip title="Remove">
+                  <IconButton size="small" color="error" onClick={() => removeGlobalHeader(h.id)}>
+                    <IconTrash size={16} />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            ))}
+          </Box>
+        )}
+
+        <Button size="small" variant="outlined" startIcon={<IconPlus size={14} />} onClick={addGlobalHeader}>
+          Add header
+        </Button>
+      </Paper>
+
       {/* SMTP */}
       <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
         <Box display="flex" alignItems="center" gap={1} mb={2}>
@@ -283,29 +363,12 @@ export default function Settings() {
         </Grid>
       </Paper>
 
-      <Divider sx={{ mb: 0 }} />
-
-      {/* Sticky save bar */}
-      <Box
-        sx={{
-          position: 'sticky',
-          bottom: 0,
-          bgcolor: 'background.paper',
-          borderTop: '1px solid',
-          borderColor: 'divider',
-          py: 2,
-          zIndex: 1,
-          display: 'flex',
-          justifyContent: 'flex-end',
-          boxShadow: isDirty ? '0 -4px 16px rgba(0,0,0,0.07)' : 'none',
-          transition: 'box-shadow 0.2s',
-        }}
-      >
+      <Box display="flex" justifyContent="flex-end" mt={1}>
         <Button
           variant="contained"
           onClick={handleSave}
           disabled={saving || !isDirty}
-          startIcon={saving ? <CircularProgress size={14} color="inherit" /> : <IconSettings size={18} />}
+          startIcon={saving ? <CircularProgress size={14} color="inherit" /> : <IconDeviceFloppy size={18} />}
         >
           {saving ? 'Saving…' : 'Save settings'}
         </Button>

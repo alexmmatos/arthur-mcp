@@ -25,7 +25,7 @@ export class DashboardController {
       throw new BadRequestException('Invalid dates. Use ISO 8601 format.');
     }
     if (from >= to) {
-      throw new BadRequestException('"from" deve ser anterior a "to".');
+      throw new BadRequestException('"from" must be before "to".');
     }
 
     return this.dashboard.getStats(from, to);

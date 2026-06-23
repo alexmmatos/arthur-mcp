@@ -72,12 +72,13 @@ export interface ToolComment {
   createdAt: Date;
 }
 
-/** Tool pronta para ser servida pelo MCP server e armazenada no MongoDB */
+/** Tool ready to be served by the MCP server and stored in the database */
 export interface GeneratedTool {
   name: string;
   description: string;
   inputSchema: JsonSchema;
   outputSchema?: JsonSchema;
+  outputTemplate?: string;
   endpointRef: EndpointRef;
   enabled?: boolean;
   comments?: ToolComment[];
@@ -89,6 +90,7 @@ export interface EndpointRef {
   baseUrl: string;
   contentType: string;
   parameterMap: ParameterMapping[];
+  staticHeaders?: { name: string; value: string }[];
 }
 
 /** Per-project authentication configuration */

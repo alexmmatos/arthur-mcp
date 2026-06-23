@@ -31,6 +31,7 @@ export interface SwaggerProjectRecord {
   maintenanceMode: { enabled: boolean; message: string };
   availabilityWindow: { enabled: boolean; timezone: string; schedule: Array<{ day: number; startHour: number; endHour: number }> };
   alertConfig: { enabled: boolean; errorThresholdPct: number; notifyEmail: string };
+  tenantConfig?: { enabled: boolean; params: Array<{ name: string; type: 'string' | 'integer' | 'number' | 'boolean' | 'uuid' | 'hash'; description?: string }> };
   createdAt?: Date;
   updatedAt?: Date;
 }

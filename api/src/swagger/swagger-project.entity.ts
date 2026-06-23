@@ -71,6 +71,9 @@ export class SwaggerProjectEntity {
   @Column('text', { default: '{"enabled":false,"errorThresholdPct":20,"notifyEmail":""}' })
   alertConfig: string;
 
+  @Column('text', { default: '{"enabled":false,"params":[]}' })
+  tenantConfig: string;
+
   @CreateDateColumn()
   createdAt: Date;
 

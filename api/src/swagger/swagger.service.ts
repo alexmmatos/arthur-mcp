@@ -76,7 +76,7 @@ export class SwaggerService {
     try {
       normalizedSpec = await parseSpec(rawSpec);
     } catch (err: any) {
-      throw new BadRequestException(`Erro ao processar o spec: ${err?.message ?? err}`);
+      throw new BadRequestException(`Error processing the spec:${err?.message ?? err}`);
     }
 
     const baseUrl = baseUrlOverride?.trim() || normalizedSpec.servers[0]?.url || 'http://localhost';
@@ -110,7 +110,7 @@ export class SwaggerService {
     try {
       normalizedSpec = await parseSpec(rawSpec);
     } catch (err: any) {
-      throw new BadRequestException(`Erro ao processar o spec: ${err?.message ?? err}`);
+      throw new BadRequestException(`Error processing the spec:${err?.message ?? err}`);
     }
 
     const baseUrl = baseUrlOverride?.trim() || normalizedSpec.servers[0]?.url || 'http://localhost';
@@ -155,7 +155,7 @@ export class SwaggerService {
     dto: { enabled: boolean; requestsPerMinute: number },
   ): Promise<SwaggerProjectRecord> {
     if (dto.requestsPerMinute < 1 || dto.requestsPerMinute > 10_000) {
-      throw new BadRequestException('requestsPerMinute deve estar entre 1 e 10000.');
+      throw new BadRequestException('requestsPerMinute must be between 1 and 10000.');
     }
     const server = await this.projectRepo.update(id, { rateLimit: dto });
     if (!server) throw new NotFoundException('Project not found.');
@@ -241,7 +241,7 @@ export class SwaggerService {
     try {
       normalizedSpec = await parseSpec(rawSpec);
     } catch (err: any) {
-      throw new BadRequestException(`Erro ao processar o spec: ${err?.message ?? err}`);
+      throw new BadRequestException(`Error processing the spec:${err?.message ?? err}`);
     }
 
     const baseUrl = baseUrlOverride?.trim() || normalizedSpec.servers[0]?.url || server.baseUrl;
@@ -384,6 +384,8 @@ export class SwaggerService {
       contentType?: string;
       parameterMap: Record<string, unknown>[];
       inputSchema: Record<string, unknown>;
+      staticHeaders?: { name: string; value: string }[];
+      outputTemplate?: string;
     },
   ): Promise<SwaggerProjectRecord> {
     const server = await this.projectRepo.findById(id);
@@ -396,12 +398,14 @@ export class SwaggerService {
       name: dto.name.trim(),
       description: dto.description?.trim() || undefined,
       inputSchema: dto.inputSchema,
+      ...(dto.outputTemplate ? { outputTemplate: dto.outputTemplate } : {}),
       endpointRef: {
         method: dto.method.toUpperCase(),
         path: dto.path.trim(),
         baseUrl: dto.baseUrl.trim(),
         contentType: dto.contentType?.trim() || 'application/json',
         parameterMap: dto.parameterMap,
+        ...(dto.staticHeaders?.length ? { staticHeaders: dto.staticHeaders } : {}),
       },
     };
 
@@ -421,6 +425,8 @@ export class SwaggerService {
       contentType?: string;
       parameterMap: Record<string, unknown>[];
       inputSchema: Record<string, unknown>;
+      staticHeaders?: { name: string; value: string }[];
+      outputTemplate?: string;
     },
   ): Promise<SwaggerProjectRecord> {
     const server = await this.projectRepo.findById(id);
@@ -435,12 +441,14 @@ export class SwaggerService {
       name: nameClean,
       description: dto.description?.trim() || undefined,
       inputSchema: dto.inputSchema as any,
+      ...(dto.outputTemplate ? { outputTemplate: dto.outputTemplate } : {}),
       endpointRef: {
         method: dto.method.toUpperCase(),
         path: dto.path.trim(),
         baseUrl: dto.baseUrl.trim(),
         contentType: dto.contentType?.trim() || 'application/json',
         parameterMap: dto.parameterMap as any,
+        ...(dto.staticHeaders?.length ? { staticHeaders: dto.staticHeaders } : {}),
       },
     } as any);
 
@@ -492,6 +500,15 @@ export class SwaggerService {
     dto: { enabled: boolean; errorThresholdPct: number; notifyEmail: string },
   ): Promise<SwaggerProjectRecord> {
     const server = await this.projectRepo.update(id, { alertConfig: dto });
+    if (!server) throw new NotFoundException('Project not found.');
+    return server;
+  }
+
+  async setTenantConfig(
+    id: string,
+    dto: { enabled: boolean; params: Array<{ name: string; type: string; description?: string }> },
+  ): Promise<SwaggerProjectRecord> {
+    const server = await this.projectRepo.update(id, { tenantConfig: dto } as any);
     if (!server) throw new NotFoundException('Project not found.');
     return server;
   }

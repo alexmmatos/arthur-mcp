@@ -6,6 +6,7 @@ import {
   AccordionDetails,
   AccordionSummary,
   Alert,
+  Autocomplete,
   Box,
   Button,
   Chip,
@@ -14,8 +15,8 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
   Drawer,
+  Divider,
   FormControl,
   FormControlLabel,
   Grid,
@@ -74,8 +75,14 @@ import {
   IconArrowsShuffle,
   IconShieldLock,
   IconChevronUp,
+  IconArrowsMaximize,
+  IconArrowsMinimize,
+  IconExternalLink,
 } from '@tabler/icons-react'
 import { QRCodeSVG } from 'qrcode.react'
+import MonacoEditor from '@monaco-editor/react'
+import { useColorMode } from '../theme/ColorModeContext'
+import { useAuth, Permission } from '../context/AuthContext'
 import api from '../api'
 import HelpButton from '../components/HelpButton'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -120,6 +127,7 @@ interface GeneratedTool {
   description?: string
   inputSchema: JsonSchema
   outputSchema?: JsonSchema
+  outputTemplate?: string
   endpointRef: EndpointRef
   enabled?: boolean
   comments?: ToolComment[]
@@ -231,11 +239,11 @@ const METHOD_COLOR: Record<string, string> = {
 }
 
 const METHOD_BG: Record<string, string> = {
-  GET: '#ebf3fb',
-  POST: '#e7f6ec',
-  PUT: '#fef3e2',
-  PATCH: '#e6f8f4',
-  DELETE: '#fde9e9',
+  GET: 'rgba(97,175,254,0.12)',
+  POST: 'rgba(73,204,144,0.12)',
+  PUT: 'rgba(252,161,48,0.12)',
+  PATCH: 'rgba(80,227,194,0.12)',
+  DELETE: 'rgba(249,62,62,0.12)',
 }
 
 const SOURCE_CHIP_COLOR: Record<
@@ -269,6 +277,7 @@ function parseMcpResponse(data: unknown): any {
 interface InlineEditProps {
   value: string
   onSave: (v: string) => Promise<void>
+  readOnly?: boolean
   multiline?: boolean
   placeholder?: string
   emptyLabel?: string
@@ -282,6 +291,7 @@ interface InlineEditProps {
 function InlineEdit({
   value,
   onSave,
+  readOnly = false,
   multiline = false,
   placeholder,
   emptyLabel = 'Add…',
@@ -314,6 +324,13 @@ function InlineEdit({
   }
 
   if (!editing) {
+    if (readOnly) {
+      return (
+        <Typography sx={{ fontSize, fontWeight, color: value ? (color ?? 'text.primary') : 'text.disabled', fontFamily, lineHeight: 1.5, fontStyle: value ? 'normal' : 'italic', maxWidth }}>
+          {value || emptyLabel}
+        </Typography>
+      )
+    }
     return (
       <Box
         display="inline-flex"
@@ -384,6 +401,7 @@ function InlineEdit({
 function BaseUrlPanel({ projectId, initialValue, onChange }: {
   projectId: string; initialValue: string; onChange: (url: string) => void
 }) {
+  const { can } = useAuth()
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(initialValue)
   const [saving, setSaving] = useState(false)
@@ -415,7 +433,7 @@ function BaseUrlPanel({ projectId, initialValue, onChange }: {
           <Typography variant="subtitle2" fontWeight={700}>API Base URL</Typography>
           <HelpButton title="API Base URL">
             <Typography variant="body2" gutterBottom>
-              The root address of the external API this project connects to. Every tool call is prefixed with this URL — for example, base <code>https://api.example.com</code> + tool path <code>/users/42</code> makes a full request to <code>https://api.example.com/users/42</code>.
+              The root address of the external API this server connects to. Every tool call is prefixed with this URL — for example, base <code>https://api.example.com</code> + tool path <code>/users/42</code> makes a full request to <code>https://api.example.com/users/42</code>.
             </Typography>
             <Typography variant="body2" gutterBottom>
               <strong>When to update this field:</strong>
@@ -465,9 +483,11 @@ function BaseUrlPanel({ projectId, initialValue, onChange }: {
             >
               {initialValue || <span style={{ fontStyle: 'italic', opacity: 0.5 }}>No base URL set</span>}
             </Typography>
-            <Tooltip title="Edit Base URL">
-              <IconButton size="small" onClick={() => setEditing(true)}><IconEdit size={15} /></IconButton>
-            </Tooltip>
+            {can(Permission.ServersEditSettings) && (
+              <Tooltip title="Edit Base URL">
+                <IconButton size="small" onClick={() => setEditing(true)}><IconEdit size={15} /></IconButton>
+              </Tooltip>
+            )}
           </Box>
         )}
       </Box>
@@ -484,6 +504,7 @@ function McpEndpointBar({ projectId, hasKeys }: { projectId: string; hasKeys: bo
   const [shareLinkCopied, setShareLinkCopied] = useState(false)
   const [shareLoading, setShareLoading] = useState(false)
   const url = `${window.location.origin}/api/mcp/server/${projectId}`
+  const { can } = useAuth()
 
   const handleShareOpen = async () => {
     setShareOpen(true)
@@ -502,11 +523,11 @@ function McpEndpointBar({ projectId, hasKeys }: { projectId: string; hasKeys: bo
       <Box display="flex" alignItems="center" gap={1} mb={1.5}>
         <IconWorld size={18} style={{ color: '#5D87FF' }} />
         <Typography variant="subtitle1" fontWeight={700} flexGrow={1}>Connection URL</Typography>
-        <Tooltip title="Share setup instructions with a client">
+        {can(Permission.ServersShare) && <Tooltip title="Share setup instructions with a client">
           <Button size="small" variant="outlined" startIcon={<IconShare size={18} />} onClick={handleShareOpen}>
             Share with client
           </Button>
-        </Tooltip>
+        </Tooltip>}
         <HelpButton title="MCP Endpoint">
           <Typography variant="body2" gutterBottom>
             The URL that MCP clients (Claude Desktop, Cursor, or any compatible client) use to connect to <em>this specific server's</em> tools.
@@ -523,7 +544,7 @@ function McpEndpointBar({ projectId, hasKeys }: { projectId: string; hasKeys: bo
       <Box display="flex" alignItems="center" gap={1}>
         <Box sx={{
           flexGrow: 1, fontFamily: 'monospace', fontSize: '0.82rem',
-          bgcolor: '#f5f5f5', border: '1px solid #e0e0e0', borderRadius: 1,
+          bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider', borderRadius: 1,
           px: 1.5, py: 1, color: 'text.primary', wordBreak: 'break-all',
         }}>
           {url}
@@ -538,26 +559,28 @@ function McpEndpointBar({ projectId, hasKeys }: { projectId: string; hasKeys: bo
 
       <Typography variant="caption" color="text.secondary" mt={0.75} display="block">
         {hasKeys
-          ? <>Configure this URL in your MCP client and include the header <Box component="code" sx={{ bgcolor: '#f0f0f0', px: 0.8, py: 0.2, borderRadius: 0.5, fontSize: '0.78rem' }}>auth: &lt;key&gt;</Box></>
+          ? <>Configure this URL in your MCP client and include the header <Box component="code" sx={{ bgcolor: 'action.hover', px: 0.8, py: 0.2, borderRadius: 0.5, fontSize: '0.78rem' }}>auth: &lt;key&gt;</Box></>
           : 'Configure this URL in Claude Desktop, Cursor, or any compatible MCP client.'}
       </Typography>
 
       {/* Share dialog */}
-      <Dialog open={shareOpen} onClose={() => setShareOpen(false)} maxWidth="sm" fullWidth scroll="paper">
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Drawer anchor="right" open={shareOpen} onClose={() => setShareOpen(false)}
+        PaperProps={{ sx: { width: { xs: '100vw', sm: 480 }, display: 'flex', flexDirection: 'column' } }}>
+        <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0 }}>
           <IconShare size={18} style={{ color: '#5D87FF' }} />
-          Share with client
-        </DialogTitle>
-        <DialogContent dividers>
+          <Typography variant="h6" fontWeight={700} flexGrow={1}>Share with client</Typography>
+          <IconButton size="small" onClick={() => setShareOpen(false)}><IconX size={18} /></IconButton>
+        </Box>
+        <Box sx={{ flex: 1, overflowY: 'auto', px: 3, py: 2.5 }}>
           <Typography variant="body2" color="text.secondary" mb={2}>
-            Send this link to anyone who needs to connect their AI client to this project. The page includes step-by-step instructions for Claude Desktop, Cursor, and a QR code for mobile.
+            Send this link to anyone who needs to connect their AI client to this server. The page includes step-by-step instructions for Claude Desktop, Cursor, and a QR code for mobile.
           </Typography>
           {shareLoading ? (
             <Box display="flex" justifyContent="center" py={3}><CircularProgress /></Box>
           ) : fullShareLink ? (
             <>
               <Box display="flex" alignItems="center" gap={1} mb={2}>
-                <Box sx={{ flexGrow: 1, fontFamily: 'monospace', fontSize: '0.8rem', bgcolor: '#f5f5f5', border: '1px solid #e0e0e0', borderRadius: 1, px: 1.5, py: 1, wordBreak: 'break-all' }}>
+                <Box sx={{ flexGrow: 1, fontFamily: 'monospace', fontSize: '0.8rem', bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider', borderRadius: 1, px: 1.5, py: 1, wordBreak: 'break-all' }}>
                   {fullShareLink}
                 </Box>
                 <Tooltip title={shareLinkCopied ? 'Copied!' : 'Copy link'}>
@@ -578,8 +601,8 @@ function McpEndpointBar({ projectId, hasKeys }: { projectId: string; hasKeys: bo
           ) : (
             <Alert severity="error">Could not generate the share link. Please try again.</Alert>
           )}
-        </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}>
+        </Box>
+        <Box sx={{ px: 3, py: 2, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1, flexShrink: 0 }}>
           <Button onClick={() => setShareOpen(false)}>Close</Button>
           {fullShareLink && (
             <Button variant="contained" startIcon={<IconCopy size={18} />}
@@ -587,8 +610,8 @@ function McpEndpointBar({ projectId, hasKeys }: { projectId: string; hasKeys: bo
               {shareLinkCopied ? 'Copied!' : 'Copy link'}
             </Button>
           )}
-        </DialogActions>
-      </Dialog>
+        </Box>
+      </Drawer>
     </Paper>
   )
 }
@@ -607,6 +630,7 @@ function ApiKeysPanel({ projectId, initialKeys, onChange }: {
   const [addOpen, setAddOpen] = useState(false)
   const [adding, setAdding] = useState(false)
   const [addError, setAddError] = useState('')
+  const { can } = useAuth()
   // After creation, the newly created key id is tracked to highlight it
   const [newlyCreatedId, setNewlyCreatedId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -688,10 +712,12 @@ function ApiKeysPanel({ projectId, initialKeys, onChange }: {
             </Typography>
           </HelpButton>
         </Box>
-        <Button size="small" variant="contained" startIcon={<IconPlus size={18} />}
-          onClick={() => { setAddOpen(true); setNewKeyName(''); setAddError('') }}>
-          Add key
-        </Button>
+        {can(Permission.ApiKeysCreate) && (
+          <Button size="small" variant="contained" startIcon={<IconPlus size={18} />}
+            onClick={() => { setAddOpen(true); setNewKeyName(''); setAddError('') }}>
+            Add key
+          </Button>
+        )}
       </Box>
 
       {keys.length === 0 ? (
@@ -708,7 +734,7 @@ function ApiKeysPanel({ projectId, initialKeys, onChange }: {
                 display: 'flex', alignItems: 'center', gap: 1,
                 border: '1px solid', borderColor: isNew ? 'success.light' : 'divider',
                 borderRadius: 1, px: 1.5, py: 1,
-                bgcolor: isNew ? '#f0fdf4' : 'transparent',
+                bgcolor: isNew ? 'rgba(73,204,144,0.08)' : 'transparent',
                 transition: 'background-color 0.3s',
               }}>
                 <Box flexGrow={1} minWidth={0}>
@@ -736,24 +762,30 @@ function ApiKeysPanel({ projectId, initialKeys, onChange }: {
                     <IconCopy size={18} />
                   </IconButton>
                 </Tooltip>
-                <Tooltip title="Revoke key">
-                  <IconButton size="small" color="error" onClick={() => setRevokeTarget(entry)}>
-                    <IconTrash size={18} />
-                  </IconButton>
-                </Tooltip>
+                {can(Permission.ApiKeysDelete) && (
+                  <Tooltip title="Revoke key">
+                    <IconButton size="small" color="error" onClick={() => setRevokeTarget(entry)}>
+                      <IconTrash size={18} />
+                    </IconButton>
+                  </Tooltip>
+                )}
               </Box>
             )
           })}
           <Typography variant="caption" color="text.secondary" mt={0.5}>
-            Use in the header: <Box component="code" sx={{ bgcolor: '#f0f0f0', px: 0.8, py: 0.2, borderRadius: 0.5, fontSize: '0.75rem' }}>auth: &lt;key&gt;</Box>
+            Use in the header: <Box component="code" sx={{ bgcolor: 'action.hover', px: 0.8, py: 0.2, borderRadius: 0.5, fontSize: '0.75rem' }}>auth: &lt;key&gt;</Box>
           </Typography>
         </Box>
       )}
 
       {/* Add key dialog */}
-      <Dialog open={addOpen} onClose={() => setAddOpen(false)} maxWidth="sm" fullWidth scroll="paper">
-        <DialogTitle sx={{ pb: 1 }}>Add API key</DialogTitle>
-        <DialogContent dividers>
+      <Drawer anchor="right" open={addOpen} onClose={() => setAddOpen(false)}
+        PaperProps={{ sx: { width: { xs: '100vw', sm: 420 }, display: 'flex', flexDirection: 'column' } }}>
+        <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+          <Typography variant="h6" fontWeight={700} flexGrow={1}>Add API key</Typography>
+          <IconButton size="small" onClick={() => setAddOpen(false)}><IconX size={18} /></IconButton>
+        </Box>
+        <Box sx={{ flex: 1, overflowY: 'auto', px: 3, py: 2.5 }}>
           {addError && <Alert severity="error" sx={{ mb: 2 }}>{addError}</Alert>}
           <TextField size="small" fullWidth autoFocus label="Key name"
             placeholder="e.g. Claude Desktop, Production client"
@@ -762,15 +794,15 @@ function ApiKeysPanel({ projectId, initialKeys, onChange }: {
             onKeyDown={(e) => e.key === 'Enter' && !adding && handleAdd()}
             helperText="A label to identify which client uses this key"
           />
-        </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}>
+        </Box>
+        <Box sx={{ px: 3, py: 2, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1, flexShrink: 0 }}>
           <Button onClick={() => setAddOpen(false)}>Cancel</Button>
           <Button variant="contained" onClick={handleAdd} disabled={adding}
             startIcon={adding ? <CircularProgress size={14} color="inherit" /> : <IconLock size={18} />}>
             {adding ? 'Creating…' : 'Create key'}
           </Button>
-        </DialogActions>
-      </Dialog>
+        </Box>
+      </Drawer>
 
       {/* Revoke confirm */}
       <ConfirmDialog
@@ -796,6 +828,7 @@ function OAuthClientPanel({ projectId, initialClientId, initialClientSecret, ser
   serverBase: string
   onChange: (clientId: string | null, clientSecret: string | null) => void
 }) {
+  const { can } = useAuth()
   const [clientId, setClientId] = useState(initialClientId ?? '')
   const [clientSecret, setClientSecret] = useState(initialClientSecret ?? '')
   const [saving, setSaving] = useState(false)
@@ -867,7 +900,7 @@ function OAuthClientPanel({ projectId, initialClientId, initialClientSecret, ser
             </Typography>
           </HelpButton>
         </Box>
-        {hasCredentials && (
+        {hasCredentials && can(Permission.ServersEditSettings) && (
           <Button size="small" color="error" onClick={() => setConfirmRemove(true)}>
             Remove
           </Button>
@@ -947,27 +980,29 @@ function OAuthClientPanel({ projectId, initialClientId, initialClientSecret, ser
           <Typography variant="body2" color="text.disabled" mb={2}>
             No OAuth client configured — ChatGPT cannot connect via OAuth.
           </Typography>
-          <Box display="flex" flexDirection="column" gap={1.5}>
-            <Box display="flex" gap={1}>
-              <TextField size="small" fullWidth label="Client ID" value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-                inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
-              />
-              <TextField size="small" fullWidth label="Client Secret" value={clientSecret}
-                onChange={(e) => setClientSecret(e.target.value)}
-                inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
-              />
+          {can(Permission.ServersEditSettings) && (
+            <Box display="flex" flexDirection="column" gap={1.5}>
+              <Box display="flex" gap={1}>
+                <TextField size="small" fullWidth label="Client ID" value={clientId}
+                  onChange={(e) => setClientId(e.target.value)}
+                  inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
+                />
+                <TextField size="small" fullWidth label="Client Secret" value={clientSecret}
+                  onChange={(e) => setClientSecret(e.target.value)}
+                  inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
+                />
+              </Box>
+              <Box display="flex" gap={1}>
+                <Button size="small" variant="outlined" onClick={handleGenerate}>
+                  Auto-generate
+                </Button>
+                <Button size="small" variant="contained" onClick={handleSave} disabled={saving || !clientId.trim() || !clientSecret.trim()}
+                  startIcon={saving ? <CircularProgress size={14} color="inherit" /> : <IconKey size={16} />}>
+                  {saving ? 'Saving…' : 'Save credentials'}
+                </Button>
+              </Box>
             </Box>
-            <Box display="flex" gap={1}>
-              <Button size="small" variant="outlined" onClick={handleGenerate}>
-                Auto-generate
-              </Button>
-              <Button size="small" variant="contained" onClick={handleSave} disabled={saving || !clientId.trim() || !clientSecret.trim()}
-                startIcon={saving ? <CircularProgress size={14} color="inherit" /> : <IconKey size={16} />}>
-                {saving ? 'Saving…' : 'Save credentials'}
-              </Button>
-            </Box>
-          </Box>
+          )}
         </>
       )}
 
@@ -985,11 +1020,218 @@ function OAuthClientPanel({ projectId, initialClientId, initialClientSecret, ser
   )
 }
 
+// ─── Endpoint accordion (with inline test) ────────────────────────────────────
+
+function EndpointAccordion({ endpoint, projectId, anyApiKey, canTest }: {
+  endpoint: { tool: GeneratedTool } & EndpointRef
+  projectId: string
+  anyApiKey?: string
+  canTest: boolean
+}) {
+  const method = endpoint.method.toUpperCase()
+  const parameterMap = endpoint.parameterMap ?? []
+  const properties = endpoint.tool.inputSchema?.properties ?? {}
+  const requiredFields = endpoint.tool.inputSchema?.required ?? []
+  const paramEntries = Object.entries(properties)
+
+  const [tryMode, setTryMode] = useState(false)
+  const [formValues, setFormValues] = useState<Record<string, string>>({})
+  const [executing, setExecuting] = useState(false)
+  const [response, setResponse] = useState<string | null>(null)
+  const [responseIsError, setResponseIsError] = useState(false)
+
+  const handleExecute = async () => {
+    setExecuting(true); setResponse(null); setResponseIsError(false)
+    try {
+      const args: Record<string, unknown> = {}
+      for (const [key, val] of Object.entries(formValues)) {
+        if (val === '') continue
+        const schema = properties[key] as any
+        if (schema?.type === 'number' || schema?.type === 'integer') args[key] = Number(val)
+        else if (schema?.type === 'boolean') args[key] = val === 'true'
+        else if (schema?.type === 'object' || schema?.type === 'array') {
+          try { args[key] = JSON.parse(val) } catch { args[key] = val }
+        } else args[key] = val
+      }
+      const payload = { jsonrpc: '2.0', method: 'tools/call', id: Date.now(), params: { name: endpoint.tool.name, arguments: args } }
+      const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' }
+      if (anyApiKey) headers['auth'] = anyApiKey
+      const res = await api.post(`/mcp/server/${projectId}`, payload, { headers })
+      const rpc = parseMcpResponse(res.data)
+      if (rpc?.error) { setResponse(JSON.stringify(rpc.error, null, 2)); setResponseIsError(true); return }
+      const content = rpc?.result?.content ?? rpc?.content
+      if (rpc?.result?.isError ?? rpc?.isError) setResponseIsError(true)
+      const text = content?.[0]?.text ?? JSON.stringify(rpc?.result ?? rpc, null, 2)
+      try { setResponse(JSON.stringify(JSON.parse(text), null, 2)) } catch { setResponse(text) }
+    } catch (err: any) {
+      setResponse(err?.response?.data?.message ?? err?.message ?? 'Unknown error')
+      setResponseIsError(true)
+    } finally { setExecuting(false) }
+  }
+
+  const queryParams = parameterMap.filter((p) => p.source === 'query')
+  const pathParams = parameterMap.filter((p) => p.source === 'path')
+  const bodyParams = parameterMap.filter((p) => p.source === 'body')
+  const headerParams = parameterMap.filter((p) => p.source === 'header')
+
+  return (
+    <Accordion variant="outlined" sx={{
+      mb: 0, '&:before': { display: 'none' },
+      borderColor: `${METHOD_COLOR[method] ?? '#ddd'}44`,
+      '&.Mui-expanded': { borderColor: `${METHOD_COLOR[method] ?? '#ddd'}88` },
+      transition: 'border-color 0.15s',
+    }}>
+      <AccordionSummary expandIcon={<IconChevronDown size={18} />} sx={{
+        bgcolor: METHOD_BG[method] ?? 'background.paper',
+        borderRadius: '7px 7px 0 0',
+        minHeight: '48px !important', px: 2,
+        '&.Mui-expanded': { minHeight: '48px !important' },
+      }}>
+        <Box display="flex" alignItems="center" gap={1.5} minWidth={0} width="100%">
+          <Box sx={{
+            px: 1.2, py: 0.35, borderRadius: '4px',
+            bgcolor: METHOD_COLOR[method] ?? '#888', color: '#fff',
+            fontWeight: 700, fontSize: '0.72rem', fontFamily: 'monospace',
+            minWidth: 58, textAlign: 'center', flexShrink: 0,
+          }}>
+            {method}
+          </Box>
+          <Typography fontFamily="monospace" fontWeight={600} fontSize="0.875rem" flexGrow={1} minWidth={0} noWrap>
+            {endpoint.path}
+          </Typography>
+          <Box display="flex" gap={0.5} flexShrink={0} sx={{ display: { xs: 'none', sm: 'flex' } }}>
+            {pathParams.length > 0 && <Chip label={`${pathParams.length} path`} size="small" color="warning" sx={{ fontSize: '0.62rem', height: 17 }} />}
+            {queryParams.length > 0 && <Chip label={`${queryParams.length} query`} size="small" color="info" sx={{ fontSize: '0.62rem', height: 17 }} />}
+            {bodyParams.length > 0 && <Chip label={`${bodyParams.length} body`} size="small" color="secondary" sx={{ fontSize: '0.62rem', height: 17 }} />}
+            {headerParams.length > 0 && <Chip label={`${headerParams.length} header`} size="small" sx={{ fontSize: '0.62rem', height: 17 }} />}
+          </Box>
+          <Chip label={endpoint.tool.name} size="small"
+            sx={{ fontFamily: 'monospace', fontSize: '0.68rem', height: 20, bgcolor: 'action.hover', flexShrink: 0, display: { xs: 'none', md: 'flex' } }} />
+        </Box>
+      </AccordionSummary>
+
+      <AccordionDetails sx={{ p: 2.5 }}>
+        {/* Full URL + description */}
+        <Typography variant="caption" color="text.disabled" fontFamily="monospace" display="block" mb={endpoint.tool.description ? 0.75 : 0}
+          sx={{ wordBreak: 'break-all' }}>
+          {endpoint.baseUrl}{endpoint.path}
+        </Typography>
+        {endpoint.tool.description && (
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            {endpoint.tool.description.replace(/\s*\[.*?\]\s*$/, '')}
+          </Typography>
+        )}
+
+        {/* Parameters table */}
+        {paramEntries.length > 0 && (
+          <>
+            <Typography variant="subtitle2" fontWeight={700} mb={1}>Parameters</Typography>
+            <Box sx={{ overflowX: 'auto', mb: 2.5 }}>
+              <Table size="small" sx={{
+                minWidth: 460,
+                '& th': { bgcolor: 'action.hover', fontWeight: 700, fontSize: '0.72rem', color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.04em' },
+                '& td': { fontSize: '0.8rem', verticalAlign: 'middle' },
+              }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Name</TableCell>
+                    <TableCell>In</TableCell>
+                    <TableCell>Type</TableCell>
+                    <TableCell>Required</TableCell>
+                    <TableCell>Description</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {paramEntries.map(([name, schema]: [string, any]) => {
+                    const mapping = parameterMap.find((pm) => pm.toolParamName === name)
+                    const isReq = requiredFields.includes(name) || (mapping?.required ?? false)
+                    return (
+                      <TableRow key={name} sx={{ '&:last-child td': { border: 0 } }}>
+                        <TableCell><Typography fontFamily="monospace" fontSize="0.8rem" fontWeight={600}>{name}</Typography></TableCell>
+                        <TableCell>
+                          <Chip label={mapping?.source ?? 'query'} size="small"
+                            color={SOURCE_CHIP_COLOR[mapping?.source ?? 'query'] ?? 'default'}
+                            sx={{ fontFamily: 'monospace', fontSize: '0.68rem', fontWeight: 700, height: 20 }} />
+                        </TableCell>
+                        <TableCell><Typography fontFamily="monospace" fontSize="0.75rem" color="text.secondary">{schema.type ?? 'string'}</Typography></TableCell>
+                        <TableCell>
+                          {isReq
+                            ? <Typography color="error.main" fontSize="0.72rem" fontWeight={700}>yes</Typography>
+                            : <Typography color="text.disabled" fontSize="0.72rem">no</Typography>}
+                        </TableCell>
+                        <TableCell><Typography color="text.secondary" fontSize="0.78rem">{schema.description ?? '—'}</Typography></TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </Box>
+          </>
+        )}
+
+        <Divider sx={{ mb: 2 }} />
+
+        {/* Try it out */}
+        <Box display="flex" alignItems="center" justifyContent="space-between" mb={tryMode && paramEntries.length ? 2 : 0}>
+          <Typography variant="subtitle2" fontWeight={700}>Try it out</Typography>
+          {canTest && (
+            <Button size="small" variant={tryMode ? 'outlined' : 'contained'} color={tryMode ? 'error' : 'primary'}
+              onClick={() => { setTryMode((v) => !v); setResponse(null) }}
+              sx={{ fontWeight: 600, fontSize: '0.72rem', minWidth: 80 }}>
+              {tryMode ? 'Cancel' : 'Try'}
+            </Button>
+          )}
+        </Box>
+
+        {tryMode && (
+          <Box>
+            {paramEntries.length > 0
+              ? <Box display="flex" flexDirection="column" gap={1.5} mb={2}>
+                  {paramEntries.map(([name, schema]: [string, any]) => (
+                    <FieldInput key={name} name={name} schema={schema}
+                      value={formValues[name] ?? ''} required={requiredFields.includes(name)}
+                      onChange={(v) => setFormValues((prev) => ({ ...prev, [name]: v }))} />
+                  ))}
+                </Box>
+              : <Typography variant="body2" color="text.secondary" mt={1} mb={2}>No parameters.</Typography>}
+            <Button variant="contained" size="small"
+              startIcon={executing ? <CircularProgress size={13} color="inherit" /> : <IconPlayerPlay size={18} />}
+              onClick={handleExecute} disabled={executing}
+              sx={{ mb: response !== null ? 2 : 0, fontWeight: 600 }}>
+              {executing ? 'Executing…' : 'Execute'}
+            </Button>
+            {response !== null && (
+              <Box component="pre" sx={{
+                bgcolor: responseIsError ? 'error.light' : '#1e1e1e',
+                color: responseIsError ? 'error.dark' : '#d4d4d4',
+                border: '1px solid', borderColor: responseIsError ? 'error.light' : 'transparent',
+                p: 2, borderRadius: 1, fontSize: '0.78rem',
+                overflowX: 'auto', overflowY: 'auto', maxHeight: 400,
+                whiteSpace: 'pre-wrap', wordBreak: 'break-word', m: 0,
+              }}>
+                {response}
+              </Box>
+            )}
+          </Box>
+        )}
+      </AccordionDetails>
+    </Accordion>
+  )
+}
+
 // ─── API Endpoints tab ────────────────────────────────────────────────────────
 
-function ApiEndpointsTab({ tools }: { tools: GeneratedTool[] }) {
+function ApiEndpointsTab({ tools, projectId, projectBaseUrl, anyApiKey, onToolAdded }: {
+  tools: GeneratedTool[]
+  projectId: string
+  projectBaseUrl: string
+  anyApiKey?: string
+  onToolAdded: (tool: GeneratedTool) => void
+}) {
+  const { can } = useAuth()
   const [search, setSearch] = useState('')
   const [methodFilter, setMethodFilter] = useState<string | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
 
   const endpoints = tools.map((t) => ({ tool: t, ...t.endpointRef }))
 
@@ -1027,7 +1269,7 @@ function ApiEndpointsTab({ tools }: { tools: GeneratedTool[] }) {
         ))}
       </Grid>
 
-      {/* Search + filter */}
+      {/* Search + filter + add button */}
       <Box display="flex" alignItems="center" gap={1} mb={2} flexWrap="wrap">
         <TextField
           size="small" placeholder="Search by path, name or description…" value={search}
@@ -1053,102 +1295,40 @@ function ApiEndpointsTab({ tools }: { tools: GeneratedTool[] }) {
           </Box>
         )}
         {(search || methodFilter) && (
-          <Typography variant="body2" color="text.secondary" ml="auto">
+          <Typography variant="body2" color="text.secondary">
             {visible.length} of {endpoints.length}
           </Typography>
+        )}
+        <Box flexGrow={1} />
+        {can(Permission.EndpointsCreate) && (
+          <Button variant="contained" size="small" startIcon={<IconPlus size={16} />}
+            onClick={() => setCreateOpen(true)}>
+            Add endpoint
+          </Button>
         )}
       </Box>
 
       {/* Endpoint list */}
       {endpoints.length === 0 ? (
-        <Alert severity="info">No endpoints — upload an OpenAPI spec to populate this list.</Alert>
+        <Alert severity="info">No endpoints — upload an OpenAPI spec or click "Add endpoint" to create one manually.</Alert>
       ) : visible.length === 0 ? (
         <Alert severity="info">No endpoints match your search.</Alert>
       ) : (
-        <Box display="flex" flexDirection="column" gap={1}>
-          {visible.map((e, i) => {
-            const method = e.method.toUpperCase()
-            const queryParams = (e.parameterMap ?? []).filter((p) => p.source === 'query')
-            const pathParams = (e.parameterMap ?? []).filter((p) => p.source === 'path')
-            const bodyParams = (e.parameterMap ?? []).filter((p) => p.source === 'body')
-            const headerParams = (e.parameterMap ?? []).filter((p) => p.source === 'header')
-            return (
-              <Paper key={i} variant="outlined" sx={{
-                p: 0, overflow: 'hidden',
-                borderColor: `${METHOD_COLOR[method] ?? '#ddd'}44`,
-                '&:hover': { borderColor: `${METHOD_COLOR[method] ?? '#ddd'}99` },
-                transition: 'border-color 0.15s',
-              }}>
-                <Box sx={{ bgcolor: METHOD_BG[method] ?? '#fafafa', px: 2, py: 1.25, display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-                  {/* Method badge */}
-                  <Box sx={{
-                    px: 1.2, py: 0.35, borderRadius: '4px',
-                    bgcolor: METHOD_COLOR[method] ?? '#888', color: '#fff',
-                    fontWeight: 700, fontSize: '0.72rem', fontFamily: 'monospace',
-                    minWidth: 58, textAlign: 'center', flexShrink: 0,
-                  }}>
-                    {method}
-                  </Box>
-
-                  {/* Path */}
-                  <Typography fontFamily="monospace" fontWeight={600} fontSize="0.875rem" flexGrow={1} minWidth={0}
-                    sx={{ wordBreak: 'break-all' }}>
-                    {e.path}
-                  </Typography>
-
-                  {/* Tool name chip */}
-                  <Chip
-                    label={e.tool.name}
-                    size="small"
-                    sx={{ fontFamily: 'monospace', fontSize: '0.68rem', height: 20, bgcolor: '#f0f0f0' }}
-                  />
-                </Box>
-
-                <Box sx={{ px: 2, py: 1.25 }}>
-                  {/* Base URL */}
-                  <Typography variant="caption" color="text.disabled" display="block" mb={0.5}
-                    sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                    {e.baseUrl}{e.path}
-                  </Typography>
-
-                  {/* Description */}
-                  {e.tool.description && (
-                    <Typography variant="body2" color="text.secondary" mb={1}>
-                      {e.tool.description.replace(/\s*\[.*?\]\s*$/, '')}
-                    </Typography>
-                  )}
-
-                  {/* Parameters */}
-                  {(e.parameterMap ?? []).length > 0 && (
-                    <Box display="flex" gap={0.75} flexWrap="wrap">
-                      {pathParams.length > 0 && (
-                        <Chip label={`${pathParams.length} path`} size="small" color="warning"
-                          sx={{ fontSize: '0.65rem', height: 18 }} />
-                      )}
-                      {queryParams.length > 0 && (
-                        <Chip label={`${queryParams.length} query`} size="small" color="info"
-                          sx={{ fontSize: '0.65rem', height: 18 }} />
-                      )}
-                      {bodyParams.length > 0 && (
-                        <Chip label={`${bodyParams.length} body`} size="small" color="secondary"
-                          sx={{ fontSize: '0.65rem', height: 18 }} />
-                      )}
-                      {headerParams.length > 0 && (
-                        <Chip label={`${headerParams.length} header`} size="small"
-                          sx={{ fontSize: '0.65rem', height: 18 }} />
-                      )}
-                      {e.contentType && e.contentType !== 'application/json' && (
-                        <Chip label={e.contentType} size="small" variant="outlined"
-                          sx={{ fontSize: '0.65rem', height: 18, fontFamily: 'monospace' }} />
-                      )}
-                    </Box>
-                  )}
-                </Box>
-              </Paper>
-            )
-          })}
+        <Box display="flex" flexDirection="column" gap={'6px'}>
+          {visible.map((e, i) => (
+            <EndpointAccordion key={i} endpoint={e} projectId={projectId} anyApiKey={anyApiKey} canTest={can(Permission.ToolsTest)} />
+          ))}
         </Box>
       )}
+
+      <ToolDialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onSaved={(tool) => { onToolAdded(tool); setCreateOpen(false) }}
+        projectId={projectId}
+        projectBaseUrl={projectBaseUrl}
+        mode="endpoint"
+      />
     </Box>
   )
 }
@@ -1203,21 +1383,20 @@ function ReimportSpecDialog({ projectId, open, onClose, onSuccess }: {
   }
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth scroll="paper">
-      <DialogTitle sx={{ pb: 1 }}>
-        <Box display="flex" alignItems="center" gap={1}>
-          <IconRefresh size={18} />
-          <Typography variant="h6" fontWeight={700}>Re-import API spec</Typography>
-        </Box>
-      </DialogTitle>
-      <DialogContent dividers>
+    <Drawer anchor="right" open={open} onClose={handleClose}
+      PaperProps={{ sx: { width: { xs: '100vw', sm: 480 }, display: 'flex', flexDirection: 'column' } }}>
+      <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+        <IconRefresh size={18} />
+        <Typography variant="h6" fontWeight={700} flexGrow={1}>Re-import API spec</Typography>
+        <IconButton size="small" onClick={handleClose}><IconX size={18} /></IconButton>
+      </Box>
+      <Box sx={{ flex: 1, overflowY: 'auto', px: 3, py: 2.5 }}>
         <Typography variant="body2" color="text.secondary" mb={2}>
           Upload a new version of the spec. Tools with the same name will be updated (schema + endpoint);
           new tools will be added. Existing tools not in the new spec are kept — delete them manually if needed.
         </Typography>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-        {/* Drop zone */}
         <Paper variant="outlined"
           onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
           onDragLeave={() => setDragging(false)}
@@ -1227,7 +1406,7 @@ function ReimportSpecDialog({ projectId, open, onClose, onSuccess }: {
             p: 3, textAlign: 'center', cursor: file ? 'default' : 'pointer',
             border: '2px dashed',
             borderColor: dragging ? 'primary.main' : file ? 'success.main' : 'divider',
-            bgcolor: dragging ? 'primary.light' : file ? '#f0fdf4' : 'background.paper',
+            bgcolor: dragging ? 'primary.light' : file ? 'rgba(73,204,144,0.08)' : 'background.paper',
             transition: 'all 0.15s', mb: 2,
             '&:hover': file ? {} : { bgcolor: 'action.hover', borderColor: 'primary.light' },
           }}
@@ -1255,15 +1434,15 @@ function ReimportSpecDialog({ projectId, open, onClose, onSuccess }: {
         <TextField size="small" fullWidth label="Base URL override" placeholder="https://api.example.com"
           value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)}
           helperText="Leave blank to use the URL declared in the spec" />
-      </DialogContent>
-      <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
+      </Box>
+      <Box sx={{ px: 3, py: 2, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1, flexShrink: 0 }}>
         <Button onClick={handleClose}>Cancel</Button>
         <Button variant="contained" onClick={handleImport} disabled={!file || loading}
           startIcon={loading ? <CircularProgress size={14} color="inherit" /> : <IconRefresh size={18} />}>
           {loading ? 'Importing…' : 'Import'}
         </Button>
-      </DialogActions>
-    </Dialog>
+      </Box>
+    </Drawer>
   )
 }
 
@@ -1283,9 +1462,19 @@ function emptyParam(): ParamEntry {
   return { id: Math.random().toString(36).slice(2), toolParamName: '', source: 'query', originalName: '', required: false, type: 'string', description: '' }
 }
 
+interface HeaderEntry {
+  id: string
+  name: string
+  value: string
+}
+
+function emptyHeader(): HeaderEntry {
+  return { id: Math.random().toString(36).slice(2), name: '', value: '' }
+}
+
 function toolToFormState(tool: GeneratedTool | undefined) {
   if (!tool) {
-    return { name: '', description: '', method: 'GET', path: '/', contentType: 'application/json', params: [] as ParamEntry[] }
+    return { name: '', description: '', method: 'GET', path: '/', contentType: 'application/json', params: [] as ParamEntry[], staticHeaders: [] as HeaderEntry[], useOutputTemplate: false, outputTemplate: '' }
   }
   const { endpointRef, inputSchema } = tool
   return {
@@ -1300,9 +1489,16 @@ function toolToFormState(tool: GeneratedTool | undefined) {
       source: pm.source,
       originalName: pm.originalName,
       required: pm.required,
-      type: inputSchema.properties?.[pm.toolParamName]?.type ?? 'string',
-      description: inputSchema.properties?.[pm.toolParamName]?.description ?? '',
+      type: (inputSchema.properties as any)?.[pm.toolParamName]?.type ?? 'string',
+      description: (inputSchema.properties as any)?.[pm.toolParamName]?.description ?? '',
     })) as ParamEntry[],
+    staticHeaders: ((endpointRef as any).staticHeaders ?? []).map((h: { name: string; value: string }) => ({
+      id: Math.random().toString(36).slice(2),
+      name: h.name,
+      value: h.value,
+    })) as HeaderEntry[],
+    useOutputTemplate: !!tool.outputTemplate,
+    outputTemplate: tool.outputTemplate ?? '',
   }
 }
 
@@ -1314,6 +1510,8 @@ interface ToolDialogProps {
   projectId: string
   projectBaseUrl: string
   editTool?: GeneratedTool
+  prefillFrom?: GeneratedTool
+  mode?: 'tool' | 'endpoint'
 }
 
 // ─── Auto-save indicator (compartilhado) ─────────────────────────────────────
@@ -1746,6 +1944,7 @@ function ProjectControlsPanel({ projectId, initialPaused, initialMaintenance, in
 }) {
   const [paused, setPaused] = useState(initialPaused ?? false)
   const [pauseSaving, setPauseSaving] = useState(false)
+  const { can } = useAuth()
 
   const [maintEnabled, setMaintEnabled] = useState(initialMaintenance?.enabled ?? false)
   const [maintMsg, setMaintMsg] = useState(initialMaintenance?.message ?? '')
@@ -1825,19 +2024,21 @@ function ProjectControlsPanel({ projectId, initialPaused, initialMaintenance, in
             {paused ? 'Server is paused — AI cannot use it right now' : 'Server is running normally'}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            {paused ? 'All MCP requests return a 503 error until you resume.' : 'Your AI assistant can call tools in this project.'}
+            {paused ? 'All MCP requests return a 503 error until you resume.' : 'Your AI assistant can call tools in this server.'}
           </Typography>
         </Box>
-        <Tooltip title={paused ? 'Resume — allow AI to use this server again' : 'Pause — block all AI requests to this server'}>
-          <span>
-            <Button size="small" variant={paused ? 'contained' : 'outlined'}
-              color={paused ? 'success' : 'warning'}
-              startIcon={pauseSaving ? <CircularProgress size={13} color="inherit" /> : paused ? <IconPlayerPlay size={18} /> : <IconPlayerPause size={18} />}
-              onClick={() => handlePause(!paused)} disabled={pauseSaving}>
-              {paused ? 'Resume' : 'Pause'}
-            </Button>
-          </span>
-        </Tooltip>
+        {can(Permission.ServersToggleActive) && (
+          <Tooltip title={paused ? 'Resume — allow AI to use this server again' : 'Pause — block all AI requests to this server'}>
+            <span>
+              <Button size="small" variant={paused ? 'contained' : 'outlined'}
+                color={paused ? 'success' : 'warning'}
+                startIcon={pauseSaving ? <CircularProgress size={13} color="inherit" /> : paused ? <IconPlayerPlay size={18} /> : <IconPlayerPause size={18} />}
+                onClick={() => handlePause(!paused)} disabled={pauseSaving}>
+                {paused ? 'Resume' : 'Pause'}
+              </Button>
+            </span>
+          </Tooltip>
+        )}
       </Box>
 
       <Divider sx={{ mb: 2 }} />
@@ -2005,17 +2206,477 @@ function AlertConfigPanel({ projectId, initialConfig }: {
   )
 }
 
-function ToolDialog({ open, onClose, onSaved, onDeleted, projectId, projectBaseUrl, editTool }: ToolDialogProps) {
+// ─── Tenant Config Panel ──────────────────────────────────────────────────────
+
+type TenantParamType = 'string' | 'integer' | 'number' | 'boolean' | 'uuid' | 'hash'
+
+interface TenantParam {
+  name: string
+  type: TenantParamType
+  description?: string
+  required?: boolean
+}
+
+const TENANT_PARAM_TYPES: { value: TenantParamType; label: string }[] = [
+  { value: 'string', label: 'String' },
+  { value: 'integer', label: 'Integer' },
+  { value: 'number', label: 'Number (float)' },
+  { value: 'boolean', label: 'Boolean' },
+  { value: 'uuid', label: 'UUID' },
+  { value: 'hash', label: 'Hash' },
+]
+
+function TenantConfigPanel({ projectId, initialConfig, toolParamSuggestions }: {
+  projectId: string
+  initialConfig?: { enabled: boolean; params: TenantParam[] }
+  toolParamSuggestions: string[]
+}) {
+  const [enabled, setEnabled] = useState(initialConfig?.enabled ?? false)
+  const [params, setParams] = useState<TenantParam[]>(initialConfig?.params ?? [])
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const scheduleSave = (en: boolean, ps: TenantParam[]) => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(async () => {
+      setSaveStatus('saving')
+      try {
+        await api.patch(`/swagger/servers/${projectId}/tenant-config`, { enabled: en, params: ps })
+        setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000)
+      } catch { setSaveStatus('error') }
+    }, 600)
+  }
+
+  const addParam = () => {
+    const next = [...params, { name: '', type: 'string' as TenantParamType, description: '', required: false }]
+    setParams(next)
+    scheduleSave(enabled, next)
+  }
+
+  const updateParam = (idx: number, patch: Partial<TenantParam>) => {
+    const next = params.map((p, i) => i === idx ? { ...p, ...patch } : p)
+    setParams(next)
+    scheduleSave(enabled, next)
+  }
+
+  const removeParam = (idx: number) => {
+    const next = params.filter((_, i) => i !== idx)
+    setParams(next)
+    scheduleSave(enabled, next)
+  }
+
+  const mcpUrl = `${window.location.origin}/api/mcp/server/${projectId}`
+  const previewUrl = params.filter((p) => p.name.trim()).length > 0
+    ? `${mcpUrl}?${params.filter((p) => p.name.trim()).map((p) => `${p.name}={value}`).join('&')}`
+    : null
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2.5, mb: 2 }}>
+      <Box display="flex" alignItems="center" gap={1} mb={enabled ? 2 : 0}>
+        <IconDatabase size={18} />
+        <Box flexGrow={1}>
+          <Typography variant="subtitle2" fontWeight={700}>Multi-tenant parameters</Typography>
+          <Typography variant="caption" color="text.secondary">
+            Inject query string values into tool calls that accept them.
+          </Typography>
+        </Box>
+        <SaveIndicator status={saveStatus} />
+        <FormControlLabel
+          control={<Switch size="small" checked={enabled} color="primary"
+            onChange={(e) => { setEnabled(e.target.checked); scheduleSave(e.target.checked, params) }} />}
+          label={<Typography variant="caption">{enabled ? 'On' : 'Off'}</Typography>}
+          sx={{ mr: 0 }} />
+      </Box>
+
+      {enabled && (
+        <Box>
+          {params.map((param, idx) => (
+            <Box key={idx} display="flex" gap={1} alignItems="flex-start" mb={1.5}>
+              <Autocomplete
+                freeSolo
+                size="small"
+                sx={{ flex: 2 }}
+                options={toolParamSuggestions}
+                value={param.name}
+                onInputChange={(_, val) => updateParam(idx, { name: val })}
+                renderOption={(props, option) => (
+                  <li {...props}>
+                    <Typography variant="body2" fontFamily="monospace">{option}</Typography>
+                  </li>
+                )}
+                renderInput={(inputProps) => (
+                  <TextField {...inputProps} label="Parameter name" placeholder="customerId" />
+                )}
+              />
+              <FormControl size="small" sx={{ flex: 1.5 }}>
+                <InputLabel>Type</InputLabel>
+                <Select
+                  label="Type"
+                  value={param.type}
+                  onChange={(e) => updateParam(idx, { type: e.target.value as TenantParamType })}
+                >
+                  {TENANT_PARAM_TYPES.map((t) => (
+                    <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <TextField
+                size="small" label="Description (optional)" placeholder="e.g. Customer ID"
+                value={param.description ?? ''}
+                onChange={(e) => updateParam(idx, { description: e.target.value })}
+                sx={{ flex: 3 }}
+              />
+              <Tooltip title={param.required ? 'Required — rejects calls missing this param' : 'Optional — ignored if not provided'}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      size="small"
+                      checked={param.required ?? false}
+                      onChange={(e) => updateParam(idx, { required: e.target.checked })}
+                      color="error"
+                    />
+                  }
+                  label={<Typography variant="caption" color={param.required ? 'error' : 'text.secondary'}>
+                    {param.required ? 'Required' : 'Optional'}
+                  </Typography>}
+                  sx={{ mr: 0, flexShrink: 0 }}
+                />
+              </Tooltip>
+              <Tooltip title="Remove">
+                <IconButton size="small" color="error" onClick={() => removeParam(idx)} sx={{ mt: 0.5 }}>
+                  <IconTrash size={16} />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          ))}
+
+          <Button size="small" variant="outlined" startIcon={<IconPlus size={16} />} onClick={addParam} sx={{ mb: 2 }}>
+            Add parameter
+          </Button>
+
+          {previewUrl && (
+            <Box sx={{ bgcolor: 'action.hover', borderRadius: 1, px: 1.5, py: 1 }}>
+              <Typography variant="caption" color="text.secondary" display="block" mb={0.25} fontWeight={600}>
+                Example tenant URL
+              </Typography>
+              <Typography variant="caption" fontFamily="monospace" sx={{ wordBreak: 'break-all' }}>
+                {previewUrl}
+              </Typography>
+            </Box>
+          )}
+
+          <Typography variant="caption" color="text.secondary" display="block" mt={1.5}>
+            Only tools that declare these parameters in their spec will receive the values. Others are unaffected.
+          </Typography>
+        </Box>
+      )}
+    </Paper>
+  )
+}
+
+// ─── Tool output template section ────────────────────────────────────────────
+
+function ToolOutputTemplateSection({
+  projectId,
+  form,
+  setForm,
+}: {
+  projectId: string
+  form: ReturnType<typeof toolToFormState>
+  setForm: React.Dispatch<React.SetStateAction<ReturnType<typeof toolToFormState>>>
+}) {
+  const { mode: colorMode } = useColorMode()
+  const [testArgs, setTestArgs] = useState<Record<string, string>>({})
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ status: number; body: string } | null>(null)
+  const [parsedBody, setParsedBody] = useState<unknown>(null)
+  const [testError, setTestError] = useState('')
+  const [scalars, setScalars] = useState<HbScalar[]>([])
+  const [arrays, setArrays] = useState<HbArray[]>([])
+  const [schemaApplied, setSchemaApplied] = useState(false)
+  const [templateTab, setTemplateTab] = useState(0)
+
+  const rawPreview = useMemo(() => {
+    try { return testResult ? JSON.stringify(JSON.parse(testResult.body), null, 2) : null }
+    catch { return testResult?.body ?? null }
+  }, [testResult])
+
+  const livePreview = useMemo(() => {
+    if (!form.outputTemplate || parsedBody == null) return null
+    try {
+      const ctx = Array.isArray(parsedBody) ? { items: parsedBody } : parsedBody
+      return Handlebars.compile(form.outputTemplate)(ctx as object)
+    } catch (e: any) { return `<!-- Template error: ${e?.message} -->` }
+  }, [form.outputTemplate, parsedBody])
+
+  const handleTest = async () => {
+    setTesting(true); setTestError('')
+    setSchemaApplied(false); setScalars([]); setArrays([])
+    try {
+      const parameterMap: ParameterMapping[] = form.params.map((p) => ({
+        toolParamName: p.toolParamName, source: p.source,
+        originalName: p.originalName || p.toolParamName, required: p.required,
+      }))
+      const endpointRef = {
+        method: form.method, path: form.path,
+        baseUrl: '', contentType: form.contentType, parameterMap,
+      }
+      const builtArgs: Record<string, unknown> = {}
+      for (const [k, v] of Object.entries(testArgs)) { if (v !== '') builtArgs[k] = v }
+      const { data } = await api.post(`/swagger/servers/${projectId}/test-endpoint`, { endpointRef, args: builtArgs })
+      setTestResult(data)
+      try { setParsedBody(JSON.parse(data.body)) } catch { setParsedBody(null) }
+    } catch (err: any) {
+      setTestError(err?.response?.data?.message ?? 'Request failed')
+      setTestResult(null); setParsedBody(null)
+    } finally { setTesting(false) }
+  }
+
+  const handleUseSchema = () => {
+    if (parsedBody == null) return
+    const root = Array.isArray(parsedBody) ? { items: parsedBody } : parsedBody
+    const { scalars: s, arrays: a } = extractHbSchema(root)
+    setScalars(s); setArrays(a); setSchemaApplied(true)
+  }
+
+  const copyBlock = (arr: HbArray) => {
+    const inner = arr.itemScalars.length > 0 ? arr.itemScalars.map((f) => `  {{${f}}}`).join('\n') : '  {{this}}'
+    navigator.clipboard?.writeText(`{{#each ${arr.path}}}\n${inner}\n{{/each}}`)
+  }
+
+  return (
+    <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: 'divider' }}>
+      <Box display="flex" alignItems="center" justifyContent="space-between" mb={form.useOutputTemplate ? 2 : 0}>
+        <Box>
+          <Typography variant="subtitle2" fontWeight={700} display="inline">HTML output template</Typography>
+          <Typography variant="caption" color="text.secondary" ml={1}>
+            Transform the API response into HTML using Handlebars.js
+          </Typography>
+        </Box>
+        <FormControlLabel
+          control={
+            <Switch
+              size="small"
+              checked={form.useOutputTemplate}
+              onChange={(e) => setForm((prev) => ({ ...prev, useOutputTemplate: e.target.checked }))}
+            />
+          }
+          label={<Typography variant="body2">{form.useOutputTemplate ? 'On' : 'Off'}</Typography>}
+          sx={{ m: 0 }}
+        />
+      </Box>
+
+      {form.useOutputTemplate && (
+        <Box display="flex" flexDirection="column" gap={2.5}>
+
+          {/* Test call */}
+          <Box>
+            <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" mb={1}>
+              Test endpoint to extract response schema
+            </Typography>
+
+            {form.params.length > 0 && (
+              <Box display="flex" flexDirection="column" gap={1} mb={1.5}>
+                {form.params.map((p) => (
+                  <TextField key={p.toolParamName} size="small" fullWidth
+                    label={p.toolParamName}
+                    helperText={`source: ${p.source}${p.required ? ' · required' : ''}`}
+                    value={testArgs[p.toolParamName] ?? ''}
+                    onChange={(e) => setTestArgs((a) => ({ ...a, [p.toolParamName]: e.target.value }))} />
+                ))}
+              </Box>
+            )}
+
+            <Box display="flex" gap={1} mb={1}>
+              <Button size="small" variant="outlined"
+                startIcon={testing ? <CircularProgress size={14} /> : <IconPlayerPlay size={16} />}
+                onClick={handleTest} disabled={testing || !form.path.trim()}>
+                {testing ? 'Running…' : 'Test endpoint'}
+              </Button>
+              {testResult && parsedBody != null && (
+                <Button size="small" variant="outlined" color="success" onClick={handleUseSchema}>
+                  {schemaApplied ? 'Refresh schema' : 'Use response schema'}
+                </Button>
+              )}
+            </Box>
+
+            {testError && <Alert severity="error" sx={{ mb: 1 }}>{testError}</Alert>}
+
+            {testResult && (
+              <Box mb={schemaApplied ? 1.5 : 0}>
+                <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
+                  HTTP {testResult.status}
+                </Typography>
+                <Box component="pre" sx={{
+                  bgcolor: 'action.hover', borderRadius: 1, p: 1.5, overflow: 'auto',
+                  maxHeight: 160, fontSize: '0.75rem', fontFamily: 'monospace', m: 0,
+                }}>
+                  {rawPreview?.slice(0, 2000)}{(rawPreview?.length ?? 0) > 2000 && '\n… (truncated)'}
+                </Box>
+              </Box>
+            )}
+
+            {schemaApplied && (
+              <Box display="flex" flexDirection="column" gap={2}>
+                {scalars.length > 0 && (
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.75}>
+                      Scalar variables
+                    </Typography>
+                    <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow sx={{ bgcolor: 'action.hover' }}>
+                            <TableCell sx={{ py: 0.5, fontWeight: 700, fontSize: '0.72rem', width: '42%' }}>Variable</TableCell>
+                            <TableCell sx={{ py: 0.5, fontWeight: 700, fontSize: '0.72rem' }}>Sample value</TableCell>
+                            <TableCell sx={{ py: 0.5, width: 36 }} />
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {scalars.map((s) => (
+                            <TableRow key={s.path} hover>
+                              <TableCell sx={{ py: 0.5 }}>
+                                <Typography fontFamily="monospace" fontSize="0.78rem" color="primary.main">{`{{${s.path}}}`}</Typography>
+                              </TableCell>
+                              <TableCell sx={{ py: 0.5 }}>
+                                <Typography variant="caption" color="text.secondary" fontFamily="monospace"
+                                  sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>
+                                  {s.sample !== '' ? s.sample : <em style={{ opacity: 0.5 }}>(empty)</em>}
+                                </Typography>
+                              </TableCell>
+                              <TableCell sx={{ py: 0.5 }}>
+                                <Tooltip title="Copy"><IconButton size="small" onClick={() => navigator.clipboard?.writeText(`{{${s.path}}}`)}>
+                                  <IconCopy size={13} />
+                                </IconButton></Tooltip>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </Paper>
+                  </Box>
+                )}
+
+                {arrays.length > 0 && (
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.75}>
+                      Array variables — use <code style={{ fontFamily: 'monospace' }}>{'{{#each}}'}</code>
+                    </Typography>
+                    <Box display="flex" flexDirection="column" gap={1}>
+                      {arrays.map((a) => {
+                        const inner = a.itemScalars.length > 0 ? a.itemScalars.map((f) => `  {{${f}}}`).join('\n') : '  {{this}}'
+                        const block = `{{#each ${a.path}}}\n${inner}\n{{/each}}`
+                        return (
+                          <Paper key={a.path} variant="outlined" sx={{ p: 1.25 }}>
+                            <Box display="flex" alignItems="flex-start" justifyContent="space-between" gap={1}>
+                              <Box flexGrow={1} minWidth={0}>
+                                <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+                                  <Typography fontFamily="monospace" fontSize="0.78rem" color="primary.main" fontWeight={700}>
+                                    {`{{#each ${a.path}}}`}
+                                  </Typography>
+                                  <Chip label={`${a.length} item${a.length !== 1 ? 's' : ''}`} size="small"
+                                    sx={{ fontSize: '0.65rem', height: 18 }} />
+                                </Box>
+                                <Box component="pre" sx={{
+                                  m: 0, p: 1, bgcolor: 'action.hover', borderRadius: 0.75,
+                                  fontSize: '0.75rem', fontFamily: 'monospace', overflow: 'auto', lineHeight: 1.5,
+                                }}>{block}</Box>
+                                {a.itemScalars.length > 0 && (
+                                  <Box display="flex" flexWrap="wrap" gap={0.5} mt={0.75}>
+                                    <Typography variant="caption" color="text.secondary" alignSelf="center">Fields inside block:</Typography>
+                                    {a.itemScalars.map((f) => (
+                                      <Chip key={f} label={`{{${f}}}`} size="small" variant="outlined"
+                                        onClick={() => navigator.clipboard?.writeText(`{{${f}}}`)}
+                                        sx={{ fontSize: '0.67rem', height: 18, fontFamily: 'monospace', cursor: 'pointer' }} />
+                                    ))}
+                                  </Box>
+                                )}
+                              </Box>
+                              <Tooltip title="Copy block">
+                                <IconButton size="small" onClick={() => copyBlock(a)} sx={{ flexShrink: 0, mt: 0.25 }}>
+                                  <IconCopy size={14} />
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
+                          </Paper>
+                        )
+                      })}
+                    </Box>
+                  </Box>
+                )}
+              </Box>
+            )}
+          </Box>
+
+          {/* Template editor */}
+          <Box>
+            <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+              <Typography variant="caption" fontWeight={700} color="text.secondary">HTML template</Typography>
+              <Tooltip title="Open Handlebars.js documentation">
+                <IconButton size="small" component="a" href="https://handlebarsjs.com/guide/expressions.html"
+                  target="_blank" rel="noopener noreferrer" sx={{ p: 0.25 }}>
+                  <IconExternalLink size={13} />
+                </IconButton>
+              </Tooltip>
+            </Box>
+            <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+              Use <code>{'{{variable}}'}</code> for fields and <code>{'{{#each items}}'}</code> to iterate arrays.
+            </Typography>
+
+            <Box sx={{ borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center' }}>
+              <Tabs value={templateTab} onChange={(_, v) => setTemplateTab(v)} sx={{ minHeight: 34 }}
+                TabIndicatorProps={{ sx: { height: 2 } }}>
+                <Tab label="Code" sx={{ minHeight: 34, fontSize: '0.78rem', py: 0 }} />
+                <Tab label="Preview" sx={{ minHeight: 34, fontSize: '0.78rem', py: 0 }} disabled={!form.outputTemplate} />
+              </Tabs>
+            </Box>
+            <Box sx={{ height: 320, border: 1, borderColor: 'divider', borderTop: 0, borderRadius: '0 0 8px 8px', overflow: 'hidden' }}>
+              {templateTab === 0 ? (
+                <MonacoEditor
+                  height="100%"
+                  language="html"
+                  value={form.outputTemplate}
+                  theme={colorMode === 'dark' ? 'vs-dark' : 'light'}
+                  onChange={(v) => setForm((prev) => ({ ...prev, outputTemplate: v ?? '' }))}
+                  options={{ minimap: { enabled: false }, fontSize: 13, wordWrap: 'on', scrollBeyondLastLine: false, tabSize: 2, automaticLayout: true, padding: { top: 8 } }}
+                />
+              ) : (
+                <iframe
+                  srcDoc={livePreview ?? form.outputTemplate ?? '<p style="color:#888;font-family:sans-serif;padding:24px">No preview — test the endpoint first.</p>'}
+                  sandbox="allow-same-origin"
+                  style={{ width: '100%', height: '100%', border: 'none', background: '#fff' }}
+                  title="Template preview"
+                />
+              )}
+            </Box>
+          </Box>
+        </Box>
+      )}
+    </Box>
+  )
+}
+
+function ToolDialog({ open, onClose, onSaved, onDeleted, projectId, projectBaseUrl, editTool, prefillFrom, mode = 'tool' }: ToolDialogProps) {
   const isEdit = !!editTool
-  const [form, setForm] = useState(() => toolToFormState(editTool))
+  const isEndpoint = mode === 'endpoint'
+  const entityLabel = isEndpoint ? 'endpoint' : 'tool'
+
+  const buildInitialForm = () => {
+    if (editTool) return toolToFormState(editTool)
+    if (prefillFrom) return { ...toolToFormState(prefillFrom), name: '', description: '' }
+    return toolToFormState(undefined)
+  }
+
+  const [form, setForm] = useState(buildInitialForm)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const { can } = useAuth()
 
   useEffect(() => {
-    if (open) { setForm(toolToFormState(editTool)); setError(''); setDeleting(false) }
-  }, [open, editTool])
+    if (open) { setForm(editTool ? toolToFormState(editTool) : prefillFrom ? { ...toolToFormState(prefillFrom), name: '', description: '' } : toolToFormState(undefined)); setError(''); setDeleting(false) }
+  }, [open, editTool, prefillFrom])
 
   const handleDeleteConfirm = async () => {
     if (!editTool) return
@@ -2035,6 +2696,10 @@ function ToolDialog({ open, onClose, onSaved, onDeleted, projectId, projectBaseU
     setForm((prev) => ({ ...prev, params: prev.params.map((p) => p.id === id ? { ...p, [field]: value } : p) }))
   const addParam = () => setForm((prev) => ({ ...prev, params: [...prev.params, emptyParam()] }))
   const removeParam = (id: string) => setForm((prev) => ({ ...prev, params: prev.params.filter((p) => p.id !== id) }))
+  const setHeader = (id: string, field: keyof HeaderEntry, value: string) =>
+    setForm((prev) => ({ ...prev, staticHeaders: prev.staticHeaders.map((h) => h.id === id ? { ...h, [field]: value } : h) }))
+  const addHeader = () => setForm((prev) => ({ ...prev, staticHeaders: [...prev.staticHeaders, emptyHeader()] }))
+  const removeHeader = (id: string) => setForm((prev) => ({ ...prev, staticHeaders: prev.staticHeaders.filter((h) => h.id !== id) }))
 
   const handleSave = async () => {
     if (!form.name.trim()) { setError('Name is required.'); return }
@@ -2055,6 +2720,9 @@ function ToolDialog({ open, onClose, onSaved, onDeleted, projectId, projectBaseU
         if (p.required) required.push(p.toolParamName)
       }
       const inputSchema = { type: 'object', properties, ...(required.length ? { required } : {}) }
+      const staticHeaders = form.staticHeaders
+        .filter((h) => h.name.trim())
+        .map((h) => ({ name: h.name.trim(), value: h.value }))
       const payload = {
         name: form.name.trim(),
         description: form.description.trim() || undefined,
@@ -2064,6 +2732,8 @@ function ToolDialog({ open, onClose, onSaved, onDeleted, projectId, projectBaseU
         contentType: form.contentType.trim() || 'application/json',
         parameterMap,
         inputSchema,
+        ...(staticHeaders.length ? { staticHeaders } : {}),
+        ...(form.useOutputTemplate && form.outputTemplate.trim() ? { outputTemplate: form.outputTemplate.trim() } : {}),
       }
       let res: any
       if (isEdit) {
@@ -2085,23 +2755,21 @@ function ToolDialog({ open, onClose, onSaved, onDeleted, projectId, projectBaseU
   return (
     <Drawer anchor="right" open={open} onClose={onClose}
       PaperProps={{ sx: { width: { xs: '100vw', sm: 560 }, display: 'flex', flexDirection: 'column' } }}>
-      {/* Header */}
       <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
         <Typography variant="h6" fontWeight={700} flexGrow={1}>
-          {isEdit ? `Edit endpoint — ${editTool?.name}` : 'New MCP tool'}
+          {isEdit ? `Edit ${entityLabel} — ${editTool?.name}` : `New ${entityLabel}`}
         </Typography>
         <IconButton size="small" onClick={onClose} disabled={saving || deleting}>
           <IconX size={18} />
         </IconButton>
       </Box>
 
-      {/* Scrollable content */}
       <Box sx={{ flex: 1, overflowY: 'auto', px: 3, py: 2.5 }}>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         <Grid container spacing={2}>
           {/* Name + method */}
           <Grid item xs={12} sm={8}>
-            <TextField size="small" fullWidth required label="Tool name" value={form.name} onChange={(e) => setField('name', e.target.value)} />
+            <TextField size="small" fullWidth required label="Name" value={form.name} onChange={(e) => setField('name', e.target.value)} />
           </Grid>
           <Grid item xs={12} sm={4}>
             <FormControl size="small" fullWidth required>
@@ -2126,7 +2794,7 @@ function ToolDialog({ open, onClose, onSaved, onDeleted, projectId, projectBaseU
 
           {/* Path */}
           <Grid item xs={12} sm={6}>
-            <TextField size="small" fullWidth required label="Path" value={form.path} onChange={(e) => setField('path', e.target.value)} placeholder="/users/{id}" helperText={`Combined with project Base URL: ${projectBaseUrl}`} InputProps={{ sx: { fontFamily: 'monospace' } }} />
+            <TextField size="small" fullWidth required label="Path" value={form.path} onChange={(e) => setField('path', e.target.value)} placeholder="/users/{id}" helperText={`Combined with server Base URL: ${projectBaseUrl}`} InputProps={{ sx: { fontFamily: 'monospace' } }} />
           </Grid>
 
           {/* Content-Type */}
@@ -2134,101 +2802,200 @@ function ToolDialog({ open, onClose, onSaved, onDeleted, projectId, projectBaseU
             <TextField size="small" fullWidth label="Content-Type" value={form.contentType} onChange={(e) => setField('contentType', e.target.value)} placeholder="application/json" />
           </Grid>
 
+          {/* Static request headers — endpoint only */}
+          {isEndpoint && <Grid item xs={12}>
+            <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+              <Box>
+                <Typography variant="subtitle2" fontWeight={700} display="inline">Request headers</Typography>
+                {form.staticHeaders.length > 0 && (
+                  <Typography variant="caption" color="text.disabled" ml={1}>{form.staticHeaders.length} defined</Typography>
+                )}
+              </Box>
+              <Button size="small" variant="outlined" startIcon={<IconPlus size={14} />} onClick={addHeader}
+                sx={{ fontSize: '0.75rem', py: 0.4, px: 1.25, minWidth: 0 }}>
+                Add
+              </Button>
+            </Box>
+
+            {form.staticHeaders.length === 0 ? (
+              <Box sx={{ border: '1px dashed', borderColor: 'divider', borderRadius: 1, py: 2, textAlign: 'center' }}>
+                <Typography variant="body2" color="text.disabled">
+                  No fixed headers — click <strong>Add</strong> to set one
+                </Typography>
+              </Box>
+            ) : (
+              <Box display="flex" flexDirection="column" gap={0.75}>
+                {form.staticHeaders.map((h) => (
+                  <Box key={h.id} display="flex" alignItems="center" gap={1}>
+                    <TextField
+                      size="small" placeholder="Header-Name" value={h.name}
+                      onChange={(e) => setHeader(h.id, 'name', e.target.value)}
+                      InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.82rem' } }}
+                      sx={{ width: 180, flexShrink: 0 }}
+                    />
+                    <TextField
+                      size="small" fullWidth placeholder="value" value={h.value}
+                      onChange={(e) => setHeader(h.id, 'value', e.target.value)}
+                      InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.82rem' } }}
+                    />
+                    <Tooltip title="Remove">
+                      <IconButton size="small" color="error" onClick={() => removeHeader(h.id)}>
+                        <IconTrash size={15} />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                ))}
+              </Box>
+            )}
+          </Grid>}
+
           {/* Parameters */}
           <Grid item xs={12}>
-            <Box display="flex" alignItems="center" justifyContent="space-between" mb={1.5}>
-              <Typography variant="subtitle2" fontWeight={700}>Parameters</Typography>
-              <Button size="small" startIcon={<IconPlus size={18} />} onClick={addParam}>Add</Button>
+            <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+              <Box>
+                <Typography variant="subtitle2" fontWeight={700} display="inline">Parameters</Typography>
+                {form.params.length > 0 && (
+                  <Typography variant="caption" color="text.disabled" ml={1}>
+                    {form.params.length} defined
+                  </Typography>
+                )}
+              </Box>
+              <Button size="small" variant="outlined" startIcon={<IconPlus size={14} />} onClick={addParam}
+                sx={{ fontSize: '0.75rem', py: 0.4, px: 1.25, minWidth: 0 }}>
+                Add
+              </Button>
             </Box>
 
             {form.params.length === 0 ? (
-              <Typography variant="body2" color="text.secondary" fontStyle="italic">
-                No parameters. Click "Add" to create one.
-              </Typography>
+              <Box sx={{ border: '1px dashed', borderColor: 'divider', borderRadius: 1, py: 2.5, textAlign: 'center' }}>
+                <Typography variant="body2" color="text.disabled">
+                  No parameters — click <strong>Add</strong> to define one
+                </Typography>
+              </Box>
             ) : (
-              <Box display="flex" flexDirection="column" gap={1.5}>
+              <Box display="flex" flexDirection="column" gap={1}>
                 {form.params.map((p, i) => (
-                  <Paper key={p.id} variant="outlined" sx={{ p: 1.5, position: 'relative' }}>
-                    <Typography variant="caption" color="text.disabled" sx={{ position: 'absolute', top: 8, left: 12 }}>
-                      #{i + 1}
-                    </Typography>
-                    <Grid container spacing={1.5} alignItems="flex-start" mt={0.5}>
-                      <Grid item xs={12} sm={3}>
-                        <TextField size="small" fullWidth label="MCP name" value={p.toolParamName}
-                          onChange={(e) => setParam(p.id, 'toolParamName', e.target.value)}
-                          InputProps={{ sx: { fontFamily: 'monospace' } }}
-                          helperText="How the LLM will pass it" />
-                      </Grid>
-                      <Grid item xs={12} sm={2}>
-                        <FormControl size="small" fullWidth>
-                          <InputLabel>Location</InputLabel>
-                          <Select value={p.source} label="Location" onChange={(e) => setParam(p.id, 'source', e.target.value as any)}>
-                            {SOURCES.map((s) => (
-                              <MenuItem key={s} value={s}>
-                                <Chip label={s} size="small" color={SOURCE_CHIP_COLOR[s] ?? 'default'} sx={{ fontSize: '0.7rem', height: 20, fontWeight: 700 }} />
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-                      </Grid>
-                      <Grid item xs={12} sm={3}>
-                        <TextField size="small" fullWidth label="API name" value={p.originalName}
-                          onChange={(e) => setParam(p.id, 'originalName', e.target.value)}
-                          placeholder={p.toolParamName || 'same as MCP'}
-                          InputProps={{ sx: { fontFamily: 'monospace' } }}
-                          helperText="Real endpoint name" />
-                      </Grid>
-                      <Grid item xs={12} sm={2}>
-                        <FormControl size="small" fullWidth>
-                          <InputLabel>Type</InputLabel>
-                          <Select value={p.type} label="Type" onChange={(e) => setParam(p.id, 'type', e.target.value)}>
-                            {PARAM_TYPES.map((t) => <MenuItem key={t} value={t}><Typography fontFamily="monospace" fontSize="0.82rem">{t}</Typography></MenuItem>)}
-                          </Select>
-                        </FormControl>
-                      </Grid>
-                      <Grid item xs={6} sm={1} display="flex" alignItems="center" pt="6px !important">
-                        <FormControlLabel
-                          control={<Switch size="small" checked={p.required} onChange={(e) => setParam(p.id, 'required', e.target.checked)} />}
-                          label={<Typography variant="caption" color="text.secondary">Req.</Typography>}
-                          sx={{ m: 0 }}
-                        />
-                      </Grid>
-                      <Grid item xs={6} sm={1} display="flex" justifyContent="flex-end" alignItems="center" pt="6px !important">
-                        <Tooltip title="Remove">
-                          <IconButton size="small" color="error" onClick={() => removeParam(p.id)}><IconTrash size={18} /></IconButton>
-                        </Tooltip>
-                      </Grid>
-                      <Grid item xs={12}>
-                        <TextField size="small" fullWidth multiline minRows={2} maxRows={4} label="Parameter description" value={p.description} onChange={(e) => setParam(p.id, 'description', e.target.value)} />
-                      </Grid>
-                    </Grid>
+                  <Paper key={p.id} variant="outlined" sx={{
+                    overflow: 'hidden',
+                    borderColor: 'divider',
+                    '&:hover': { borderColor: 'text.disabled' },
+                    transition: 'border-color 0.15s',
+                  }}>
+                    {/* Row 1 — identity */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, pt: 1.25, pb: 0.75 }}>
+                      <Box sx={{
+                        minWidth: 20, height: 20, borderRadius: '4px',
+                        bgcolor: 'action.selected', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                      }}>
+                        <Typography variant="caption" fontWeight={700} color="text.secondary" fontSize="0.65rem" lineHeight={1}>
+                          {i + 1}
+                        </Typography>
+                      </Box>
+                      <TextField
+                        size="small" placeholder="param_name" value={p.toolParamName}
+                        onChange={(e) => setParam(p.id, 'toolParamName', e.target.value)}
+                        InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
+                        sx={{ flexGrow: 1, '& .MuiOutlinedInput-root': { borderRadius: '6px' } }}
+                      />
+                      <FormControl size="small" sx={{ minWidth: 100, flexShrink: 0 }}>
+                        <Select
+                          value={p.source}
+                          onChange={(e) => setParam(p.id, 'source', e.target.value as any)}
+                          renderValue={(v) => (
+                            <Chip label={v} size="small"
+                              color={SOURCE_CHIP_COLOR[v as keyof typeof SOURCE_CHIP_COLOR] ?? 'default'}
+                              sx={{ fontSize: '0.68rem', height: 18, fontWeight: 700, cursor: 'pointer' }} />
+                          )}
+                          sx={{ '& .MuiSelect-select': { py: '5px' } }}
+                        >
+                          {SOURCES.map((s) => (
+                            <MenuItem key={s} value={s}>
+                              <Chip label={s} size="small" color={SOURCE_CHIP_COLOR[s] ?? 'default'}
+                                sx={{ fontSize: '0.7rem', height: 20, fontWeight: 700 }} />
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                      <Tooltip title="Remove parameter">
+                        <IconButton size="small" color="error" onClick={() => removeParam(p.id)} sx={{ flexShrink: 0 }}>
+                          <IconTrash size={15} />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+
+                    {/* Row 2 — config */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, pb: 1.25, pl: '44px' }}>
+                      <TextField
+                        size="small" label="API name" value={p.originalName}
+                        onChange={(e) => setParam(p.id, 'originalName', e.target.value)}
+                        placeholder={p.toolParamName || 'same as MCP name'}
+                        InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.8rem' } }}
+                        sx={{ flexGrow: 1 }}
+                      />
+                      <FormControl size="small" sx={{ minWidth: 105, flexShrink: 0 }}>
+                        <InputLabel>Type</InputLabel>
+                        <Select value={p.type} label="Type" onChange={(e) => setParam(p.id, 'type', e.target.value)}>
+                          {PARAM_TYPES.map((t) => (
+                            <MenuItem key={t} value={t}>
+                              <Typography fontFamily="monospace" fontSize="0.82rem">{t}</Typography>
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                      <FormControlLabel
+                        control={<Switch size="small" checked={p.required} onChange={(e) => setParam(p.id, 'required', e.target.checked)} />}
+                        label={<Typography variant="caption" color={p.required ? 'error.main' : 'text.disabled'} fontWeight={p.required ? 700 : 400}>required</Typography>}
+                        sx={{ m: 0, flexShrink: 0 }}
+                      />
+                    </Box>
+
+                    {/* Row 3 — description */}
+                    <Box sx={{ px: 1.5, pb: 1.25, pl: '44px', borderTop: '1px solid', borderColor: 'action.hover' }}>
+                      <TextField
+                        size="small" fullWidth multiline minRows={1} maxRows={3}
+                        placeholder="Describe this parameter so the AI knows what to pass…"
+                        value={p.description}
+                        onChange={(e) => setParam(p.id, 'description', e.target.value)}
+                        sx={{ mt: 1, '& .MuiOutlinedInput-root': { fontSize: '0.8rem' } }}
+                      />
+                    </Box>
                   </Paper>
                 ))}
               </Box>
             )}
           </Grid>
         </Grid>
+
+        {/* Output template — tool mode only */}
+        {!isEndpoint && (
+          <ToolOutputTemplateSection
+            projectId={projectId}
+            form={form}
+            setForm={setForm}
+          />
+        )}
       </Box>
 
-      {/* Footer */}
       <Box sx={{ px: 3, py: 2, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1, flexShrink: 0 }}>
-        {isEdit && (
+        {isEdit && can(Permission.ToolsDelete) && (
           <Button color="error" onClick={() => setDeleteConfirmOpen(true)} disabled={saving || deleting}
             startIcon={<IconTrash size={18} />}
             sx={{ mr: 'auto' }}>
-            Delete tool
+            {`Delete ${entityLabel}`}
           </Button>
         )}
         <Button onClick={onClose} disabled={saving || deleting}>Cancel</Button>
-        <Button variant="contained" onClick={handleSave} disabled={saving || deleting}
-          startIcon={saving ? <CircularProgress size={14} color="inherit" /> : undefined}>
-          {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Create tool'}
-        </Button>
+        {(isEdit ? can(Permission.ToolsEdit) : (isEndpoint ? can(Permission.EndpointsCreate) : can(Permission.ToolsCreate))) && (
+          <Button variant="contained" onClick={handleSave} disabled={saving || deleting}
+            startIcon={saving ? <CircularProgress size={14} color="inherit" /> : undefined}>
+            {saving ? 'Saving…' : isEdit ? 'Save changes' : `Create ${entityLabel}`}
+          </Button>
+        )}
       </Box>
 
       <ConfirmDialog
         open={deleteConfirmOpen}
-        title="Delete tool?"
+        title={`Delete ${entityLabel}?`}
         message={`"${editTool?.name}" will be permanently removed from this server.`}
         confirmLabel="Delete"
         confirmColor="error"
@@ -2344,6 +3111,7 @@ function ToolCommentsSection({ projectId, toolName, initialComments }: {
   toolName: string
   initialComments: ToolComment[]
 }) {
+  const { can } = useAuth()
   const [comments, setComments] = useState<ToolComment[]>(initialComments)
   const [text, setText] = useState('')
   const [saving, setSaving] = useState(false)
@@ -2383,29 +3151,33 @@ function ToolCommentsSection({ projectId, toolName, initialComments }: {
             <Typography variant="caption" color="text.disabled">No notes yet.</Typography>
           )}
           {comments.map((c) => (
-            <Box key={c.id} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', bgcolor: '#fafafa', border: '1px solid #eee', borderRadius: 1, px: 1.5, py: 1 }}>
+            <Box key={c.id} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 1, px: 1.5, py: 1 }}>
               <Box flexGrow={1}>
                 <Typography fontSize="0.82rem">{c.text}</Typography>
                 <Typography variant="caption" color="text.disabled">
                   {c.author} · {new Date(c.createdAt).toLocaleDateString()}
                 </Typography>
               </Box>
-              <Tooltip title="Delete note">
-                <IconButton size="small" color="error" onClick={() => handleDelete(c.id)}>
-                  <IconTrash size={14} />
-                </IconButton>
-              </Tooltip>
+              {can(Permission.ToolsEdit) && (
+                <Tooltip title="Delete note">
+                  <IconButton size="small" color="error" onClick={() => handleDelete(c.id)}>
+                    <IconTrash size={14} />
+                  </IconButton>
+                </Tooltip>
+              )}
             </Box>
           ))}
-          <Box display="flex" gap={1} mt={0.5}>
-            <TextField size="small" fullWidth placeholder="Add a note…" value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAdd() } }} />
-            <Button size="small" variant="contained" onClick={handleAdd} disabled={!text.trim() || saving}
-              startIcon={saving ? <CircularProgress size={12} color="inherit" /> : undefined}>
-              Add
-            </Button>
-          </Box>
+          {can(Permission.ToolsEdit) && (
+            <Box display="flex" gap={1} mt={0.5}>
+              <TextField size="small" fullWidth placeholder="Add a note…" value={text}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAdd() } }} />
+              <Button size="small" variant="contained" onClick={handleAdd} disabled={!text.trim() || saving}
+                startIcon={saving ? <CircularProgress size={12} color="inherit" /> : undefined}>
+                Add
+              </Button>
+            </Box>
+          )}
         </Box>
       )}
     </Box>
@@ -2424,6 +3196,7 @@ function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged,
   const [tool, setTool] = useState(initialTool)
   const [curlCopied, setCurlCopied] = useState(false)
   const [mcpCurlCopied, setMcpCurlCopied] = useState(false)
+  const { can } = useAuth()
   const [tryMode, setTryMode] = useState(false)
   const [formValues, setFormValues] = useState<Record<string, string>>({})
   const [executing, setExecuting] = useState(false)
@@ -2501,7 +3274,7 @@ function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged,
       transition: 'opacity 0.2s',
     }}>
       <AccordionSummary expandIcon={<IconChevronDown />} sx={{
-        bgcolor: isDisabled ? '#f5f5f5' : METHOD_BG[method] ?? '#fafafa',
+        bgcolor: isDisabled ? 'action.hover' : METHOD_BG[method] ?? 'background.paper',
         borderRadius: '7px 7px 0 0',
         minHeight: '52px !important', px: 2,
         filter: isDisabled ? 'grayscale(0.5)' : 'none',
@@ -2520,7 +3293,7 @@ function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged,
           {/* Tool name — editable */}
           <Box onClick={(e) => e.stopPropagation()} sx={{ flexShrink: 0 }}>
             <InlineEdit value={tool.name} onSave={(v) => saveToolMeta('name', v)}
-              placeholder="Tool name" fontSize="0.875rem" fontWeight={700} />
+              readOnly={!can(Permission.ToolsEdit)} placeholder="Tool name" fontSize="0.875rem" fontWeight={700} />
           </Box>
 
           {/* Disabled chip */}
@@ -2529,26 +3302,36 @@ function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged,
               sx={{ fontSize: '0.65rem', height: 18, bgcolor: '#9e9e9e', color: '#fff', flexShrink: 0 }} />
           )}
 
+          {/* HTML template chip */}
+          {tool.outputTemplate && !isDisabled && (
+            <Chip label="HTML" size="small"
+              sx={{ fontSize: '0.65rem', height: 18, bgcolor: 'warning.main', color: '#fff', flexShrink: 0 }} />
+          )}
+
           {/* Path — read only */}
           <Typography fontFamily="monospace" fontSize="0.78rem" color="text.secondary" noWrap flexGrow={1}>{path}</Typography>
 
           {/* Toggle enable/disable */}
-          <Tooltip title={isDisabled ? 'Enable — make this tool available to the AI' : 'Disable — hide this tool from the AI'}>
-            <Switch
-              size="small"
-              checked={!isDisabled}
-              onClick={handleToggle}
-              sx={{ flexShrink: 0 }}
-            />
-          </Tooltip>
+          {can(Permission.ToolsEdit) && (
+            <Tooltip title={isDisabled ? 'Enable — make this tool available to the AI' : 'Disable — hide this tool from the AI'}>
+              <Switch
+                size="small"
+                checked={!isDisabled}
+                onClick={handleToggle}
+                sx={{ flexShrink: 0 }}
+              />
+            </Tooltip>
+          )}
 
           {/* Edit endpoint button */}
-          <Tooltip title="Edit endpoint">
-            <IconButton size="small" onClick={(e) => { e.stopPropagation(); onEditEndpoint(tool) }}
-              sx={{ flexShrink: 0, color: 'text.secondary', '&:hover': { color: 'primary.main' } }}>
-              <IconEdit size={18} />
-            </IconButton>
-          </Tooltip>
+          {can(Permission.ToolsEdit) && (
+            <Tooltip title="Edit endpoint">
+              <IconButton size="small" onClick={(e) => { e.stopPropagation(); onEditEndpoint(tool) }}
+                sx={{ flexShrink: 0, color: 'text.secondary', '&:hover': { color: 'primary.main' } }}>
+                <IconEdit size={18} />
+              </IconButton>
+            </Tooltip>
+          )}
 
         </Box>
       </AccordionSummary>
@@ -2557,7 +3340,7 @@ function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged,
         {/* Description — editable */}
         <Box mb={2}>
           <InlineEdit value={tool.description ?? ''} onSave={(v) => saveToolMeta('description', v)}
-            multiline placeholder="Describe what this tool does…"
+            readOnly={!can(Permission.ToolsEdit)} multiline placeholder="Describe what this tool does…"
             emptyLabel="Add description…" fontSize="0.875rem" color="text.secondary" />
         </Box>
 
@@ -2608,11 +3391,13 @@ function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged,
         {/* Try it out */}
         <Box display="flex" alignItems="center" justifyContent="space-between" mb={tryMode ? 2 : 0}>
           <Typography variant="subtitle2" fontWeight={700}>Try</Typography>
-          <Button size="small" variant={tryMode ? 'outlined' : 'contained'} color={tryMode ? 'error' : 'primary'}
-            onClick={() => { setTryMode((v) => !v); setResponse(null) }}
-            sx={{ fontWeight: 600, fontSize: '0.72rem', minWidth: 80 }}>
-            {tryMode ? 'Cancel' : 'Try'}
-          </Button>
+          {can(Permission.ToolsTest) && (
+            <Button size="small" variant={tryMode ? 'outlined' : 'contained'} color={tryMode ? 'error' : 'primary'}
+              onClick={() => { setTryMode((v) => !v); setResponse(null) }}
+              sx={{ fontWeight: 600, fontSize: '0.72rem', minWidth: 80 }}>
+              {tryMode ? 'Cancel' : 'Try'}
+            </Button>
+          )}
         </Box>
 
         {tryMode && (
@@ -2637,9 +3422,9 @@ function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged,
             {response !== null && (
               <>
                 <Box component="pre" sx={{
-                  bgcolor: responseIsError ? '#fff8f8' : '#1e1e1e',
-                  color: responseIsError ? '#c62828' : '#d4d4d4',
-                  border: '1px solid', borderColor: responseIsError ? '#ffcdd2' : 'transparent',
+                  bgcolor: responseIsError ? 'error.light' : '#1e1e1e',
+                  color: responseIsError ? 'error.dark' : '#d4d4d4',
+                  border: '1px solid', borderColor: responseIsError ? 'error.light' : 'transparent',
                   p: 2, borderRadius: 1, fontSize: '0.78rem',
                   overflowX: 'auto', overflowY: 'auto', maxHeight: 400,
                   whiteSpace: 'pre-wrap', wordBreak: 'break-word', m: 0, mb: 1,
@@ -2650,7 +3435,7 @@ function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged,
                   let parsed: unknown = null
                   try { parsed = JSON.parse(response) } catch { /* not JSON */ }
                   if (parsed === null) return null
-                  return (
+                  return can(Permission.ToolsEdit) ? (
                     <Button size="small" variant="outlined" disabled={savingSchema}
                       startIcon={savingSchema ? <CircularProgress size={12} color="inherit" /> : undefined}
                       onClick={async () => {
@@ -2665,7 +3450,7 @@ function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged,
                       }}>
                       {savingSchema ? 'Saving…' : 'Use as output schema'}
                     </Button>
-                  )
+                  ) : null
                 })()}
               </>
             )}
@@ -2682,7 +3467,7 @@ function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged,
               : <Chip label="none" size="small" sx={{ fontSize: '0.65rem', height: 18, opacity: 0.5 }} />}
           </Box>
           <Box display="flex" gap={0.5}>
-            {tool.outputSchema && (
+            {tool.outputSchema && can(Permission.ToolsEdit) && (
               <Button size="small" color="error" disabled={savingSchema}
                 onClick={async () => {
                   setSavingSchema(true)
@@ -2765,183 +3550,6 @@ function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged,
 
 // ─── ResourcesTab ─────────────────────────────────────────────────────────────
 
-// ─── GrapesJS visual editor ───────────────────────────────────────────────────
-
-function GrapesInner({
-  initialHtml,
-  initialEditorData,
-  editorRef,
-}: {
-  initialHtml: string
-  initialEditorData?: string
-  editorRef: React.MutableRefObject<any>
-}) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-
-    let editor: any = null
-    let destroyed = false
-
-    const init = async () => {
-      const gj = (await import('grapesjs')).default
-      await import('grapesjs/dist/css/grapes.min.css')
-      if (destroyed || !containerRef.current) return
-
-      editor = gj.init({
-        container: containerRef.current,
-        height: '100%',
-        width: 'auto',
-        storageManager: false,
-        fromElement: false,
-      })
-
-      if (initialEditorData) {
-        try { editor.loadProjectData(JSON.parse(initialEditorData)) }
-        catch { editor.setComponents(initialHtml || '') }
-      } else if (initialHtml) {
-        editor.setComponents(initialHtml)
-      }
-
-      editorRef.current = editor
-      setLoading(false)
-    }
-
-    init()
-
-    return () => {
-      destroyed = true
-      if (editor) { editor.destroy(); editorRef.current = null }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  return (
-    <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
-      {loading && (
-        <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, bgcolor: 'background.paper' }}>
-          <CircularProgress />
-        </Box>
-      )}
-      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
-    </Box>
-  )
-}
-
-function GrapesEditorDialog({
-  open,
-  initialHtml,
-  initialEditorData,
-  onApply,
-  onClose,
-}: {
-  open: boolean
-  initialHtml: string
-  initialEditorData?: string
-  onApply: (html: string, editorData: string) => void
-  onClose: () => void
-}) {
-  const editorRef = useRef<any>(null)
-
-  const handleApply = () => {
-    const editor = editorRef.current
-    if (!editor) return
-    const html = editor.getHtml() as string
-    const css = editor.getCss() as string
-    const fullHtml = css ? `<style>${css}</style>\n${html}` : html
-    const data = JSON.stringify(editor.getProjectData())
-    onApply(fullHtml, data)
-    onClose()
-  }
-
-  return (
-    <Dialog open={open} onClose={onClose} fullScreen>
-      <Box sx={{
-        display: 'flex', alignItems: 'center', gap: 2,
-        px: 2, py: 1.25, bgcolor: 'primary.main', color: '#fff', flexShrink: 0,
-      }}>
-        <Typography variant="subtitle1" fontWeight={700} sx={{ flex: 1 }}>
-          Visual Editor
-        </Typography>
-        <Button size="small" onClick={onClose} sx={{ color: '#fff' }}>Cancel</Button>
-        <Button size="small" variant="outlined" onClick={handleApply}
-          sx={{ color: '#fff', borderColor: 'rgba(255,255,255,0.5)', '&:hover': { borderColor: '#fff' } }}>
-          Apply & close
-        </Button>
-      </Box>
-      <Box sx={{ flex: 1, overflow: 'hidden', height: 'calc(100vh - 52px)' }}>
-        {open && (
-          <GrapesInner
-            initialHtml={initialHtml}
-            initialEditorData={initialEditorData}
-            editorRef={editorRef}
-          />
-        )}
-      </Box>
-    </Dialog>
-  )
-}
-
-// ─── GrapesEditorDialog extended for dynamic resource variables ───────────────
-
-function GrapesEditorDialogWithVars({
-  open, initialHtml, initialEditorData, variables, onApply, onClose,
-}: {
-  open: boolean
-  initialHtml: string
-  initialEditorData?: string
-  variables: string[]
-  onApply: (html: string, editorData: string) => void
-  onClose: () => void
-}) {
-  const editorRef = useRef<any>(null)
-
-  const handleApply = () => {
-    const editor = editorRef.current
-    if (!editor) return
-    const html = editor.getHtml() as string
-    const css = editor.getCss() as string
-    const fullHtml = css ? `<style>${css}</style>\n${html}` : html
-    onApply(fullHtml, JSON.stringify(editor.getProjectData()))
-    onClose()
-  }
-
-  const insertVariable = (v: string) => {
-    const editor = editorRef.current
-    if (!editor) return
-    const sel = editor.getSelected()
-    if (sel) sel.set('content', `{{${v}}}`)
-  }
-
-  return (
-    <Dialog open={open} onClose={onClose} fullScreen>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, px: 2, py: 1.25, bgcolor: 'primary.main', color: '#fff', flexShrink: 0 }}>
-        <Typography variant="subtitle1" fontWeight={700} sx={{ flex: 1 }}>Visual Editor</Typography>
-        {variables.length > 0 && (
-          <Box display="flex" alignItems="center" gap={0.75} flexWrap="wrap" sx={{ maxWidth: '60%' }}>
-            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', mr: 0.5 }}>Insert:</Typography>
-            {variables.map((v) => (
-              <Chip key={v} label={`{{${v}}}`} size="small" onClick={() => insertVariable(v)}
-                sx={{ fontSize: '0.68rem', height: 20, cursor: 'pointer', bgcolor: 'rgba(255,255,255,0.15)', color: '#fff', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' } }} />
-            ))}
-          </Box>
-        )}
-        <Button size="small" onClick={onClose} sx={{ color: '#fff' }}>Cancel</Button>
-        <Button size="small" variant="outlined" onClick={handleApply}
-          sx={{ color: '#fff', borderColor: 'rgba(255,255,255,0.5)', '&:hover': { borderColor: '#fff' } }}>
-          Apply & close
-        </Button>
-      </Box>
-      <Box sx={{ flex: 1, overflow: 'hidden', height: 'calc(100vh - 52px)' }}>
-        {open && <GrapesInner initialHtml={initialHtml} initialEditorData={initialEditorData} editorRef={editorRef} />}
-      </Box>
-    </Dialog>
-  )
-}
-
 // ─── Dynamic Resource Dialog ──────────────────────────────────────────────────
 
 interface HbScalar { path: string; sample: string }
@@ -2989,22 +3597,25 @@ function DynamicResourceDialog({
   const [scalars, setScalars] = useState<HbScalar[]>([])
   const [arrays, setArrays] = useState<HbArray[]>([])
   const [content, setContent] = useState('')
-  const [editorData, setEditorData] = useState('')
-  const [grapesOpen, setGrapesOpen] = useState(false)
   const [name, setName] = useState('')
   const [uri, setUri] = useState('')
   const [description, setDescription] = useState('')
   const [errorMessage, setErrorMessage] = useState('Error loading resource: {{error}}')
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const [templateTab, setTemplateTab] = useState(0)
+  const [templateExpanded, setTemplateExpanded] = useState(false)
+  const { mode: colorMode } = useColorMode()
 
   const slugify = (s: string) => s.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+
+
 
   const reset = () => {
     setSelectedTool(null); setArgs({}); setTesting(false)
     setTestResult(null); setParsedBody(null); setTestError('')
     setSchemaApplied(false); setScalars([]); setArrays([])
-    setContent(''); setEditorData(''); setGrapesOpen(false)
+    setContent('')
     setName(''); setUri(''); setDescription('')
     setErrorMessage('Error loading resource: {{error}}')
     setSaving(false); setFormError('')
@@ -3063,7 +3674,6 @@ function DynamicResourceDialog({
         name: name.trim(), uri: uri.trim(),
         description: description.trim() || undefined,
         mimeType: 'text/html', content,
-        editorData: editorData || undefined,
         type: 'dynamic', endpointRef: selectedTool.endpointRef, inputDefaults,
         errorConfig: errorMessage.trim() ? { message: errorMessage.trim() } : undefined,
       }
@@ -3099,9 +3709,14 @@ function DynamicResourceDialog({
   const scalarPaths = scalars.map((s) => s.path)
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth scroll="paper">
-      <DialogTitle>New dynamic resource</DialogTitle>
-      <DialogContent dividers>
+    <>
+    <Drawer anchor="right" open={open} onClose={handleClose}
+      PaperProps={{ sx: { width: { xs: '100vw', sm: 760 }, display: 'flex', flexDirection: 'column' } }}>
+      <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+        <Typography variant="h6" fontWeight={700} flexGrow={1}>New dynamic resource</Typography>
+        <IconButton size="small" onClick={handleClose}><IconX size={18} /></IconButton>
+      </Box>
+      <Box sx={{ flex: 1, overflowY: 'auto', px: 3, py: 2.5 }}>
         {formError && <Alert severity="error" sx={{ mb: 2 }}>{formError}</Alert>}
         <Box display="flex" flexDirection="column" gap={3}>
 
@@ -3278,31 +3893,61 @@ function DynamicResourceDialog({
 
           {/* Section 3 — Template */}
           <Box>
-            <Typography variant="subtitle2" fontWeight={700} mb={1.5}>3. HTML template</Typography>
-            <Box display="flex" alignItems="center" justifyContent="space-between" mb={0.75}>
-              <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                Handlebars template {editorData ? '· edited in visual editor' : ''}
-              </Typography>
-              <Button size="small" variant="outlined" startIcon={<IconEdit size={14} />}
-                onClick={() => setGrapesOpen(true)} sx={{ fontSize: '0.75rem', py: 0.25, px: 1 }}>
-                Open visual editor
-              </Button>
+            <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+              <Typography variant="subtitle2" fontWeight={700}>3. HTML template</Typography>
+              <Tooltip title="Open Handlebars.js documentation — template syntax reference (expressions, #each, helpers)">
+                <IconButton size="small" component="a" href="https://handlebarsjs.com/guide/expressions.html" target="_blank" rel="noopener noreferrer" sx={{ p: 0.25 }}>
+                  <IconExternalLink size={13} />
+                </IconButton>
+              </Tooltip>
             </Box>
-            <TextField size="small" fullWidth multiline minRows={7} maxRows={18}
-              placeholder={`{{#each hotels}}\n<div class="card">\n  <h2>{{name}}</h2>\n  <p>{{price}}</p>\n</div>\n{{/each}}`}
-              value={content} onChange={(e) => setContent(e.target.value)}
-              InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.82rem' } }} />
+            <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+              Write HTML using <strong>Handlebars.js</strong> syntax — use <code>{'{{variable}}'}</code> to insert data fields and <code>{'{{#each items}}'}</code> to iterate over arrays. The icon <IconExternalLink size={11} style={{ verticalAlign: 'middle', marginLeft: 2 }} /> opens the official Handlebars.js docs.
+            </Typography>
 
-            {livePreview && (
-              <Box mt={1.5}>
-                <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>
-                  Preview
-                </Typography>
-                <Paper variant="outlined" sx={{ p: 1.5, maxHeight: 300, overflow: 'auto', bgcolor: '#fff' }}>
-                  <div dangerouslySetInnerHTML={{ __html: livePreview }} />
-                </Paper>
-              </Box>
-            )}
+            {/* Tabs */}
+            <Box sx={{ borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', mb: 0 }}>
+              <Tabs value={templateTab} onChange={(_, v) => setTemplateTab(v)} sx={{ minHeight: 36 }}
+                TabIndicatorProps={{ sx: { height: 2 } }}>
+                <Tab label="Code" sx={{ minHeight: 36, fontSize: '0.78rem', py: 0 }} />
+                <Tab label="Preview" sx={{ minHeight: 36, fontSize: '0.78rem', py: 0 }} />
+              </Tabs>
+              <Box flexGrow={1} />
+              <Tooltip title="Expand editor">
+                <IconButton size="small" onClick={() => setTemplateExpanded(true)} sx={{ mr: 0.5 }}>
+                  <IconArrowsMaximize size={16} />
+                </IconButton>
+              </Tooltip>
+            </Box>
+
+            <Box sx={{ height: 360, border: 1, borderColor: 'divider', borderTop: 0, borderRadius: '0 0 8px 8px', overflow: 'hidden' }}>
+              {templateTab === 0 ? (
+                <MonacoEditor
+                  height="100%"
+                  language="html"
+                  value={content}
+                  theme={colorMode === 'dark' ? 'vs-dark' : 'light'}
+                  onChange={(v) => setContent(v ?? '')}
+                  options={{
+                    minimap: { enabled: false },
+                    fontSize: 13,
+                    lineNumbers: 'on',
+                    wordWrap: 'on',
+                    scrollBeyondLastLine: false,
+                    tabSize: 2,
+                    automaticLayout: true,
+                    padding: { top: 8 },
+                  }}
+                />
+              ) : (
+                <iframe
+                  srcDoc={livePreview ?? content ?? '<p style="color:#888;font-family:sans-serif;padding:24px">No content yet — write HTML in the Code tab.</p>'}
+                  sandbox="allow-same-origin"
+                  style={{ width: '100%', height: '100%', border: 'none', background: '#fff' }}
+                  title="Template preview"
+                />
+              )}
+            </Box>
           </Box>
 
           <Divider />
@@ -3325,34 +3970,166 @@ function DynamicResourceDialog({
             </Box>
           </Box>
         </Box>
-      </DialogContent>
-      <DialogActions sx={{ px: 3, py: 2 }}>
+      </Box>
+      <Box sx={{ px: 3, py: 2, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1, flexShrink: 0 }}>
         <Button onClick={handleClose}>Cancel</Button>
         <Button variant="contained" onClick={handleSave} disabled={saving}
           startIcon={saving ? <CircularProgress size={14} color="inherit" /> : undefined}>
           {saving ? 'Saving…' : 'Create resource'}
         </Button>
-      </DialogActions>
+      </Box>
 
-      <GrapesEditorDialogWithVars
-        open={grapesOpen}
-        initialHtml={content}
-        initialEditorData={editorData || undefined}
-        variables={scalarPaths}
-        onApply={(html, data) => { setContent(html); setEditorData(data) }}
-        onClose={() => setGrapesOpen(false)}
-      />
-    </Dialog>
+    </Drawer>
+
+    {/* Expanded Monaco — left drawer */}
+    <Drawer anchor="left" open={templateExpanded} onClose={() => setTemplateExpanded(false)}
+      PaperProps={{ sx: { width: { xs: '100vw', sm: 'calc(100vw - 760px)' }, display: 'flex', flexDirection: 'column' } }}>
+      <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+        <Box display="flex" alignItems="center" gap={1} flexGrow={1}>
+          <Typography variant="h6" fontWeight={700}>HTML template</Typography>
+          <Tooltip title="Handlebars.js template syntax documentation">
+            <IconButton size="small" component="a" href="https://handlebarsjs.com/guide/expressions.html" target="_blank" rel="noopener noreferrer" sx={{ p: 0.25 }}>
+              <IconExternalLink size={14} />
+            </IconButton>
+          </Tooltip>
+        </Box>
+        <Tabs value={templateTab} onChange={(_, v) => setTemplateTab(v)} sx={{ minHeight: 36 }}
+          TabIndicatorProps={{ sx: { height: 2 } }}>
+          <Tab label="Code" sx={{ minHeight: 36, fontSize: '0.8rem', py: 0 }} />
+          <Tab label="Preview" sx={{ minHeight: 36, fontSize: '0.8rem', py: 0 }} />
+        </Tabs>
+        <Box flexGrow={1} />
+        <Tooltip title="Collapse">
+          <IconButton size="small" onClick={() => setTemplateExpanded(false)}>
+            <IconArrowsMinimize size={16} />
+          </IconButton>
+        </Tooltip>
+      </Box>
+      <Box sx={{ flex: 1, overflow: 'hidden' }}>
+        {templateTab === 0 ? (
+          <MonacoEditor
+            height="100%"
+            language="html"
+            value={content}
+            theme={colorMode === 'dark' ? 'vs-dark' : 'light'}
+            onChange={(v) => setContent(v ?? '')}
+            options={{
+              minimap: { enabled: true },
+              fontSize: 14,
+              lineNumbers: 'on',
+              wordWrap: 'on',
+              scrollBeyondLastLine: false,
+              tabSize: 2,
+              automaticLayout: true,
+              padding: { top: 16 },
+            }}
+          />
+        ) : (
+          <iframe
+            srcDoc={livePreview ?? content ?? '<p style="color:#888;font-family:sans-serif;padding:24px">No content yet.</p>'}
+            sandbox="allow-same-origin"
+            style={{ width: '100%', height: '100%', border: 'none', background: '#fff' }}
+            title="Template preview expanded"
+          />
+        )}
+      </Box>
+    </Drawer>
+    </>
+  )
+}
+
+// ─── ResourceTestPanel ────────────────────────────────────────────────────────
+
+function ResourceTestPanel({ resource, projectId, anyApiKey }: {
+  resource: McpResource
+  projectId: string
+  anyApiKey?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const [executing, setExecuting] = useState(false)
+  const [response, setResponse] = useState<string | null>(null)
+  const [isError, setIsError] = useState(false)
+
+  const handleExecute = async () => {
+    setExecuting(true)
+    setResponse(null)
+    setIsError(false)
+    try {
+      const res = await api.post(
+        `/mcp/server/${projectId}`,
+        { jsonrpc: '2.0', method: 'resources/read', id: Date.now(), params: { uri: resource.uri } },
+        { headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', ...(anyApiKey ? { auth: anyApiKey } : {}) } },
+      )
+      const rpc = parseMcpResponse(res.data)
+      const result = rpc?.result
+      const text = result?.contents?.[0]?.text ?? JSON.stringify(result ?? rpc, null, 2)
+      setResponse(text)
+      setIsError(!!rpc?.error)
+    } catch (err: any) {
+      setResponse(err?.response?.data ? JSON.stringify(err.response.data, null, 2) : String(err))
+      setIsError(true)
+    } finally {
+      setExecuting(false)
+    }
+  }
+
+  return (
+    <>
+      <Divider sx={{ my: 1.5 }} />
+      <Box display="flex" alignItems="center" justifyContent="space-between">
+        <Typography variant="subtitle2" fontWeight={700} fontSize="0.8rem">Test</Typography>
+        <Button
+          size="small"
+          variant="outlined"
+          color={open ? 'error' : 'primary'}
+          onClick={() => { setOpen((v) => !v); setResponse(null); setIsError(false) }}
+        >
+          {open ? 'Cancel' : 'Try'}
+        </Button>
+      </Box>
+      {open && (
+        <Box mt={1}>
+          <Typography variant="caption" color="text.secondary">
+            No inputs required — the URI is fixed.
+          </Typography>
+          <Box>
+            <Button
+              variant="contained"
+              size="small"
+              disabled={executing}
+              startIcon={executing ? <CircularProgress size={12} color="inherit" /> : <IconPlayerPlay size={14} />}
+              onClick={handleExecute}
+              sx={{ mt: 1, fontWeight: 600 }}
+            >
+              {executing ? 'Executing…' : 'Execute'}
+            </Button>
+          </Box>
+          {response !== null && (
+            <Box component="pre" sx={{
+              bgcolor: isError ? 'error.light' : '#1e1e1e',
+              color: isError ? 'error.dark' : '#d4d4d4',
+              p: 2, borderRadius: 1, fontSize: '0.75rem',
+              overflowX: 'auto', maxHeight: 300,
+              whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+              m: 0, mt: 1.5,
+            }}>
+              {response}
+            </Box>
+          )}
+        </Box>
+      )}
+    </>
   )
 }
 
 // ─── Resources tab ─────────────────────────────────────────────────────────────
 
-function ResourcesTab({ projectId, initialResources, tools, onChange }: {
+function ResourcesTab({ projectId, initialResources, tools, onChange, anyApiKey }: {
   projectId: string
   initialResources: McpResource[]
   tools: GeneratedTool[]
   onChange: (resources: McpResource[]) => void
+  anyApiKey?: string
 }) {
   const [resources, setResources] = useState<McpResource[]>(initialResources)
   const [dynDialogOpen, setDynDialogOpen] = useState(false)
@@ -3362,9 +4139,12 @@ function ResourcesTab({ projectId, initialResources, tools, onChange }: {
   const [deleting, setDeleting] = useState(false)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
-  const [grapesOpen, setGrapesOpen] = useState(false)
+  const [contentTab, setContentTab] = useState(0)
+  const [expandedOpen, setExpandedOpen] = useState(false)
+  const { mode: colorMode } = useColorMode()
+  const { can } = useAuth()
 
-  const emptyForm = () => ({ name: '', uri: '', description: '', mimeType: 'text/html', content: '', editorData: '' })
+  const emptyForm = () => ({ name: '', uri: '', description: '', mimeType: 'text/html', content: '' })
   const [form, setForm] = useState(emptyForm())
 
   const slugify = (s: string) => s.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
@@ -3378,7 +4158,7 @@ function ResourcesTab({ projectId, initialResources, tools, onChange }: {
 
   const openEdit = (r: McpResource) => {
     setEditTarget(r)
-    setForm({ name: r.name, uri: r.uri, description: r.description ?? '', mimeType: r.mimeType ?? 'text/html', content: r.content, editorData: r.editorData ?? '' })
+    setForm({ name: r.name, uri: r.uri, description: r.description ?? '', mimeType: r.mimeType ?? 'text/html', content: r.content })
     setFormError('')
     setDialogOpen(true)
   }
@@ -3394,7 +4174,7 @@ function ResourcesTab({ projectId, initialResources, tools, onChange }: {
     if (!form.content.trim()) { setFormError('Content is required.'); return }
     setSaving(true); setFormError('')
     try {
-      const dto = { name: form.name.trim(), uri: form.uri.trim(), description: form.description.trim() || undefined, mimeType: form.mimeType.trim() || undefined, content: form.content, editorData: form.editorData || undefined }
+      const dto = { name: form.name.trim(), uri: form.uri.trim(), description: form.description.trim() || undefined, mimeType: form.mimeType.trim() || undefined, content: form.content }
       if (editTarget) {
         await api.put(`/swagger/servers/${projectId}/resources/${editTarget.id}`, dto)
         const updated = resources.map((r) => r.id === editTarget.id ? { ...r, ...dto } : r)
@@ -3430,12 +4210,16 @@ function ResourcesTab({ projectId, initialResources, tools, onChange }: {
           </Typography>
         </Box>
         <Box display="flex" gap={1}>
-          <Button variant="outlined" size="small" startIcon={<IconRoute size={16} />} onClick={() => setDynDialogOpen(true)}>
-            From endpoint
-          </Button>
-          <Button variant="contained" size="small" startIcon={<IconPlus size={18} />} onClick={openAdd}>
-            Add resource
-          </Button>
+          {can(Permission.ResourcesCreate) && (
+            <Button variant="outlined" size="small" startIcon={<IconRoute size={16} />} onClick={() => setDynDialogOpen(true)}>
+              From endpoint
+            </Button>
+          )}
+          {can(Permission.ResourcesCreate) && (
+            <Button variant="contained" size="small" startIcon={<IconPlus size={18} />} onClick={openAdd}>
+              Add resource
+            </Button>
+          )}
         </Box>
       </Box>
 
@@ -3458,9 +4242,6 @@ function ResourcesTab({ projectId, initialResources, tools, onChange }: {
                     {r.mimeType && (
                       <Chip label={r.mimeType} size="small" variant="outlined" sx={{ fontSize: '0.68rem', height: 18 }} />
                     )}
-                    {r.editorData && (
-                      <Chip label="GrapesJS" size="small" color="secondary" sx={{ fontSize: '0.68rem', height: 18 }} />
-                    )}
                   </Box>
                   <Typography fontFamily="monospace" fontSize="0.78rem" color="text.secondary" sx={{ wordBreak: 'break-all' }}>
                     {r.uri}
@@ -3473,62 +4254,151 @@ function ResourcesTab({ projectId, initialResources, tools, onChange }: {
                   </Typography>
                 </Box>
                 <Box display="flex" gap={0.5} flexShrink={0}>
-                  <Tooltip title="Edit">
-                    <IconButton size="small" onClick={() => openEdit(r)}><IconEdit size={16} /></IconButton>
-                  </Tooltip>
-                  <Tooltip title="Delete">
-                    <IconButton size="small" color="error" onClick={() => setDeleteTarget(r)}><IconTrash size={16} /></IconButton>
-                  </Tooltip>
+                  {can(Permission.ResourcesEdit) && (
+                    <Tooltip title="Edit">
+                      <IconButton size="small" onClick={() => openEdit(r)}><IconEdit size={16} /></IconButton>
+                    </Tooltip>
+                  )}
+                  {can(Permission.ResourcesDelete) && (
+                    <Tooltip title="Delete">
+                      <IconButton size="small" color="error" onClick={() => setDeleteTarget(r)}><IconTrash size={16} /></IconButton>
+                    </Tooltip>
+                  )}
                 </Box>
               </Box>
+              <ResourceTestPanel resource={r} projectId={projectId} anyApiKey={anyApiKey} />
             </Paper>
           ))}
         </Box>
       )}
 
       {/* Add / Edit dialog */}
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth scroll="paper">
-        <DialogTitle>{editTarget ? `Edit resource — ${editTarget.name}` : 'New resource'}</DialogTitle>
-        <DialogContent dividers>
-          {formError && <Alert severity="error" sx={{ mb: 2 }}>{formError}</Alert>}
-          <Box display="flex" flexDirection="column" gap={2}>
-            <TextField size="small" fullWidth label="Name" required value={form.name}
-              onChange={(e) => handleNameChange(e.target.value)} />
-            <TextField size="small" fullWidth label="URI" required value={form.uri}
-              onChange={(e) => setForm((f) => ({ ...f, uri: e.target.value }))}
-              helperText="Unique identifier used by the MCP client to read this resource"
-              InputProps={{ sx: { fontFamily: 'monospace' } }} />
-            <TextField size="small" fullWidth multiline minRows={3} label="Description" value={form.description}
+      <Drawer anchor="right" open={dialogOpen} onClose={() => setDialogOpen(false)}
+        PaperProps={{ sx: { width: { xs: '100vw', sm: 760 }, display: 'flex', flexDirection: 'column' } }}>
+        <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+          <Typography variant="h6" fontWeight={700} flexGrow={1}>{editTarget ? `Edit resource — ${editTarget.name}` : 'New resource'}</Typography>
+          <IconButton size="small" onClick={() => setDialogOpen(false)}><IconX size={18} /></IconButton>
+        </Box>
+        {/* Metadata fields */}
+        <Box sx={{ px: 3, py: 2.5, borderBottom: 1, borderColor: 'divider', display: 'flex', flexDirection: 'column', gap: 2, flexShrink: 0 }}>
+          {formError && <Alert severity="error">{formError}</Alert>}
+          <TextField size="small" fullWidth label="Name" required value={form.name}
+            onChange={(e) => handleNameChange(e.target.value)} />
+          <TextField size="small" fullWidth label="URI" required value={form.uri}
+            onChange={(e) => setForm((f) => ({ ...f, uri: e.target.value }))}
+            helperText="Unique identifier used by the MCP client to read this resource"
+            InputProps={{ sx: { fontFamily: 'monospace' } }} />
+          <Box display="flex" gap={2}>
+            <TextField size="small" fullWidth multiline minRows={2} maxRows={4} label="Description" value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
-            <TextField size="small" fullWidth label="MIME Type" value={form.mimeType}
+            <TextField size="small" label="MIME Type" value={form.mimeType}
               onChange={(e) => setForm((f) => ({ ...f, mimeType: e.target.value }))}
-              placeholder="text/html" />
-            <Box>
-              <Box display="flex" alignItems="center" justifyContent="space-between" mb={0.75}>
-                <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                  Content {form.editorData ? '· edited in visual editor' : ''}
-                </Typography>
-                <Button size="small" variant="outlined" startIcon={<IconEdit size={14} />}
-                  onClick={() => setGrapesOpen(true)}
-                  sx={{ fontSize: '0.75rem', py: 0.25, px: 1 }}>
-                  Open visual editor
-                </Button>
-              </Box>
-              <TextField size="small" fullWidth multiline minRows={8} maxRows={20} label="" required
-                value={form.content}
-                onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
-                InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.82rem' } }} />
-            </Box>
+              placeholder="text/html" sx={{ width: 160, flexShrink: 0 }} />
           </Box>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}>
+        </Box>
+
+        {/* Code / Preview tabs */}
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', px: 2, flexShrink: 0 }}>
+          <Tabs value={contentTab} onChange={(_, v) => setContentTab(v)} sx={{ minHeight: 40 }}
+            TabIndicatorProps={{ sx: { height: 2 } }}>
+            <Tab label="Code" sx={{ minHeight: 40, fontSize: '0.8rem', py: 0.5 }} />
+            <Tab label="Preview" sx={{ minHeight: 40, fontSize: '0.8rem', py: 0.5 }} />
+          </Tabs>
+          <Box flexGrow={1} />
+          <Tooltip title="Expand editor">
+            <IconButton size="small" onClick={() => setExpandedOpen(true)} sx={{ mr: 0.5 }}>
+              <IconArrowsMaximize size={16} />
+            </IconButton>
+          </Tooltip>
+        </Box>
+
+        {/* Editor area — flex:1 so it fills remaining drawer height */}
+        <Box sx={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+          {contentTab === 0 ? (
+            <MonacoEditor
+              height="100%"
+              language={form.mimeType?.includes('html') ? 'html' : form.mimeType?.includes('json') ? 'json' : 'html'}
+              value={form.content}
+              theme={colorMode === 'dark' ? 'vs-dark' : 'light'}
+              onChange={(v) => setForm((f) => ({ ...f, content: v ?? '' }))}
+              options={{
+                minimap: { enabled: false },
+                fontSize: 13,
+                lineNumbers: 'on',
+                wordWrap: 'on',
+                scrollBeyondLastLine: false,
+                tabSize: 2,
+                automaticLayout: true,
+                padding: { top: 12 },
+              }}
+            />
+          ) : (
+            <Box sx={{ width: '100%', height: '100%', overflow: 'hidden' }}>
+              <iframe
+                srcDoc={form.content || '<p style="color:#888;font-family:sans-serif;padding:24px">No content yet — write HTML in the Code tab.</p>'}
+                sandbox="allow-same-origin"
+                style={{ width: '100%', height: '100%', border: 'none', background: '#fff' }}
+                title="Resource preview"
+              />
+            </Box>
+          )}
+        </Box>
+
+        <Box sx={{ px: 3, py: 2, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1, flexShrink: 0 }}>
           <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
           <Button variant="contained" onClick={handleSave} disabled={saving}
             startIcon={saving ? <CircularProgress size={14} color="inherit" /> : undefined}>
             {saving ? 'Saving…' : editTarget ? 'Save changes' : 'Create resource'}
           </Button>
-        </DialogActions>
-      </Dialog>
+        </Box>
+      </Drawer>
+
+      {/* Expanded Monaco editor — left drawer */}
+      <Drawer anchor="left" open={expandedOpen} onClose={() => setExpandedOpen(false)}
+        PaperProps={{ sx: { width: { xs: '100vw', sm: 'calc(100vw - 760px)' }, display: 'flex', flexDirection: 'column' } }}>
+        <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+          <Typography variant="h6" fontWeight={700} flexGrow={1}>HTML template</Typography>
+          <Tabs value={contentTab} onChange={(_, v) => setContentTab(v)} sx={{ minHeight: 36 }}
+            TabIndicatorProps={{ sx: { height: 2 } }}>
+            <Tab label="Code" sx={{ minHeight: 36, fontSize: '0.8rem', py: 0 }} />
+            <Tab label="Preview" sx={{ minHeight: 36, fontSize: '0.8rem', py: 0 }} />
+          </Tabs>
+          <Box flexGrow={1} />
+          <Tooltip title="Collapse">
+            <IconButton size="small" onClick={() => setExpandedOpen(false)}>
+              <IconArrowsMinimize size={16} />
+            </IconButton>
+          </Tooltip>
+        </Box>
+        <Box sx={{ flex: 1, overflow: 'hidden' }}>
+          {contentTab === 0 ? (
+            <MonacoEditor
+              height="100%"
+              language={form.mimeType?.includes('html') ? 'html' : form.mimeType?.includes('json') ? 'json' : 'html'}
+              value={form.content}
+              theme={colorMode === 'dark' ? 'vs-dark' : 'light'}
+              onChange={(v) => setForm((f) => ({ ...f, content: v ?? '' }))}
+              options={{
+                minimap: { enabled: true },
+                fontSize: 14,
+                lineNumbers: 'on',
+                wordWrap: 'on',
+                scrollBeyondLastLine: false,
+                tabSize: 2,
+                automaticLayout: true,
+                padding: { top: 16 },
+              }}
+            />
+          ) : (
+            <iframe
+              srcDoc={form.content || '<p style="color:#888;font-family:sans-serif;padding:24px">No content yet — write HTML in the Code tab.</p>'}
+              sandbox="allow-same-origin"
+              style={{ width: '100%', height: '100%', border: 'none', background: '#fff' }}
+              title="Resource preview expanded"
+            />
+          )}
+        </Box>
+      </Drawer>
 
       <ConfirmDialog
         open={deleteTarget !== null}
@@ -3539,16 +4409,6 @@ function ResourcesTab({ projectId, initialResources, tools, onChange }: {
         loading={deleting}
         onConfirm={handleDelete}
         onClose={() => setDeleteTarget(null)}
-      />
-
-      <GrapesEditorDialog
-        open={grapesOpen}
-        initialHtml={form.content}
-        initialEditorData={form.editorData || undefined}
-        onApply={(html, data) => {
-          setForm((f) => ({ ...f, content: html, editorData: data, mimeType: 'text/html' }))
-        }}
-        onClose={() => setGrapesOpen(false)}
       />
 
       <DynamicResourceDialog
@@ -3792,9 +4652,13 @@ function ChainDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth scroll="paper">
-      <DialogTitle>{editTarget ? `Edit chain — ${editTarget.name}` : 'New chain'}</DialogTitle>
-      <DialogContent dividers>
+    <Drawer anchor="right" open={open} onClose={onClose}
+      PaperProps={{ sx: { width: { xs: '100vw', sm: 600 }, display: 'flex', flexDirection: 'column' } }}>
+      <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+        <Typography variant="h6" fontWeight={700} flexGrow={1}>{editTarget ? `Edit chain — ${editTarget.name}` : 'New chain'}</Typography>
+        <IconButton size="small" onClick={onClose}><IconX size={18} /></IconButton>
+      </Box>
+      <Box sx={{ flex: 1, overflowY: 'auto', px: 3, py: 2.5 }}>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         <Box display="flex" flexDirection="column" gap={2}>
           <Box display="flex" gap={2} alignItems="flex-start">
@@ -3862,8 +4726,8 @@ function ChainDialog({
             </Box>
           )}
         </Box>
-      </DialogContent>
-      <DialogActions sx={{ px: 3, py: 2 }}>
+      </Box>
+      <Box sx={{ px: 3, py: 2, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1, flexShrink: 0 }}>
         <Button onClick={onClose}>Cancel</Button>
         <Button
           variant="contained" disabled={saving}
@@ -3877,8 +4741,8 @@ function ChainDialog({
         >
           {saving ? 'Saving…' : editTarget ? 'Save changes' : 'Create chain'}
         </Button>
-      </DialogActions>
-    </Dialog>
+      </Box>
+    </Drawer>
   )
 }
 
@@ -3888,6 +4752,7 @@ function ChainsTab({ projectId, initialChains, tools, onChange }: {
   tools: GeneratedTool[]
   onChange: (chains: ToolChain[]) => void
 }) {
+  const { can } = useAuth()
   const [chains, setChains] = useState<ToolChain[]>(initialChains)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<ToolChain | null>(null)
@@ -3937,10 +4802,12 @@ function ChainsTab({ projectId, initialChains, tools, onChange }: {
             Each step's output is available to the next step.
           </Typography>
         </Box>
-        <Button size="small" variant="contained" startIcon={<IconPlus size={16} />} onClick={openCreate}
-          disabled={tools.length === 0}>
-          New chain
-        </Button>
+        {can(Permission.ToolsCreate) && (
+          <Button size="small" variant="contained" startIcon={<IconPlus size={16} />} onClick={openCreate}
+            disabled={tools.length === 0}>
+            New chain
+          </Button>
+        )}
       </Box>
 
       {tools.length === 0 && (
@@ -3983,16 +4850,20 @@ function ChainsTab({ projectId, initialChains, tools, onChange }: {
                   </Box>
                 </Box>
                 <Box display="flex" gap={0.25} flexShrink={0}>
-                  <Tooltip title="Edit">
-                    <IconButton size="small" onClick={() => openEdit(chain)}>
-                      <IconEdit size={15} />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Delete">
-                    <IconButton size="small" color="error" onClick={() => setDeleteTarget(chain)}>
-                      <IconTrash size={15} />
-                    </IconButton>
-                  </Tooltip>
+                  {can(Permission.ToolsEdit) && (
+                    <Tooltip title="Edit">
+                      <IconButton size="small" onClick={() => openEdit(chain)}>
+                        <IconEdit size={15} />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  {can(Permission.ToolsDelete) && (
+                    <Tooltip title="Delete">
+                      <IconButton size="small" color="error" onClick={() => setDeleteTarget(chain)}>
+                        <IconTrash size={15} />
+                      </IconButton>
+                    </Tooltip>
+                  )}
                 </Box>
               </Box>
             </Paper>
@@ -4022,12 +4893,114 @@ function ChainsTab({ projectId, initialChains, tools, onChange }: {
   )
 }
 
-function PromptsTab({ projectId, initialPrompts, onChange }: {
+// ─── PromptTestPanel ──────────────────────────────────────────────────────────
+
+function PromptTestPanel({ prompt, projectId, anyApiKey }: {
+  prompt: GlobalPrompt
+  projectId: string
+  anyApiKey?: string
+}) {
+  const argNames = [...new Set([...prompt.content.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]))]
+  const [open, setOpen] = useState(false)
+  const [executing, setExecuting] = useState(false)
+  const [formValues, setFormValues] = useState<Record<string, string>>({})
+  const [response, setResponse] = useState<string | null>(null)
+  const [isError, setIsError] = useState(false)
+
+  const handleExecute = async () => {
+    setExecuting(true)
+    setResponse(null)
+    setIsError(false)
+    try {
+      const res = await api.post(
+        `/mcp/server/${projectId}`,
+        { jsonrpc: '2.0', method: 'prompts/get', id: Date.now(), params: { name: prompt.name, arguments: formValues } },
+        { headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', ...(anyApiKey ? { auth: anyApiKey } : {}) } },
+      )
+      const rpc = parseMcpResponse(res.data)
+      const result = rpc?.result
+      const text = result?.messages?.[0]?.content?.text ?? JSON.stringify(result ?? rpc, null, 2)
+      setResponse(text)
+      setIsError(!!rpc?.error)
+    } catch (err: any) {
+      setResponse(err?.response?.data ? JSON.stringify(err.response.data, null, 2) : String(err))
+      setIsError(true)
+    } finally {
+      setExecuting(false)
+    }
+  }
+
+  return (
+    <>
+      <Divider sx={{ my: 1.5 }} />
+      <Box display="flex" alignItems="center" justifyContent="space-between">
+        <Typography variant="subtitle2" fontWeight={700} fontSize="0.8rem">Test</Typography>
+        <Button
+          size="small"
+          variant="outlined"
+          color={open ? 'error' : 'primary'}
+          onClick={() => { setOpen((v) => !v); setResponse(null); setIsError(false); setFormValues({}) }}
+        >
+          {open ? 'Cancel' : 'Try'}
+        </Button>
+      </Box>
+      {open && (
+        <Box mt={1}>
+          {argNames.length > 0 ? (
+            <Box display="flex" flexDirection="column" gap={1} mb={1.5}>
+              {argNames.map((arg) => (
+                <TextField
+                  key={arg}
+                  size="small"
+                  fullWidth
+                  label={arg}
+                  placeholder="<string>"
+                  value={formValues[arg] ?? ''}
+                  onChange={(e) => setFormValues((prev) => ({ ...prev, [arg]: e.target.value }))}
+                />
+              ))}
+            </Box>
+          ) : (
+            <Typography variant="caption" color="text.secondary" display="block" mb={1.5}>
+              This prompt has no variables.
+            </Typography>
+          )}
+          <Button
+            variant="contained"
+            size="small"
+            disabled={executing}
+            startIcon={executing ? <CircularProgress size={12} color="inherit" /> : <IconPlayerPlay size={14} />}
+            onClick={handleExecute}
+            sx={{ fontWeight: 600 }}
+          >
+            {executing ? 'Executing…' : 'Execute'}
+          </Button>
+          {response !== null && (
+            <Box component="pre" sx={{
+              bgcolor: isError ? 'error.light' : '#1e1e1e',
+              color: isError ? 'error.dark' : '#d4d4d4',
+              p: 2, borderRadius: 1, fontSize: '0.75rem',
+              overflowX: 'auto', maxHeight: 300,
+              whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+              m: 0, mt: 1.5,
+            }}>
+              {response}
+            </Box>
+          )}
+        </Box>
+      )}
+    </>
+  )
+}
+
+function PromptsTab({ projectId, initialPrompts, onChange, anyApiKey }: {
   projectId: string
   initialPrompts: McpPrompt[]
   onChange: (prompts: McpPrompt[]) => void
+  anyApiKey?: string
 }) {
   const navigate = useNavigate()
+  const { can } = useAuth()
   const [refs, setRefs] = useState<McpPrompt[]>(initialPrompts)
   const [globals, setGlobals] = useState<GlobalPrompt[]>([])
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -4040,11 +5013,12 @@ function PromptsTab({ projectId, initialPrompts, onChange }: {
   const attachedPrompts = globals.filter((p) => attachedIds.has(p.id))
 
   useEffect(() => {
+    if (!can(Permission.PromptsView)) return
     setLoadingGlobals(true)
     api.get<GlobalPrompt[]>('/prompts')
       .then((r) => setGlobals(r.data))
       .finally(() => setLoadingGlobals(false))
-  }, [])
+  }, [can])
 
   const openPicker = async () => {
     setPickerSearch('')
@@ -4095,10 +5069,12 @@ function PromptsTab({ projectId, initialPrompts, onChange }: {
             onClick={() => navigate('/prompts')}>
             Prompt library
           </Button>
-          <Button size="small" variant="contained" startIcon={<IconPlus size={16} />}
-            onClick={openPicker}>
-            Add prompt
-          </Button>
+          {can(Permission.PromptsCreate) && (
+            <Button size="small" variant="contained" startIcon={<IconPlus size={16} />}
+              onClick={openPicker}>
+              Add prompt
+            </Button>
+          )}
         </Box>
       </Box>
 
@@ -4147,13 +5123,14 @@ function PromptsTab({ projectId, initialPrompts, onChange }: {
                       {p.content.length > 280 ? p.content.slice(0, 280) + '…' : p.content}
                     </Box>
                   </Box>
-                  <Tooltip title="Remove from project">
+                  {can(Permission.PromptsDelete) && <Tooltip title="Remove from project">
                     <IconButton size="small" color="error" disabled={isRemoving}
                       onClick={() => handleRemove(p.id)}>
                       {isRemoving ? <CircularProgress size={14} /> : <IconTrash size={16} />}
                     </IconButton>
-                  </Tooltip>
+                  </Tooltip>}
                 </Box>
+              <PromptTestPanel prompt={p} projectId={projectId} anyApiKey={anyApiKey} />
               </Paper>
             )
           })}
@@ -4161,17 +5138,20 @@ function PromptsTab({ projectId, initialPrompts, onChange }: {
       )}
 
       {/* Picker dialog */}
-      <Dialog open={pickerOpen} onClose={() => setPickerOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Add prompt from library</DialogTitle>
-        <DialogContent dividers sx={{ p: 0 }}>
-          <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-            <TextField
-              size="small" fullWidth autoFocus placeholder="Search prompts…"
-              value={pickerSearch} onChange={(e) => setPickerSearch(e.target.value)}
-              InputProps={{ startAdornment: <InputAdornment position="start"><IconSearch size={16} /></InputAdornment> }}
-            />
-          </Box>
-
+      <Drawer anchor="right" open={pickerOpen} onClose={() => setPickerOpen(false)}
+        PaperProps={{ sx: { width: { xs: '100vw', sm: 480 }, display: 'flex', flexDirection: 'column' } }}>
+        <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+          <Typography variant="h6" fontWeight={700} flexGrow={1}>Add prompt from library</Typography>
+          <IconButton size="small" onClick={() => setPickerOpen(false)}><IconX size={18} /></IconButton>
+        </Box>
+        <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', flexShrink: 0 }}>
+          <TextField
+            size="small" fullWidth autoFocus placeholder="Search prompts…"
+            value={pickerSearch} onChange={(e) => setPickerSearch(e.target.value)}
+            InputProps={{ startAdornment: <InputAdornment position="start"><IconSearch size={16} /></InputAdornment> }}
+          />
+        </Box>
+        <Box sx={{ flex: 1, overflowY: 'auto' }}>
           {loadingGlobals ? (
             <Box display="flex" justifyContent="center" alignItems="center" py={4}>
               <CircularProgress size={28} />
@@ -4189,54 +5169,52 @@ function PromptsTab({ projectId, initialPrompts, onChange }: {
           ) : pickerVisible.length === 0 ? (
             <Box p={3}>
               <Alert severity="info">
-                {pickerSearch ? 'No prompts match your search.' : 'All prompts are already added to this project.'}
+                {pickerSearch ? 'No prompts match your search.' : 'All prompts are already added to this server.'}
               </Alert>
             </Box>
           ) : (
-            <Box sx={{ maxHeight: 420, overflowY: 'auto' }}>
-              {pickerVisible.map((p) => {
-                const isAdding = adding === p.id
-                const argNames = [...new Set([...p.content.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]))]
-                return (
-                  <Box key={p.id} sx={{
-                    display: 'flex', alignItems: 'flex-start', gap: 1.5,
-                    px: 2.5, py: 1.75,
-                    borderBottom: 1, borderColor: 'divider',
-                    '&:last-child': { borderBottom: 0 },
-                    '&:hover': { bgcolor: 'action.hover' },
-                    transition: 'background 0.12s',
-                  }}>
-                    <Box sx={{ color: 'secondary.main', mt: 0.25, flexShrink: 0 }}>
-                      <IconBulb size={16} />
-                    </Box>
-                    <Box flexGrow={1} minWidth={0}>
-                      <Box display="flex" alignItems="center" gap={0.75} flexWrap="wrap" mb={0.25}>
-                        <Typography fontWeight={600} fontSize="0.875rem">{p.name}</Typography>
-                        {argNames.length > 0 && (
-                          <Chip label={`${argNames.length} var${argNames.length !== 1 ? 's' : ''}`}
-                            size="small" sx={{ fontSize: '0.65rem', height: 16 }} />
-                        )}
-                      </Box>
-                      {p.description && (
-                        <Typography variant="caption" color="text.secondary">{p.description}</Typography>
+            pickerVisible.map((p) => {
+              const isAdding = adding === p.id
+              const argNames = [...new Set([...p.content.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]))]
+              return (
+                <Box key={p.id} sx={{
+                  display: 'flex', alignItems: 'flex-start', gap: 1.5,
+                  px: 2.5, py: 1.75,
+                  borderBottom: 1, borderColor: 'divider',
+                  '&:last-child': { borderBottom: 0 },
+                  '&:hover': { bgcolor: 'action.hover' },
+                  transition: 'background 0.12s',
+                }}>
+                  <Box sx={{ color: 'secondary.main', mt: 0.25, flexShrink: 0 }}>
+                    <IconBulb size={16} />
+                  </Box>
+                  <Box flexGrow={1} minWidth={0}>
+                    <Box display="flex" alignItems="center" gap={0.75} flexWrap="wrap" mb={0.25}>
+                      <Typography fontWeight={600} fontSize="0.875rem">{p.name}</Typography>
+                      {argNames.length > 0 && (
+                        <Chip label={`${argNames.length} var${argNames.length !== 1 ? 's' : ''}`}
+                          size="small" sx={{ fontSize: '0.65rem', height: 16 }} />
                       )}
                     </Box>
-                    <Button size="small" variant="contained" disabled={isAdding}
-                      startIcon={isAdding ? <CircularProgress size={12} color="inherit" /> : <IconPlus size={14} />}
-                      onClick={() => handleAdd(p.id)}
-                      sx={{ flexShrink: 0 }}>
-                      Add
-                    </Button>
+                    {p.description && (
+                      <Typography variant="caption" color="text.secondary">{p.description}</Typography>
+                    )}
                   </Box>
-                )
-              })}
-            </Box>
+                  <Button size="small" variant="contained" disabled={isAdding}
+                    startIcon={isAdding ? <CircularProgress size={12} color="inherit" /> : <IconPlus size={14} />}
+                    onClick={() => handleAdd(p.id)}
+                    sx={{ flexShrink: 0 }}>
+                    Add
+                  </Button>
+                </Box>
+              )
+            })
           )}
-        </DialogContent>
-        <DialogActions sx={{ px: 2.5, py: 1.5 }}>
+        </Box>
+        <Box sx={{ px: 2.5, py: 1.5, borderTop: 1, borderColor: 'divider', flexShrink: 0 }}>
           <Button onClick={() => setPickerOpen(false)}>Done</Button>
-        </DialogActions>
-      </Dialog>
+        </Box>
+      </Drawer>
     </Box>
   )
 }
@@ -4310,7 +5288,7 @@ function ProjectLogs({ projectId }: { projectId: string }) {
               </TableRow>
             )}
             {logs.map((log) => (
-              <TableRow key={log._id} hover sx={{ '&:last-child td': { border: 0 }, bgcolor: log.isError ? '#fff5f5' : undefined }}>
+              <TableRow key={log._id} hover sx={{ '&:last-child td': { border: 0 }, bgcolor: log.isError ? 'error.light' : undefined }}>
                 <TableCell>
                   <Typography fontSize="0.78rem" color="text.secondary" whiteSpace="nowrap">
                     {new Date(log.createdAt).toLocaleString('en-US')}
@@ -4356,17 +5334,94 @@ function ProjectLogs({ projectId }: { projectId: string }) {
   )
 }
 
+// ─── From-endpoint picker (Tools tab) ────────────────────────────────────────
+
+function FromEndpointPickerDialog({ open, tools, onPick, onClose }: {
+  open: boolean
+  tools: GeneratedTool[]
+  onPick: (tool: GeneratedTool) => void
+  onClose: () => void
+}) {
+  const [search, setSearch] = useState('')
+  const filtered = tools.filter((t) => {
+    const q = search.toLowerCase()
+    return !q || t.endpointRef?.path?.toLowerCase().includes(q) || t.name.toLowerCase().includes(q)
+  })
+
+  return (
+    <Drawer anchor="right" open={open} onClose={onClose}
+      PaperProps={{ sx: { width: { xs: '100vw', sm: 460 }, display: 'flex', flexDirection: 'column' } }}>
+      <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+        <Typography variant="h6" fontWeight={700} flexGrow={1}>Create tool from endpoint</Typography>
+        <IconButton size="small" onClick={onClose}><IconX size={18} /></IconButton>
+      </Box>
+      <Box sx={{ px: 3, pt: 2, pb: 1, flexShrink: 0 }}>
+        <Typography variant="body2" color="text.secondary" mb={1.5}>
+          Select an endpoint to pre-fill the tool form with its HTTP details. You'll only need to fill in the tool name and description.
+        </Typography>
+        <TextField
+          size="small" fullWidth placeholder="Search by path or name…" value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          InputProps={{ startAdornment: <InputAdornment position="start"><IconSearch size={16} /></InputAdornment> }}
+        />
+      </Box>
+      <Box sx={{ flex: 1, overflowY: 'auto', px: 2, pb: 2 }}>
+        {tools.length === 0 ? (
+          <Box sx={{ textAlign: 'center', py: 6 }}>
+            <Typography variant="body2" color="text.disabled">No endpoints defined yet.</Typography>
+          </Box>
+        ) : filtered.length === 0 ? (
+          <Box sx={{ textAlign: 'center', py: 4 }}>
+            <Typography variant="body2" color="text.disabled">No endpoints match your search.</Typography>
+          </Box>
+        ) : (
+          <Box display="flex" flexDirection="column" gap={0.75} pt={1}>
+            {filtered.map((t) => (
+              <Paper key={t.name} variant="outlined" sx={{
+                px: 2, py: 1.5, cursor: 'pointer',
+                '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' },
+                transition: 'border-color 0.15s',
+              }} onClick={() => onPick(t)}>
+                <Box display="flex" alignItems="center" gap={1} mb={0.25}>
+                  <Box sx={{
+                    minWidth: 48, textAlign: 'center', fontFamily: 'monospace', fontWeight: 700,
+                    fontSize: '0.68rem', color: METHOD_COLOR[t.endpointRef?.method ?? ''] ?? '#888',
+                    bgcolor: 'action.selected', borderRadius: '4px', px: 0.75, py: 0.25,
+                  }}>
+                    {t.endpointRef?.method ?? '?'}
+                  </Box>
+                  <Typography fontFamily="monospace" fontSize="0.82rem" noWrap flexGrow={1}>
+                    {t.endpointRef?.path ?? '/'}
+                  </Typography>
+                </Box>
+                {t.description && (
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25, pl: '56px' }} noWrap>
+                    {t.description}
+                  </Typography>
+                )}
+              </Paper>
+            ))}
+          </Box>
+        )}
+      </Box>
+    </Drawer>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function ServerDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { can } = useAuth()
   const [project, setProject] = useState<Project | null>(null)
   const [baseUrl, setBaseUrl] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingTool, setEditingTool] = useState<GeneratedTool | undefined>()
+  const [prefillTool, setPrefillTool] = useState<GeneratedTool | undefined>()
+  const [pickerOpen, setPickerOpen] = useState(false)
   const [tab, setTab] = useState(0)
   const [toolSearch, setToolSearch] = useState('')
   const [toolMethodFilter, setToolMethodFilter] = useState<string | null>(null)
@@ -4387,8 +5442,9 @@ export default function ServerDetail() {
     setProject((prev) => prev ? { ...prev, [field]: value } : prev)
   }
 
-  const handleOpenCreate = () => { setEditingTool(undefined); setDialogOpen(true) }
-  const handleOpenEdit = (tool: GeneratedTool) => { setEditingTool(tool); setDialogOpen(true) }
+  const handleOpenCreate = () => { setEditingTool(undefined); setPrefillTool(undefined); setDialogOpen(true) }
+  const handleOpenEdit = (tool: GeneratedTool) => { setEditingTool(tool); setPrefillTool(undefined); setDialogOpen(true) }
+  const handlePickEndpoint = (tool: GeneratedTool) => { setPickerOpen(false); setEditingTool(undefined); setPrefillTool(tool); setDialogOpen(true) }
 
   const handleToolSaved = (savedTool: GeneratedTool, oldName?: string) => {
     setProject((prev) => {
@@ -4448,31 +5504,32 @@ export default function ServerDetail() {
         <Box display="flex" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={2}>
           <Box minWidth={0} flexGrow={1}>
             <InlineEdit value={project.name} onSave={(v) => saveProjectInfo('name', v)}
-              placeholder="Server name" fontSize="1.375rem" fontWeight={700} />
+              readOnly={!can(Permission.ServersEditSettings)} placeholder="Server name" fontSize="1.375rem" fontWeight={700} />
             <Box mt={0.5}>
               <InlineEdit value={project.description ?? ''} onSave={(v) => saveProjectInfo('description', v)}
-                multiline placeholder="Add a short description…" emptyLabel="Add a short description…"
+                readOnly={!can(Permission.ServersEditSettings)} multiline placeholder="Add a short description…" emptyLabel="Add a short description…"
                 fontSize="0.875rem" color="text.secondary" />
             </Box>
           </Box>
           <Box display="flex" gap={1} flexWrap="wrap" alignItems="flex-start">
             {isPaused
-              ? <Chip label="Paused" icon={<IconPlayerPause size={18} />} sx={{ bgcolor: '#FEF5E5', color: '#ae8e59', fontWeight: 600 }} />
+              ? <Chip label="Paused" icon={<IconPlayerPause size={18} />} color="warning" variant="outlined" sx={{ fontWeight: 600 }} />
               : <Chip
                   label={project.status === 'active' ? 'Active' : 'Error'}
-                  sx={project.status === 'active'
-                    ? { bgcolor: '#E6FFFA', color: '#02b3a9', fontWeight: 600 }
-                    : { bgcolor: '#FDEDE8', color: '#f3704d', fontWeight: 600 }
-                  }
+                  color={project.status === 'active' ? 'success' : 'error'}
+                  variant="outlined"
+                  sx={{ fontWeight: 600 }}
                 />
             }
             {project.version && <Chip label={`v${project.version}`} variant="outlined" sx={{ fontWeight: 500 }} />}
-            <Tooltip title="Upload a new version of the spec to add or update tools">
-              <Button size="small" variant="outlined" startIcon={<IconRefresh size={18} />}
-                onClick={() => { setReimportOpen(true); setReimportSuccess(null) }}>
-                Update from spec
-              </Button>
-            </Tooltip>
+            {can(Permission.ServersCreate) && (
+              <Tooltip title="Upload a new version of the spec to add or update tools">
+                <Button size="small" variant="outlined" startIcon={<IconRefresh size={18} />}
+                  onClick={() => { setReimportOpen(true); setReimportSuccess(null) }}>
+                  Update from spec
+                </Button>
+              </Tooltip>
+            )}
           </Box>
         </Box>
       </Paper>
@@ -4506,11 +5563,13 @@ export default function ServerDetail() {
       {tab === 0 && (
         <>
           <McpEndpointBar projectId={id!} hasKeys={(project.mcpApiKeys ?? []).length > 0} />
-          <ApiKeysPanel
-            projectId={id!}
-            initialKeys={project.mcpApiKeys ?? []}
-            onChange={(keys) => setProject((prev) => prev ? { ...prev, mcpApiKeys: keys } : prev)}
-          />
+          {can(Permission.ApiKeysView) && (
+            <ApiKeysPanel
+              projectId={id!}
+              initialKeys={project.mcpApiKeys ?? []}
+              onChange={(keys) => setProject((prev) => prev ? { ...prev, mcpApiKeys: keys } : prev)}
+            />
+          )}
           <OAuthClientPanel
             projectId={id!}
             initialClientId={project.oauthClientId}
@@ -4523,11 +5582,17 @@ export default function ServerDetail() {
 
       {/* ── Tab 1: API Endpoints ──────────────────────────────────────────────── */}
       {tab === 1 && (
-        <ApiEndpointsTab tools={project.tools} />
+        <ApiEndpointsTab
+          tools={project.tools}
+          projectId={id!}
+          projectBaseUrl={project.baseUrl ?? ''}
+          anyApiKey={project.mcpApiKeys?.[0]?.key}
+          onToolAdded={(tool) => setProject((prev) => prev ? { ...prev, tools: [...prev.tools, tool] } : prev)}
+        />
       )}
 
       {/* ── Tab 2: Tools ──────────────────────────────────────────────────────── */}
-      {tab === 2 && (
+      {tab === 2 && (can(Permission.ToolsView) ? (
         <>
           <Grid container spacing={2} mb={3}>
             <Grid item xs={6} sm={3}>
@@ -4555,9 +5620,16 @@ export default function ServerDetail() {
                 </Typography>
               </HelpButton>
             </Box>
-            <Button variant="contained" startIcon={<IconPlus size={18} />} onClick={handleOpenCreate} size="small">
-              Add tool
-            </Button>
+            {can(Permission.ToolsCreate) && (
+              <Box display="flex" gap={1}>
+                <Button variant="outlined" startIcon={<IconRoute size={16} />} onClick={() => setPickerOpen(true)} size="small">
+                  From endpoint
+                </Button>
+                <Button variant="contained" startIcon={<IconPlus size={18} />} onClick={handleOpenCreate} size="small">
+                  Add tool
+                </Button>
+              </Box>
+            )}
           </Box>
 
           <Box display="flex" alignItems="center" gap={1} mb={2} flexWrap="wrap">
@@ -4604,17 +5676,28 @@ export default function ServerDetail() {
                   />
                 ))}
         </>
-      )}
+      ) : (
+        <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={12}>
+          <Typography color="text.secondary" variant="h6">Access restricted</Typography>
+          <Typography color="text.secondary" variant="body2">You don't have permission to view tools.</Typography>
+        </Box>
+      ))}
 
       {/* ── Tab 3: Resources ──────────────────────────────────────────────────── */}
-      {tab === 3 && (
+      {tab === 3 && (can(Permission.ResourcesView) ? (
         <ResourcesTab
           projectId={id!}
           initialResources={project.resources ?? []}
           tools={project.tools ?? []}
           onChange={(resources) => setProject((prev) => prev ? { ...prev, resources } : prev)}
+          anyApiKey={project.mcpApiKeys?.[0]?.key}
         />
-      )}
+      ) : (
+        <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={12}>
+          <Typography color="text.secondary" variant="h6">Access restricted</Typography>
+          <Typography color="text.secondary" variant="body2">You don't have permission to view resources.</Typography>
+        </Box>
+      ))}
 
       {/* ── Tab 4: Prompts ────────────────────────────────────────────────────── */}
       {tab === 4 && (
@@ -4622,6 +5705,7 @@ export default function ServerDetail() {
           projectId={id!}
           initialPrompts={project.prompts ?? []}
           onChange={(prompts) => setProject((prev) => prev ? { ...prev, prompts } : prev)}
+          anyApiKey={project.mcpApiKeys?.[0]?.key}
         />
       )}
 
@@ -4637,7 +5721,7 @@ export default function ServerDetail() {
 
       {/* ── Tab 6: Settings ───────────────────────────────────────────────────── */}
       {tab === 6 && (
-        <>
+        can(Permission.ServersEditSettings) ? <>
           <BaseUrlPanel projectId={id!} initialValue={baseUrl} onChange={setBaseUrl} />
           <AuthConfigPanel
             projectId={id!}
@@ -4657,7 +5741,25 @@ export default function ServerDetail() {
             onPausedChange={setIsPaused}
           />
           <AlertConfigPanel projectId={id!} initialConfig={project.alertConfig} />
-        </>
+          <TenantConfigPanel
+            projectId={id!}
+            initialConfig={(project as any).tenantConfig}
+            toolParamSuggestions={(() => {
+              const seen = new Set<string>()
+              for (const tool of project.tools ?? []) {
+                for (const mapping of tool.endpointRef?.parameterMap ?? []) {
+                  seen.add(mapping.originalName)
+                }
+              }
+              return Array.from(seen).sort()
+            })()}
+          />
+        </> : (
+          <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={12}>
+            <Typography color="text.secondary" variant="h6">Access restricted</Typography>
+            <Typography color="text.secondary" variant="body2">You don't have permission to manage server settings.</Typography>
+          </Box>
+        )
       )}
 
       {/* ── Tab 7: Activity ───────────────────────────────────────────────────── */}
@@ -4700,12 +5802,20 @@ export default function ServerDetail() {
 
       <ToolDialog
         open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
+        onClose={() => { setDialogOpen(false); setPrefillTool(undefined) }}
         onSaved={handleToolSaved}
         onDeleted={handleDeleteTool}
         projectId={id!}
         projectBaseUrl={baseUrl}
         editTool={editingTool}
+        prefillFrom={prefillTool}
+      />
+
+      <FromEndpointPickerDialog
+        open={pickerOpen}
+        tools={project?.tools ?? []}
+        onPick={handlePickEndpoint}
+        onClose={() => setPickerOpen(false)}
       />
 
       <ReimportSpecDialog

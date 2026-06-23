@@ -36,6 +36,7 @@ export class MongoSwaggerProjectRepository implements ISwaggerProjectRepository 
       maintenanceMode: obj.maintenanceMode ?? { enabled: false, message: '' },
       availabilityWindow: obj.availabilityWindow ?? { enabled: false, timezone: 'UTC', schedule: [] },
       alertConfig: obj.alertConfig ?? { enabled: false, errorThresholdPct: 20, notifyEmail: '' },
+      tenantConfig: obj.tenantConfig ?? { enabled: false, params: [] },
       createdAt: obj.createdAt,
       updatedAt: obj.updatedAt,
     };

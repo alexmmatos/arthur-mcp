@@ -4,3 +4,4 @@ export const SETTINGS_REPO = 'SETTINGS_REPO' as const;
 export const PASSWORD_RESET_REPO = 'PASSWORD_RESET_REPO' as const;
 export const PROMPT_REPO = 'PROMPT_REPO' as const;
 export const SECRET_REPO = 'SECRET_REPO' as const;
+export const ROLE_REPO = 'ROLE_REPO' as const;

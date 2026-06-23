@@ -54,10 +54,11 @@ export class DynamicMcpController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
-    const server = await this.dynamicMcpService.createMcpServer(serverId);
+    const queryParams = (req as any).query as Record<string, string>;
+    const server = await this.dynamicMcpService.createMcpServer(serverId, queryParams);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
-      enableJsonResponse: true, // returns plain JSON instead of SSE for clients that accept JSON
+      enableJsonResponse: true,
     });
 
     res.on('close', () => server.close().catch(() => undefined));
@@ -73,7 +74,8 @@ export class DynamicMcpController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
-    const server = await this.dynamicMcpService.createMcpServer(serverId);
+    const queryParams = (req as any).query as Record<string, string>;
+    const server = await this.dynamicMcpService.createMcpServer(serverId, queryParams);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
@@ -93,7 +95,8 @@ export class DynamicMcpController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
-    const server = await this.dynamicMcpService.createMcpServer(serverId);
+    const queryParams = (req as any).query as Record<string, string>;
+    const server = await this.dynamicMcpService.createMcpServer(serverId, queryParams);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,

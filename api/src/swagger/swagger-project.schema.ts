@@ -86,6 +86,10 @@ export class SwaggerProject {
   /** Alert config */
   @Prop({ type: Object, default: { enabled: false, errorThresholdPct: 20, notifyEmail: '' } })
   alertConfig: { enabled: boolean; errorThresholdPct: number; notifyEmail: string };
+
+  /** Multi-tenant parameter injection */
+  @Prop({ type: Object, default: { enabled: false, params: [] } })
+  tenantConfig: { enabled: boolean; params: Array<{ name: string; type: 'string' | 'integer' | 'number' | 'boolean' | 'uuid' | 'hash'; description?: string }> };
 }
 
 export const SwaggerProjectSchema = SchemaFactory.createForClass(SwaggerProject);

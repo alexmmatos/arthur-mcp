@@ -8,6 +8,7 @@ import { Settings, SettingsSchema } from '../settings/settings.schema';
 import { PasswordReset, PasswordResetSchema } from '../auth/password-reset.schema';
 import { Prompt, PromptSchema } from '../prompts/prompt.schema';
 import { Secret, SecretSchema } from '../secrets/secret.schema';
+import { Role, RoleSchema } from '../roles/role.schema';
 
 import { UserEntity } from '../users/user.entity';
 import { SwaggerProjectEntity } from '../swagger/swagger-project.entity';
@@ -15,6 +16,7 @@ import { SettingsEntity } from '../settings/settings.entity';
 import { PasswordResetEntity } from '../auth/password-reset.entity';
 import { PromptEntity } from '../prompts/prompt.entity';
 import { SecretEntity } from '../secrets/secret.entity';
+import { RoleEntity } from '../roles/role.entity';
 
 import { MongoUserRepository } from '../users/repositories/mongo-user.repository';
 import { SqliteUserRepository } from '../users/repositories/sqlite-user.repository';
@@ -28,8 +30,10 @@ import { MongoPromptRepository } from '../prompts/repositories/mongo-prompt.repo
 import { SqlitePromptRepository } from '../prompts/repositories/sqlite-prompt.repository';
 import { MongoSecretRepository } from '../secrets/repositories/mongo-secret.repository';
 import { SqliteSecretRepository } from '../secrets/repositories/sqlite-secret.repository';
+import { MongoRoleRepository } from '../roles/repositories/mongo-role.repository';
+import { SqliteRoleRepository } from '../roles/repositories/sqlite-role.repository';
 
-import { USER_REPO, PROJECT_REPO, SETTINGS_REPO, PASSWORD_RESET_REPO, PROMPT_REPO, SECRET_REPO } from './database.tokens';
+import { USER_REPO, PROJECT_REPO, SETTINGS_REPO, PASSWORD_RESET_REPO, PROMPT_REPO, SECRET_REPO, ROLE_REPO } from './database.tokens';
 
 @Module({})
 export class DatabaseModule {
@@ -51,6 +55,7 @@ export class DatabaseModule {
             { name: PasswordReset.name, schema: PasswordResetSchema },
             { name: Prompt.name, schema: PromptSchema },
             { name: Secret.name, schema: SecretSchema },
+            { name: Role.name, schema: RoleSchema },
           ]),
         ],
         providers: [
@@ -60,14 +65,16 @@ export class DatabaseModule {
           MongoPasswordResetRepository,
           MongoPromptRepository,
           MongoSecretRepository,
+          MongoRoleRepository,
           { provide: USER_REPO, useExisting: MongoUserRepository },
           { provide: PROJECT_REPO, useExisting: MongoSwaggerProjectRepository },
           { provide: SETTINGS_REPO, useExisting: MongoSettingsRepository },
           { provide: PASSWORD_RESET_REPO, useExisting: MongoPasswordResetRepository },
           { provide: PROMPT_REPO, useExisting: MongoPromptRepository },
           { provide: SECRET_REPO, useExisting: MongoSecretRepository },
+          { provide: ROLE_REPO, useExisting: MongoRoleRepository },
         ],
-        exports: [USER_REPO, PROJECT_REPO, SETTINGS_REPO, PASSWORD_RESET_REPO, PROMPT_REPO, SECRET_REPO],
+        exports: [USER_REPO, PROJECT_REPO, SETTINGS_REPO, PASSWORD_RESET_REPO, PROMPT_REPO, SECRET_REPO, ROLE_REPO],
       };
     }
 
@@ -78,10 +85,10 @@ export class DatabaseModule {
         TypeOrmModule.forRoot({
           type: 'sqlite',
           database: process.env.SQLITE_PATH ?? 'database.sqlite',
-          entities: [UserEntity, SwaggerProjectEntity, SettingsEntity, PasswordResetEntity, PromptEntity, SecretEntity],
+          entities: [UserEntity, SwaggerProjectEntity, SettingsEntity, PasswordResetEntity, PromptEntity, SecretEntity, RoleEntity],
           synchronize: true,
         }),
-        TypeOrmModule.forFeature([UserEntity, SwaggerProjectEntity, SettingsEntity, PasswordResetEntity, PromptEntity, SecretEntity]),
+        TypeOrmModule.forFeature([UserEntity, SwaggerProjectEntity, SettingsEntity, PasswordResetEntity, PromptEntity, SecretEntity, RoleEntity]),
       ],
       providers: [
         SqliteUserRepository,
@@ -90,14 +97,16 @@ export class DatabaseModule {
         SqlitePasswordResetRepository,
         SqlitePromptRepository,
         SqliteSecretRepository,
+        SqliteRoleRepository,
         { provide: USER_REPO, useExisting: SqliteUserRepository },
         { provide: PROJECT_REPO, useExisting: SqliteSwaggerProjectRepository },
         { provide: SETTINGS_REPO, useExisting: SqliteSettingsRepository },
         { provide: PASSWORD_RESET_REPO, useExisting: SqlitePasswordResetRepository },
         { provide: PROMPT_REPO, useExisting: SqlitePromptRepository },
         { provide: SECRET_REPO, useExisting: SqliteSecretRepository },
+        { provide: ROLE_REPO, useExisting: SqliteRoleRepository },
       ],
-      exports: [USER_REPO, PROJECT_REPO, SETTINGS_REPO, PASSWORD_RESET_REPO, PROMPT_REPO, SECRET_REPO],
+      exports: [USER_REPO, PROJECT_REPO, SETTINGS_REPO, PASSWORD_RESET_REPO, PROMPT_REPO, SECRET_REPO, ROLE_REPO],
     };
   }
 }

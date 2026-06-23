@@ -1,11 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConflictException, BadRequestException } from '@nestjs/common';
-import { getModelToken } from '@nestjs/mongoose';
 import { JwtService } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
-import { PasswordReset } from './password-reset.schema';
 import { SettingsService } from '../settings/settings.service';
+import { PASSWORD_RESET_REPO } from '../database/database.tokens';
 
 const mockUser = { _id: 'user123', username: 'testuser', password: 'hashed', role: 'user' };
 
@@ -20,10 +19,11 @@ const mockUsersService = {
 
 const mockJwtService = { sign: jest.fn().mockReturnValue('jwt.token.here') };
 
-const mockResetModel = {
-  deleteMany: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue({}) }),
+const mockPasswordResetRepo = {
+  findByToken: jest.fn(),
   create: jest.fn().mockResolvedValue({}),
-  findOne: jest.fn(),
+  deleteByUserId: jest.fn().mockResolvedValue(undefined),
+  markUsed: jest.fn().mockResolvedValue(undefined),
 };
 
 const mockSettingsService = {
@@ -40,7 +40,7 @@ describe('AuthService', () => {
         { provide: UsersService, useValue: mockUsersService },
         { provide: JwtService, useValue: mockJwtService },
         { provide: SettingsService, useValue: mockSettingsService },
-        { provide: getModelToken(PasswordReset.name), useValue: mockResetModel },
+        { provide: PASSWORD_RESET_REPO, useValue: mockPasswordResetRepo },
       ],
     }).compile();
 
@@ -48,8 +48,9 @@ describe('AuthService', () => {
     jest.clearAllMocks();
     mockJwtService.sign.mockReturnValue('jwt.token.here');
     mockSettingsService.get.mockResolvedValue({ serverBaseUrl: 'http://localhost:3000', smtpHost: null });
-    mockResetModel.deleteMany.mockReturnValue({ exec: jest.fn().mockResolvedValue({}) });
-    mockResetModel.create.mockResolvedValue({});
+    mockPasswordResetRepo.create.mockResolvedValue({});
+    mockPasswordResetRepo.deleteByUserId.mockResolvedValue(undefined);
+    mockPasswordResetRepo.markUsed.mockResolvedValue(undefined);
   });
 
   describe('validateUser', () => {
@@ -107,13 +108,13 @@ describe('AuthService', () => {
     it('returns silently when email not found (no leak)', async () => {
       mockUsersService.findByEmail.mockResolvedValue(null);
       await expect(service.forgotPassword('unknown@test.com')).resolves.toBeUndefined();
-      expect(mockResetModel.create).not.toHaveBeenCalled();
+      expect(mockPasswordResetRepo.create).not.toHaveBeenCalled();
     });
 
     it('creates reset token when email exists and SMTP not configured', async () => {
       mockUsersService.findByEmail.mockResolvedValue(mockUser);
       await service.forgotPassword('test@test.com');
-      expect(mockResetModel.create).toHaveBeenCalledWith(
+      expect(mockPasswordResetRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({ userId: 'user123', token: expect.any(String) }),
       );
     });
@@ -121,31 +122,29 @@ describe('AuthService', () => {
 
   describe('resetPassword', () => {
     it('throws BadRequestException for invalid or used token', async () => {
-      mockResetModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(null) });
+      mockPasswordResetRepo.findByToken.mockResolvedValue(null);
       await expect(service.resetPassword('bad-token', 'newpass')).rejects.toThrow(BadRequestException);
     });
 
     it('throws BadRequestException for expired token', async () => {
-      const expired = { token: 'tok', used: false, expiresAt: new Date(Date.now() - 1000), save: jest.fn() };
-      mockResetModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(expired) });
+      const expired = { _id: 'r1', token: 'tok', used: false, expiresAt: new Date(Date.now() - 1000), userId: 'user123' };
+      mockPasswordResetRepo.findByToken.mockResolvedValue(expired);
       await expect(service.resetPassword('tok', 'newpass')).rejects.toThrow(BadRequestException);
     });
 
     it('updates password and marks token as used', async () => {
       const record = {
-        token: 'valid-tok', used: false, userId: 'user123',
+        _id: 'r1', token: 'valid-tok', used: false, userId: 'user123',
         expiresAt: new Date(Date.now() + 60_000),
-        save: jest.fn().mockResolvedValue({}),
       };
-      mockResetModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(record) });
+      mockPasswordResetRepo.findByToken.mockResolvedValue(record);
       mockUsersService.findById.mockResolvedValue(mockUser);
       mockUsersService.updateByAdmin.mockResolvedValue({});
 
       await service.resetPassword('valid-tok', 'newpass123');
 
       expect(mockUsersService.updateByAdmin).toHaveBeenCalledWith('user123', { password: 'newpass123' });
-      expect(record.used).toBe(true);
-      expect(record.save).toHaveBeenCalled();
+      expect(mockPasswordResetRepo.markUsed).toHaveBeenCalledWith('r1');
     });
   });
 });

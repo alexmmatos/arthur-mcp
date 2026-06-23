@@ -15,10 +15,18 @@ import { executeRequest } from './http-client';
 import { mapResponse, McpToolResult } from './response-mapper';
 import { applyAuth, resolveSecretRefs } from './auth-provider';
 import { ExecutionLogsService } from '../execution-logs/execution-logs.service';
-import { PROJECT_REPO, PROMPT_REPO, SECRET_REPO } from '../database/database.tokens';
+import { PROJECT_REPO, PROMPT_REPO, SECRET_REPO, SETTINGS_REPO } from '../database/database.tokens';
 import { ISwaggerProjectRepository } from '../swagger/swagger-project.repository';
 import type { IPromptRepository, PromptRecord } from '../prompts/prompt.repository';
 import type { ISecretRepository } from '../secrets/secret.repository';
+import type { ISettingsRepository } from '../settings/settings.repository';
+
+interface TenantParamDef {
+  name: string;
+  type: 'string' | 'integer' | 'number' | 'boolean' | 'uuid' | 'hash';
+  description?: string;
+  required?: boolean;
+}
 
 interface CachedProject {
   tools: GeneratedTool[];
@@ -29,6 +37,8 @@ interface CachedProject {
   resources: McpResource[];
   prompts: PromptRecord[];
   secrets: Map<string, string>;
+  tenantConfig: { enabled: boolean; params: TenantParamDef[] };
+  globalRequestHeaders: Record<string, string>;
   expiresAt: number;
 }
 
@@ -86,6 +96,7 @@ export class DynamicMcpService {
     @Inject(PROJECT_REPO) private readonly projectRepo: ISwaggerProjectRepository,
     @Inject(PROMPT_REPO) private readonly promptRepo: IPromptRepository,
     @Inject(SECRET_REPO) private readonly secretRepo: ISecretRepository,
+    @Inject(SETTINGS_REPO) private readonly settingsRepo: ISettingsRepository,
     private readonly executionLogs: ExecutionLogsService,
   ) {}
 
@@ -111,6 +122,11 @@ export class DynamicMcpService {
     const allSecrets = await this.secretRepo.findAll();
     const secretsMap = new Map(allSecrets.map((s) => [s.name, s.value]));
 
+    const settings = await this.settingsRepo.getGlobal();
+    const globalRequestHeaders = Object.fromEntries(
+      (settings.globalRequestHeaders ?? []).filter((h) => h.name).map((h) => [h.name, h.value]),
+    );
+
     const entry: CachedProject = {
       tools: server.tools ?? [],
       chains: server.chains ?? [],
@@ -120,14 +136,43 @@ export class DynamicMcpService {
       resources: server.resources ?? [],
       prompts: resolvedPrompts,
       secrets: secretsMap,
+      tenantConfig: (server as any).tenantConfig ?? { enabled: false, params: [] },
+      globalRequestHeaders,
       expiresAt: Date.now() + this.CACHE_TTL_MS,
     };
     this.projectCache.set(serverId, entry);
     return entry;
   }
 
-  async createMcpServer(serverId: string): Promise<Server> {
-    const { tools: allTools, chains: allChains, auth: rawAuth, name, version, resources, prompts, secrets } = await this.getProjectData(serverId);
+  private coerceTenantValue(value: string, type: TenantParamDef['type']): unknown {
+    switch (type) {
+      case 'integer': return parseInt(value, 10);
+      case 'number': return parseFloat(value);
+      case 'boolean': return value === 'true' || value === '1';
+      default: return value;
+    }
+  }
+
+  private injectTenantParams(
+    args: Record<string, unknown>,
+    tool: GeneratedTool,
+    tenantConfig: CachedProject['tenantConfig'],
+    queryParams: Record<string, string>,
+  ): Record<string, unknown> {
+    if (!tenantConfig.enabled || tenantConfig.params.length === 0) return args;
+    const injected = { ...args };
+    for (const def of tenantConfig.params) {
+      const value = queryParams[def.name];
+      if (value === undefined) continue;
+      const mapping = tool.endpointRef.parameterMap.find((m) => m.originalName === def.name);
+      if (!mapping) continue;
+      injected[mapping.toolParamName] = this.coerceTenantValue(value, def.type);
+    }
+    return injected;
+  }
+
+  async createMcpServer(serverId: string, queryParams: Record<string, string> = {}): Promise<Server> {
+    const { tools: allTools, chains: allChains, auth: rawAuth, name, version, resources, prompts, secrets, tenantConfig, globalRequestHeaders } = await this.getProjectData(serverId);
     const auth = resolveSecretRefs(rawAuth, secrets);
 
     const tools: GeneratedTool[] = allTools.filter((t) => t.enabled !== false);
@@ -142,19 +187,45 @@ export class DynamicMcpService {
       { capabilities: { tools: {}, resources: {}, prompts: {} } },
     );
 
+    // Build a set of toolParamNames that are managed by multi-tenant injection
+    const tenantToolParamNames = new Set<string>();
+    if (tenantConfig.enabled) {
+      for (const def of tenantConfig.params) {
+        for (const tool of tools) {
+          const mapping = tool.endpointRef?.parameterMap.find((m) => m.originalName === def.name);
+          if (mapping) tenantToolParamNames.add(mapping.toolParamName);
+        }
+      }
+    }
+
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: [
         ...tools.map((t) => {
           const method = (t.endpointRef?.method ?? 'GET').toUpperCase();
           const readOnly = method === 'GET' || method === 'HEAD';
           const destructive = method === 'DELETE';
+
+          // Strip tenant-injected params from the schema exposed to the AI
+          const tenantKeysForTool = new Set(
+            (t.endpointRef?.parameterMap ?? [])
+              .filter((m) => tenantToolParamNames.has(m.toolParamName))
+              .map((m) => m.toolParamName),
+          );
+          const allProps = t.inputSchema.properties ?? {};
+          const filteredProps = Object.fromEntries(
+            Object.entries(allProps).filter(([k]) => !tenantKeysForTool.has(k)),
+          );
+          const filteredRequired = (t.inputSchema.required ?? []).filter(
+            (k) => !tenantKeysForTool.has(k),
+          );
+
           return {
             name: t.name,
             description: t.description,
             inputSchema: {
               type: 'object' as const,
-              properties: t.inputSchema.properties ?? {},
-              ...(t.inputSchema.required ? { required: t.inputSchema.required } : {}),
+              properties: filteredProps,
+              ...(filteredRequired.length > 0 ? { required: filteredRequired } : {}),
             },
             ...(t.outputSchema ? { outputSchema: t.outputSchema } : {}),
             annotations: {
@@ -193,7 +264,7 @@ export class DynamicMcpService {
       const chain = chainMap.get(toolName);
       if (chain) {
         try {
-          const result = await this.executeChain(chain, args, tools, auth);
+          const result = await this.executeChain(chain, args, tools, auth, globalRequestHeaders);
           this.executionLogs.log({ serverId, serverName: name, toolName, source: 'mcp', statusCode: result.isError ? 500 : 200, responseTimeMs: Date.now() - t0, isError: result.isError ?? false });
           return result;
         } catch (err: any) {
@@ -206,12 +277,12 @@ export class DynamicMcpService {
       if (!tool) {
         this.logger.warn(`Tool not found: "${toolName}" | available: [${[...toolMap.keys()].join(', ')}]`);
         this.executionLogs.log({ serverId, serverName: name, toolName, source: 'mcp', isError: true, statusCode: 404, errorMessage: 'Tool not found', responseTimeMs: Date.now() - t0 });
-        return { content: [{ type: 'text' as const, text: `Tool desconhecida: ${toolName}` }], isError: true };
+        return { content: [{ type: 'text' as const, text: `Unknown tool: ${toolName}` }], isError: true };
       }
 
       if (!tool.endpointRef) {
         this.logger.error(`Tool "${toolName}" has no endpointRef — data may be stale. Re-upload the spec.`);
-        this.executionLogs.log({ serverId, serverName: name, toolName, source: 'mcp', isError: true, statusCode: 500, errorMessage: 'endpointRef ausente', responseTimeMs: Date.now() - t0 });
+        this.executionLogs.log({ serverId, serverName: name, toolName, source: 'mcp', isError: true, statusCode: 500, errorMessage: 'endpointRef missing', responseTimeMs: Date.now() - t0 });
         return { content: [{ type: 'text' as const, text: `Invalid internal configuration for "${toolName}". Re-upload the spec.` }], isError: true };
       }
 
@@ -223,12 +294,39 @@ export class DynamicMcpService {
         return { content: [{ type: 'text' as const, text: msg }], isError: true };
       }
 
+      // Validate required tenant params before executing
+      if (tenantConfig.enabled) {
+        const missingRequired = tenantConfig.params
+          .filter((def) => def.required && queryParams[def.name] === undefined)
+          .map((def) => def.name);
+        if (missingRequired.length > 0) {
+          const msg = `Missing required tenant parameter`;
+          this.logger.warn(`Tool "${toolName}" — ${msg}`);
+          this.executionLogs.log({ serverId, serverName: name, toolName, source: 'mcp', isError: true, statusCode: 400, errorMessage: msg, responseTimeMs: Date.now() - t0 });
+          return { content: [{ type: 'text' as const, text: msg }], isError: true };
+        }
+      }
+
       try {
-        let httpReq = buildRequest(args, tool.endpointRef);
+        const effectiveArgs = this.injectTenantParams(args, tool, tenantConfig, queryParams);
+        let httpReq = buildRequest(effectiveArgs, tool.endpointRef, globalRequestHeaders);
         httpReq = await applyAuth(httpReq, auth);
         this.logger.log(`→ HTTP ${httpReq.method} ${httpReq.url}`);
         const httpRes = await executeRequest(httpReq);
         this.logger.log(`← HTTP ${httpRes.status} ${httpRes.statusText}`);
+        // If the tool has an HTML output template, render with Handlebars instead of raw JSON
+        if (tool.outputTemplate && !httpRes.body.trim().startsWith('<')) {
+          try {
+            const parsed = JSON.parse(httpRes.body);
+            const ctx = Array.isArray(parsed) ? { items: parsed } : parsed;
+            const html = compileAndRender(tool.outputTemplate, ctx);
+            this.executionLogs.log({ serverId, serverName: name, toolName, source: 'mcp', statusCode: httpRes.status, responseTimeMs: Date.now() - t0, isError: false });
+            return { content: [{ type: 'text' as const, text: html }] };
+          } catch (tplErr: any) {
+            this.logger.warn(`Template render failed for "${toolName}": ${tplErr?.message}`);
+          }
+        }
+
         const result = mapResponse(httpRes);
         this.executionLogs.log({ serverId, serverName: name, toolName, source: 'mcp', statusCode: httpRes.status, responseTimeMs: Date.now() - t0, isError: result.isError ?? false });
 
@@ -270,7 +368,7 @@ export class DynamicMcpService {
       }
 
       try {
-        let httpReq = buildRequest(resource.inputDefaults ?? {}, resource.endpointRef);
+        let httpReq = buildRequest(resource.inputDefaults ?? {}, resource.endpointRef, globalRequestHeaders);
         httpReq = await applyAuth(httpReq, auth);
         const httpRes = await executeRequest(httpReq);
         if (httpRes.status >= 400) throw new Error(`HTTP ${httpRes.status}: ${httpRes.body.slice(0, 200)}`);
@@ -318,6 +416,7 @@ export class DynamicMcpService {
     chainArgs: Record<string, unknown>,
     tools: GeneratedTool[],
     auth: AuthConfig,
+    globalRequestHeaders: Record<string, string> = {},
   ): Promise<McpToolResult> {
     const stepOutputs = new Map<string, unknown>();
 
@@ -341,7 +440,7 @@ export class DynamicMcpService {
       }
 
       try {
-        let httpReq = buildRequest(stepArgs, tool.endpointRef);
+        let httpReq = buildRequest(stepArgs, tool.endpointRef, globalRequestHeaders);
         httpReq = await applyAuth(httpReq, auth);
         const httpRes = await executeRequest(httpReq);
 
@@ -370,7 +469,7 @@ export class DynamicMcpService {
     toolName: string,
     args: Record<string, unknown>,
   ): Promise<McpToolResult> {
-    const { tools: allTools, auth: rawAuth, name, secrets } = await this.getProjectData(serverId);
+    const { tools: allTools, auth: rawAuth, name, secrets, globalRequestHeaders } = await this.getProjectData(serverId);
     const auth = resolveSecretRefs(rawAuth, secrets);
 
     const tool = allTools.find((t) => t.name === toolName);
@@ -386,7 +485,7 @@ export class DynamicMcpService {
     }
 
     try {
-      let httpReq = buildRequest(args, tool.endpointRef);
+      let httpReq = buildRequest(args, tool.endpointRef, globalRequestHeaders);
       httpReq = await applyAuth(httpReq, auth);
       const httpRes = await executeRequest(httpReq);
       const result = mapResponse(httpRes);

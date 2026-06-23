@@ -8,21 +8,21 @@ import {
   CardContent,
   Chip,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
+  Drawer,
+  IconButton,
   Grid,
   InputAdornment,
   LinearProgress,
   TextField,
   Typography,
 } from '@mui/material'
+import { IconX } from '@tabler/icons-react'
 import SearchIcon from '@mui/icons-material/Search'
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import api from '../api'
+import { useAuth, Permission } from '../context/AuthContext'
 import { API_TEMPLATES, ApiTemplate, TEMPLATE_CATEGORIES, buildToolPayload } from '../data/api-templates'
 import SecretAutocomplete, { useSecrets } from '../components/SecretAutocomplete'
 
@@ -46,6 +46,7 @@ const AUTH_COLORS: Record<string, string> = {
 
 function TemplateCard({ template, onUse }: { template: ApiTemplate; onUse: (t: ApiTemplate) => void }) {
   const authColor = AUTH_COLORS[template.auth.type]
+  const { can } = useAuth()
   return (
     <Card
       variant="outlined"
@@ -115,9 +116,11 @@ function TemplateCard({ template, onUse }: { template: ApiTemplate; onUse: (t: A
             <OpenInNewIcon fontSize="small" />
           </Button>
         )}
-        <Button variant="outlined" size="small" fullWidth onClick={() => onUse(template)}>
-          Use template
-        </Button>
+        {can(Permission.TemplatesUse) && (
+          <Button variant="outlined" size="small" fullWidth onClick={() => onUse(template)}>
+            Use template
+          </Button>
+        )}
       </Box>
     </Card>
   )
@@ -161,7 +164,7 @@ function UseTemplateDialog({
     try {
       // 1. Create server
       tick('Creating server…')
-      const { data: project } = await api.post('/swagger/servers', {
+      const { data: server } = await api.post('/swagger/servers', {
         name: serverName.trim(),
         baseUrl: template.baseUrl,
         description: template.description,
@@ -176,7 +179,7 @@ function UseTemplateDialog({
             : template.auth.type === 'api-key'
             ? { type: 'api-key', name: template.auth.keyName ?? 'X-Api-Key', value: authValue, in: template.auth.keyIn ?? 'header' }
             : { type: 'none' }
-        await api.patch(`/swagger/servers/${project._id}/auth`, authPayload)
+        await api.patch(`/swagger/servers/${server._id}/auth`, authPayload)
       } else {
         tick('No auth required…')
       }
@@ -185,10 +188,10 @@ function UseTemplateDialog({
       for (const toolDef of template.tools) {
         tick(`Adding tool: ${toolDef.name}…`)
         const payload = buildToolPayload(toolDef, template.baseUrl)
-        await api.post(`/swagger/servers/${project._id}/tools`, payload)
+        await api.post(`/swagger/servers/${server._id}/tools`, payload)
       }
 
-      navigate(`/servers/${project._id}`)
+      navigate(`/servers/${server._id}`)
     } catch (err: any) {
       setCreating(false)
       setError(err?.response?.data?.message ?? 'Something went wrong creating the server.')
@@ -196,18 +199,20 @@ function UseTemplateDialog({
   }
 
   return (
-    <Dialog open onClose={!creating ? onClose : undefined} maxWidth="sm" fullWidth scroll="paper">
-      <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5, pb: 1 }}>
+    <Drawer anchor="right" open onClose={!creating ? onClose : undefined}
+      PaperProps={{ sx: { width: { xs: '100vw', sm: 520 }, display: 'flex', flexDirection: 'column' } }}>
+      <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
         <Box sx={{ fontSize: '1.6rem', lineHeight: 1 }}>{template.emoji}</Box>
-        <Box>
+        <Box flexGrow={1}>
           <Typography fontWeight={700} fontSize="1.05rem">{template.name}</Typography>
           <Typography variant="caption" color="text.secondary">
             {template.tools.length} tool{template.tools.length !== 1 ? 's' : ''} pre-configured
           </Typography>
         </Box>
-      </DialogTitle>
+        <IconButton size="small" onClick={onClose} disabled={creating}><IconX size={18} /></IconButton>
+      </Box>
 
-      <DialogContent dividers>
+      <Box sx={{ flex: 1, overflowY: 'auto', px: 3, py: 2.5 }}>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
         {creating ? (
@@ -264,9 +269,9 @@ function UseTemplateDialog({
             </Box>
           </>
         )}
-      </DialogContent>
+      </Box>
 
-      <DialogActions sx={{ px: 3, py: 2 }}>
+      <Box sx={{ px: 3, py: 2, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1, flexShrink: 0 }}>
         <Button onClick={onClose} disabled={creating}>Cancel</Button>
         <Button
           variant="contained"
@@ -276,8 +281,8 @@ function UseTemplateDialog({
         >
           {creating ? 'Creating…' : 'Create server'}
         </Button>
-      </DialogActions>
-    </Dialog>
+      </Box>
+    </Drawer>
   )
 }
 

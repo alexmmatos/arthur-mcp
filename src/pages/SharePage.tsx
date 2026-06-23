@@ -134,7 +134,7 @@ export default function SharePage() {
             <>
               <Divider sx={{ my: 2 }} />
               <Alert severity="info" icon={<LockIcon fontSize="small" />}>
-                This project requires an API key. Contact the person who shared this link to obtain your personal key.
+                This server requires an API key. Contact the person who shared this link to obtain your personal key.
               </Alert>
             </>
           )}

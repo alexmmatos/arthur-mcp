@@ -1,15 +1,13 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth, Permission } from '../context/AuthContext'
 import {
   Alert,
   Box,
   Button,
   Chip,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
+  Drawer,
   FormControl,
   FormControlLabel,
   Grid,
@@ -95,6 +93,7 @@ function uid() { return Math.random().toString(36).slice(2) }
 
 export default function NewServer() {
   const navigate = useNavigate()
+  const { can, loading: authLoading } = useAuth()
   const [activeStep, setActiveStep] = useState(0)
 
   // Step 0
@@ -371,6 +370,15 @@ export default function NewServer() {
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
+  if (!authLoading && !can(Permission.ServersCreate)) {
+    return (
+      <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={12}>
+        <Typography variant="h6" color="text.secondary">Access restricted</Typography>
+        <Typography variant="body2" color="text.secondary">You don't have permission to create servers.</Typography>
+      </Box>
+    )
+  }
+
   return (
     <Box p={3} maxWidth={700} mx="auto">
       {/* Header */}
@@ -428,7 +436,7 @@ export default function NewServer() {
               p: 5, textAlign: 'center', cursor: file ? 'default' : 'pointer',
               border: '2px dashed',
               borderColor: dragging ? 'primary.main' : file ? 'success.main' : 'divider',
-              bgcolor: dragging ? 'primary.light' : file ? '#f0fdf4' : 'background.paper',
+              bgcolor: dragging ? 'primary.light' : file ? 'rgba(73,204,144,0.08)' : 'background.paper',
               transition: 'all 0.18s',
               '&:hover': file ? {} : { bgcolor: 'action.hover', borderColor: 'primary.light' },
             }}
@@ -836,11 +844,13 @@ export default function NewServer() {
       </Box>
 
       {/* ── Add tool dialog ─────────────────────────────────────────────── */}
-      <Dialog open={addOpen} onClose={() => { setAddOpen(false); setAddError('') }} maxWidth="sm" fullWidth scroll="paper">
-        <DialogTitle sx={{ pb: 1 }}>
-          <Typography variant="h6" fontWeight={700}>Add MCP tool</Typography>
-        </DialogTitle>
-        <DialogContent dividers>
+      <Drawer anchor="right" open={addOpen} onClose={() => { setAddOpen(false); setAddError('') }}
+        PaperProps={{ sx: { width: { xs: '100vw', sm: 480 }, display: 'flex', flexDirection: 'column' } }}>
+        <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+          <Typography variant="h6" fontWeight={700} flexGrow={1}>Add MCP tool</Typography>
+          <IconButton size="small" onClick={() => { setAddOpen(false); setAddError('') }}><CloseIcon fontSize="small" /></IconButton>
+        </Box>
+        <Box sx={{ flex: 1, overflowY: 'auto', px: 3, py: 2.5 }}>
           <Typography variant="body2" color="text.secondary" mb={2.5}>
             Define the basic endpoint for this tool. You can add parameters and fine-tune the configuration from the server detail page after creation.
           </Typography>
@@ -887,12 +897,12 @@ export default function NewServer() {
               helperText="Optional but recommended — a clear description improves AI tool selection accuracy"
             />
           </Box>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
+        </Box>
+        <Box sx={{ px: 3, py: 2, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1, flexShrink: 0 }}>
           <Button onClick={() => { setAddOpen(false); setAddError('') }}>Cancel</Button>
           <Button variant="contained" onClick={handleAddTool} startIcon={<AddIcon />}>Add tool</Button>
-        </DialogActions>
-      </Dialog>
+        </Box>
+      </Drawer>
     </Box>
   )
 }

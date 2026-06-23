@@ -21,6 +21,9 @@ export class Settings {
   @Prop({ default: '' }) smtpUser: string;
   @Prop({ default: '' }) smtpPass: string;
   @Prop({ default: '' }) smtpFrom: string;
+
+  @Prop({ type: [{ name: String, value: String }], default: [] })
+  globalRequestHeaders: { name: string; value: string }[];
 }
 
 export const SettingsSchema = SchemaFactory.createForClass(Settings);

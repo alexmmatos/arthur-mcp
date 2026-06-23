@@ -70,6 +70,14 @@ export interface GeneratedTool {
   enabled?: boolean
 }
 
+export interface DocsResource {
+  id: string
+  name: string
+  uri: string
+  description?: string
+  mimeType?: string
+}
+
 export interface DocsProject {
   _id: string
   name: string
@@ -79,6 +87,8 @@ export interface DocsProject {
   status: string
   tools: GeneratedTool[]
   mcpApiKey?: string
+  resources?: DocsResource[]
+  prompts?: Array<{ promptId: string }>
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -120,7 +130,7 @@ function TypeBadge({ type }: { type?: string }) {
   return (
     <Box component="span" sx={{
       display: 'inline-block', px: 0.8, py: 0.15, borderRadius: '3px',
-      fontSize: '0.68rem', border: '1px solid #bbb', color: '#555', fontFamily: 'monospace',
+      fontSize: '0.68rem', border: '1px solid', borderColor: 'divider', color: 'text.secondary', fontFamily: 'monospace',
     }}>
       {type ?? 'string'}
     </Box>
@@ -218,7 +228,7 @@ function ToolCard({ tool, projectId, mcpApiKey }: { tool: GeneratedTool; project
   return (
     <Accordion variant="outlined" sx={{ mb: '6px', '&:before': { display: 'none' } }}>
       <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{
-        bgcolor: '#f8f9fa', borderRadius: '7px 7px 0 0',
+        bgcolor: 'action.hover', borderRadius: '7px 7px 0 0',
         minHeight: '52px !important', '&.Mui-expanded': { borderRadius: '7px 7px 0 0' }, px: 2,
       }}>
         <Box display="flex" alignItems="center" gap={1.5} width="100%" minWidth={0}>
@@ -241,7 +251,7 @@ function ToolCard({ tool, projectId, mcpApiKey }: { tool: GeneratedTool; project
             <Box sx={{ overflowX: 'auto', mb: 2.5 }}>
               <Table size="small" sx={{
                 minWidth: 500,
-                '& th': { bgcolor: '#f8f9fa', fontWeight: 700, fontSize: '0.72rem', color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.04em' },
+                '& th': { bgcolor: 'action.hover', fontWeight: 700, fontSize: '0.72rem', color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.04em' },
                 '& td': { fontSize: '0.8rem', verticalAlign: 'middle' },
               }}>
                 <TableHead>
@@ -304,8 +314,8 @@ function ToolCard({ tool, projectId, mcpApiKey }: { tool: GeneratedTool; project
             </Button>
             {response !== null && (
               <Box component="pre" sx={{
-                bgcolor: responseIsError ? '#fff8f8' : '#1e1e1e', color: responseIsError ? '#c62828' : '#d4d4d4',
-                border: '1px solid', borderColor: responseIsError ? '#ffcdd2' : 'transparent',
+                bgcolor: responseIsError ? 'error.light' : '#1e1e1e', color: responseIsError ? 'error.dark' : '#d4d4d4',
+                border: '1px solid', borderColor: responseIsError ? 'error.light' : 'transparent',
                 p: 2, borderRadius: 1, fontSize: '0.78rem', overflowX: 'auto', overflowY: 'auto',
                 maxHeight: 400, whiteSpace: 'pre-wrap', wordBreak: 'break-word', m: 0,
               }}>
@@ -337,15 +347,327 @@ function ToolCard({ tool, projectId, mcpApiKey }: { tool: GeneratedTool; project
   )
 }
 
+// ─── Resource card ────────────────────────────────────────────────────────────
+
+function ResourceCard({ resource, projectId, mcpApiKey }: { resource: DocsResource; projectId: string; mcpApiKey?: string }) {
+  const [tryMode, setTryMode] = useState(false)
+  const [executing, setExecuting] = useState(false)
+  const [response, setResponse] = useState<string | null>(null)
+  const [responseIsError, setResponseIsError] = useState(false)
+  const [exampleCopied, setExampleCopied] = useState(false)
+
+  const mcpExample = JSON.stringify({
+    jsonrpc: '2.0', method: 'resources/read', id: 1,
+    params: { uri: resource.uri },
+  }, null, 2)
+
+  const handleCopyExample = () => {
+    navigator.clipboard.writeText(mcpExample)
+    setExampleCopied(true)
+    setTimeout(() => setExampleCopied(false), 2000)
+  }
+
+  const handleExecute = async () => {
+    setExecuting(true); setResponse(null); setResponseIsError(false)
+    try {
+      const payload = { jsonrpc: '2.0', method: 'resources/read', id: Date.now(), params: { uri: resource.uri } }
+      const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' }
+      if (mcpApiKey) headers['auth'] = mcpApiKey
+      const res = await api.post(`/mcp/server/${projectId}`, payload, { headers })
+      const rpc = parseMcpResponse(res.data)
+      if (rpc?.error) { setResponse(JSON.stringify(rpc.error, null, 2)); setResponseIsError(true); return }
+      const text = JSON.stringify(rpc?.result ?? rpc, null, 2)
+      setResponse(text)
+    } catch (err: any) {
+      setResponse(err?.response?.data?.message ?? err?.message ?? 'Unknown error')
+      setResponseIsError(true)
+    } finally { setExecuting(false) }
+  }
+
+  return (
+    <Accordion variant="outlined" sx={{ mb: '6px', '&:before': { display: 'none' } }}>
+      <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{
+        bgcolor: 'action.hover', borderRadius: '7px 7px 0 0',
+        minHeight: '52px !important', '&.Mui-expanded': { borderRadius: '7px 7px 0 0' }, px: 2,
+      }}>
+        <Box display="flex" alignItems="center" gap={1.5} width="100%" minWidth={0}>
+          <Typography fontWeight={700} fontSize="0.875rem" noWrap>{resource.name}</Typography>
+          {resource.description && (
+            <Typography variant="body2" color="text.secondary" noWrap sx={{ flexGrow: 1, display: { xs: 'none', sm: 'block' } }}>
+              — {resource.description}
+            </Typography>
+          )}
+        </Box>
+      </AccordionSummary>
+
+      <AccordionDetails sx={{ p: 2.5 }}>
+        {resource.description && <Typography variant="body2" color="text.secondary" mb={2.5}>{resource.description}</Typography>}
+
+        {/* URI + MIME type info row */}
+        <Box display="flex" alignItems="center" gap={1.5} mb={2.5} flexWrap="wrap">
+          <Box sx={{ bgcolor: 'action.hover', borderRadius: 1, px: 1.5, py: 0.75, display: 'inline-block', border: '1px solid', borderColor: 'divider' }}>
+            <Typography fontFamily="monospace" fontSize="0.8rem" color="text.secondary">{resource.uri}</Typography>
+          </Box>
+          {resource.mimeType && (
+            <Chip label={resource.mimeType} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 20 }} />
+          )}
+        </Box>
+
+        <Divider sx={{ mb: 2 }} />
+
+        {/* Try it out */}
+        <Box display="flex" alignItems="center" justifyContent="space-between" mb={tryMode ? 2 : 0}>
+          <Typography variant="subtitle2" fontWeight={700}>Try it out</Typography>
+          <Button size="small" variant={tryMode ? 'outlined' : 'contained'} color={tryMode ? 'error' : 'primary'}
+            onClick={() => { setTryMode((v) => !v); setResponse(null) }}
+            sx={{ fontWeight: 600, fontSize: '0.72rem', minWidth: 80 }}>
+            {tryMode ? 'Cancel' : 'Try'}
+          </Button>
+        </Box>
+
+        {tryMode && (
+          <Box>
+            <Button variant="contained" size="small"
+              startIcon={executing ? <CircularProgress size={13} color="inherit" /> : <PlayArrowIcon fontSize="small" />}
+              onClick={handleExecute} disabled={executing}
+              sx={{ mb: response !== null ? 2 : 0, fontWeight: 600 }}>
+              {executing ? 'Executing...' : 'Execute'}
+            </Button>
+            {response !== null && (
+              <Box component="pre" sx={{
+                bgcolor: responseIsError ? 'error.light' : '#1e1e1e', color: responseIsError ? 'error.dark' : '#d4d4d4',
+                border: '1px solid', borderColor: responseIsError ? 'error.light' : 'transparent',
+                p: 2, borderRadius: 1, fontSize: '0.78rem', overflowX: 'auto', overflowY: 'auto',
+                maxHeight: 400, whiteSpace: 'pre-wrap', wordBreak: 'break-word', m: 0, mt: 2,
+              }}>
+                {response}
+              </Box>
+            )}
+          </Box>
+        )}
+
+        {/* MCP JSON example */}
+        {!tryMode && (
+          <Box mt={0.5}>
+            <Typography variant="caption" fontWeight={700} color="text.disabled" display="block" mb={0.75} sx={{ letterSpacing: '0.06em' }}>
+              MCP CALL EXAMPLE (JSON-RPC)
+            </Typography>
+            <Box component="pre" sx={{ bgcolor: '#282c34', color: '#abb2bf', p: 2, borderRadius: 1, fontSize: '0.75rem', overflowX: 'auto', position: 'relative', m: 0 }}>
+              <Tooltip title={exampleCopied ? 'Copied!' : 'Copy'}>
+                <IconButton size="small" onClick={handleCopyExample}
+                  sx={{ position: 'absolute', top: 8, right: 8, color: exampleCopied ? 'primary.light' : '#abb2bf', '&:hover': { color: '#fff' } }}>
+                  <ContentCopyIcon sx={{ fontSize: 15 }} />
+                </IconButton>
+              </Tooltip>
+              {mcpExample}
+            </Box>
+          </Box>
+        )}
+      </AccordionDetails>
+    </Accordion>
+  )
+}
+
+// ─── Prompt card ──────────────────────────────────────────────────────────────
+
+function PromptCard({ prompt, projectId, mcpApiKey }: { prompt: GlobalPrompt; projectId: string; mcpApiKey?: string }) {
+  const args = [...new Set([...prompt.content.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]))]
+
+  const [tryMode, setTryMode] = useState(false)
+  const [formValues, setFormValues] = useState<Record<string, string>>({})
+  const [executing, setExecuting] = useState(false)
+  const [response, setResponse] = useState<string | null>(null)
+  const [responseIsError, setResponseIsError] = useState(false)
+  const [exampleCopied, setExampleCopied] = useState(false)
+
+  const mcpExample = JSON.stringify({
+    jsonrpc: '2.0', method: 'prompts/get', id: 1,
+    params: { name: prompt.name, arguments: Object.fromEntries(args.map((a) => [a, '<string>'])) },
+  }, null, 2)
+
+  const handleCopyExample = () => {
+    navigator.clipboard.writeText(mcpExample)
+    setExampleCopied(true)
+    setTimeout(() => setExampleCopied(false), 2000)
+  }
+
+  const handleExecute = async () => {
+    setExecuting(true); setResponse(null); setResponseIsError(false)
+    try {
+      const payload = {
+        jsonrpc: '2.0', method: 'prompts/get', id: Date.now(),
+        params: { name: prompt.name, arguments: formValues },
+      }
+      const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' }
+      if (mcpApiKey) headers['auth'] = mcpApiKey
+      const res = await api.post(`/mcp/server/${projectId}`, payload, { headers })
+      const rpc = parseMcpResponse(res.data)
+      if (rpc?.error) { setResponse(JSON.stringify(rpc.error, null, 2)); setResponseIsError(true); return }
+      const result = rpc?.result ?? rpc
+      const text = result?.messages?.[0]?.content?.text ?? JSON.stringify(result, null, 2)
+      setResponse(text)
+    } catch (err: any) {
+      setResponse(err?.response?.data?.message ?? err?.message ?? 'Unknown error')
+      setResponseIsError(true)
+    } finally { setExecuting(false) }
+  }
+
+  return (
+    <Accordion variant="outlined" sx={{ mb: '6px', '&:before': { display: 'none' } }}>
+      <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{
+        bgcolor: 'action.hover', borderRadius: '7px 7px 0 0',
+        minHeight: '52px !important', '&.Mui-expanded': { borderRadius: '7px 7px 0 0' }, px: 2,
+      }}>
+        <Box display="flex" alignItems="center" gap={1.5} width="100%" minWidth={0}>
+          <Typography fontWeight={700} fontSize="0.875rem" noWrap>{prompt.name}</Typography>
+          {prompt.description && (
+            <Typography variant="body2" color="text.secondary" noWrap sx={{ flexGrow: 1, display: { xs: 'none', sm: 'block' } }}>
+              — {prompt.description}
+            </Typography>
+          )}
+          {prompt.tags?.length > 0 && (
+            <Box display="flex" gap={0.5} flexShrink={0} sx={{ display: { xs: 'none', md: 'flex' } }}>
+              {prompt.tags.slice(0, 3).map((tag) => (
+                <Chip key={tag} label={tag} size="small" variant="outlined" sx={{ fontSize: '0.65rem', height: 18 }} />
+              ))}
+            </Box>
+          )}
+        </Box>
+      </AccordionSummary>
+
+      <AccordionDetails sx={{ p: 2.5 }}>
+        {prompt.description && <Typography variant="body2" color="text.secondary" mb={2.5}>{prompt.description}</Typography>}
+
+        {/* Tags row */}
+        {prompt.tags?.length > 0 && (
+          <Box display="flex" gap={0.5} flexWrap="wrap" mb={2}>
+            {prompt.tags.map((tag) => (
+              <Chip key={tag} label={tag} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 20 }} />
+            ))}
+          </Box>
+        )}
+
+        {/* Arguments table */}
+        {args.length > 0 && (
+          <>
+            <Typography variant="subtitle2" fontWeight={700} mb={1}>Arguments</Typography>
+            <Box sx={{ overflowX: 'auto', mb: 2.5 }}>
+              <Table size="small" sx={{
+                minWidth: 400,
+                '& th': { bgcolor: 'action.hover', fontWeight: 700, fontSize: '0.72rem', color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.04em' },
+                '& td': { fontSize: '0.8rem', verticalAlign: 'middle' },
+              }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Name</TableCell>
+                    <TableCell>Required</TableCell>
+                    <TableCell>Description</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {args.map((arg) => (
+                    <TableRow key={arg} sx={{ '&:last-child td': { border: 0 } }}>
+                      <TableCell><Typography fontFamily="monospace" fontSize="0.8rem" fontWeight={600}>{arg}</Typography></TableCell>
+                      <TableCell><Typography color="text.disabled" fontSize="0.75rem">optional</Typography></TableCell>
+                      <TableCell><Typography color="text.secondary" fontSize="0.78rem">—</Typography></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Box>
+          </>
+        )}
+
+        <Divider sx={{ mb: 2 }} />
+
+        {/* Try it out */}
+        <Box display="flex" alignItems="center" justifyContent="space-between" mb={tryMode && args.length ? 2 : 0}>
+          <Typography variant="subtitle2" fontWeight={700}>Try it out</Typography>
+          <Button size="small" variant={tryMode ? 'outlined' : 'contained'} color={tryMode ? 'error' : 'primary'}
+            onClick={() => { setTryMode((v) => !v); setResponse(null) }}
+            sx={{ fontWeight: 600, fontSize: '0.72rem', minWidth: 80 }}>
+            {tryMode ? 'Cancel' : 'Try'}
+          </Button>
+        </Box>
+
+        {tryMode && (
+          <Box>
+            {args.length > 0
+              ? <Box display="flex" flexDirection="column" gap={1.5} mb={2}>
+                  {args.map((arg) => (
+                    <TextField key={arg} size="small" fullWidth label={arg} placeholder="<string>"
+                      value={formValues[arg] ?? ''}
+                      onChange={(e) => setFormValues((prev) => ({ ...prev, [arg]: e.target.value }))} />
+                  ))}
+                </Box>
+              : <Typography variant="body2" color="text.secondary" mt={1} mb={2}>This prompt has no arguments.</Typography>}
+            <Button variant="contained" size="small"
+              startIcon={executing ? <CircularProgress size={13} color="inherit" /> : <PlayArrowIcon fontSize="small" />}
+              onClick={handleExecute} disabled={executing}
+              sx={{ mb: response !== null ? 2 : 0, fontWeight: 600 }}>
+              {executing ? 'Executing...' : 'Execute'}
+            </Button>
+            {response !== null && (
+              <Box component="pre" sx={{
+                bgcolor: responseIsError ? 'error.light' : '#1e1e1e', color: responseIsError ? 'error.dark' : '#d4d4d4',
+                border: '1px solid', borderColor: responseIsError ? 'error.light' : 'transparent',
+                p: 2, borderRadius: 1, fontSize: '0.78rem', overflowX: 'auto', overflowY: 'auto',
+                maxHeight: 400, whiteSpace: 'pre-wrap', wordBreak: 'break-word', m: 0, mt: 2,
+              }}>
+                {response}
+              </Box>
+            )}
+          </Box>
+        )}
+
+        {/* MCP JSON example */}
+        {!tryMode && (
+          <Box mt={0.5}>
+            <Typography variant="caption" fontWeight={700} color="text.disabled" display="block" mb={0.75} sx={{ letterSpacing: '0.06em' }}>
+              MCP CALL EXAMPLE (JSON-RPC)
+            </Typography>
+            <Box component="pre" sx={{ bgcolor: '#282c34', color: '#abb2bf', p: 2, borderRadius: 1, fontSize: '0.75rem', overflowX: 'auto', position: 'relative', m: 0 }}>
+              <Tooltip title={exampleCopied ? 'Copied!' : 'Copy'}>
+                <IconButton size="small" onClick={handleCopyExample}
+                  sx={{ position: 'absolute', top: 8, right: 8, color: exampleCopied ? 'primary.light' : '#abb2bf', '&:hover': { color: '#fff' } }}>
+                  <ContentCopyIcon sx={{ fontSize: 15 }} />
+                </IconButton>
+              </Tooltip>
+              {mcpExample}
+            </Box>
+          </Box>
+        )}
+      </AccordionDetails>
+    </Accordion>
+  )
+}
+
 // ─── McpDocsContent (reusable as a tab or standalone page) ──────────────
 
-export function McpDocsContent({ project, projectId }: { project: DocsProject; projectId: string }) {
+interface GlobalPrompt {
+  id: string
+  name: string
+  description?: string
+  content: string
+  tags: string[]
+}
+
+export function McpDocsContent({ project: server, projectId }: { project: DocsProject; projectId: string }) {
   const [search, setSearch] = useState('')
   const [urlCopied, setUrlCopied] = useState(false)
+  const [resolvedPrompts, setResolvedPrompts] = useState<GlobalPrompt[]>([])
+
+  useEffect(() => {
+    const ids = (server.prompts ?? []).map((p) => p.promptId)
+    if (ids.length === 0) { setResolvedPrompts([]); return }
+    api.get<GlobalPrompt[]>('/prompts')
+      .then((r) => setResolvedPrompts(r.data.filter((p) => ids.includes(p.id))))
+      .catch(() => {})
+  }, [server.prompts])
 
   const mcpUrl = `${window.location.origin}/api/mcp/server/${projectId}`
 
-  const enabledTools = (project.tools ?? []).filter((t) => t.enabled !== false)
+  const enabledTools = (server.tools ?? []).filter((t) => t.enabled !== false)
   const filteredTools = enabledTools.filter((t) =>
     !search
     || t.name.toLowerCase().includes(search.toLowerCase())
@@ -358,26 +680,26 @@ export function McpDocsContent({ project, projectId }: { project: DocsProject; p
       <Paper variant="outlined" sx={{ mb: 3, overflow: 'hidden', borderColor: 'primary.light' }}>
         <Box sx={{ bgcolor: 'primary.main', px: 3, py: 2.5 }}>
           <Box display="flex" alignItems="center" gap={1.5} flexWrap="wrap">
-            <Typography variant="h5" fontWeight={700} color="#fff" lineHeight={1.2}>{project.name}</Typography>
-            {project.version && (
+            <Typography variant="h5" fontWeight={700} color="#fff" lineHeight={1.2}>{server.name}</Typography>
+            {server.version && (
               <Box sx={{ px: 1, py: 0.2, bgcolor: 'rgba(255,255,255,0.25)', borderRadius: 1, fontSize: '0.75rem', color: '#fff', fontWeight: 700, alignSelf: 'flex-start', mt: 0.3 }}>
-                {project.version}
+                {server.version}
               </Box>
             )}
           </Box>
-          {project.description && <Typography color="rgba(255,255,255,0.8)" variant="body2" mt={0.5}>{project.description}</Typography>}
+          {server.description && <Typography color="rgba(255,255,255,0.8)" variant="body2" mt={0.5}>{server.description}</Typography>}
         </Box>
 
         <Box px={3} py={2}>
           <Box display="flex" alignItems="center" gap={1} mb={2} flexWrap="wrap">
-            <Chip label={project.status === 'active' ? 'Active' : 'Error'} color={project.status === 'active' ? 'success' : 'error'} size="small" />
+            <Chip label={server.status === 'active' ? 'Active' : 'Error'} color={server.status === 'active' ? 'success' : 'error'} size="small" />
             <Chip label={`${enabledTools.length} tools`} size="small" color="primary" variant="outlined" />
           </Box>
 
           <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" mb={0.75} sx={{ letterSpacing: '0.06em' }}>
             ENDPOINT MCP
           </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, bgcolor: '#f8f9fa', borderRadius: 1, px: 2, py: 1.25, border: '1px solid', borderColor: 'divider' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, bgcolor: 'action.hover', borderRadius: 1, px: 2, py: 1.25, border: '1px solid', borderColor: 'divider' }}>
             <Typography fontFamily="monospace" fontSize="0.85rem" flexGrow={1} sx={{ wordBreak: 'break-all', color: 'text.primary' }}>
               {mcpUrl}
             </Typography>
@@ -387,12 +709,12 @@ export function McpDocsContent({ project, projectId }: { project: DocsProject; p
               </IconButton>
             </Tooltip>
           </Box>
-          {project.mcpApiKey && (
+          {server.mcpApiKey && (
             <Typography variant="caption" color="warning.main" mt={0.75} display="block" fontWeight={600}>
               This server requires authentication — send the header <code>auth: &lt;your-key&gt;</code>
             </Typography>
           )}
-          {!project.mcpApiKey && (
+          {!server.mcpApiKey && (
             <Typography variant="caption" color="text.secondary" mt={0.75} display="block">
               Configure this URL in Claude Desktop, Cursor, or any compatible MCP client.
             </Typography>
@@ -410,7 +732,35 @@ export function McpDocsContent({ project, projectId }: { project: DocsProject; p
       {/* Tools */}
       {filteredTools.length === 0
         ? <Alert severity="info">No tools found.</Alert>
-        : filteredTools.map((tool) => <ToolCard key={tool.name} tool={tool} projectId={projectId} mcpApiKey={project.mcpApiKey} />)}
+        : filteredTools.map((tool) => <ToolCard key={tool.name} tool={tool} projectId={projectId} mcpApiKey={server.mcpApiKey} />)}
+
+      {/* Resources */}
+      {(server.resources ?? []).length > 0 && (
+        <Box mt={4}>
+          <Divider sx={{ mb: 3 }} />
+          <Box display="flex" alignItems="center" gap={1} mb={2}>
+            <Typography variant="h6" fontWeight={700}>Resources</Typography>
+            <Chip label={`${server.resources!.length} resources`} size="small" color="primary" variant="outlined" />
+          </Box>
+          {server.resources!.map((r) => (
+            <ResourceCard key={r.id} resource={r} projectId={projectId} mcpApiKey={server.mcpApiKey} />
+          ))}
+        </Box>
+      )}
+
+      {/* Prompts */}
+      {resolvedPrompts.length > 0 && (
+        <Box mt={4}>
+          <Divider sx={{ mb: 3 }} />
+          <Box display="flex" alignItems="center" gap={1} mb={2}>
+            <Typography variant="h6" fontWeight={700}>Prompts</Typography>
+            <Chip label={`${resolvedPrompts.length} prompts`} size="small" color="primary" variant="outlined" />
+          </Box>
+          {resolvedPrompts.map((p) => (
+            <PromptCard key={p.id} prompt={p} projectId={projectId} mcpApiKey={server.mcpApiKey} />
+          ))}
+        </Box>
+      )}
     </Box>
   )
 }

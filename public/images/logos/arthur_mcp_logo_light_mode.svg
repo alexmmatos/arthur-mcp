@@ -1,0 +1,31 @@
+<svg width="100%" viewBox="0 0 690 270" role="img" xmlns="http://www.w3.org/2000/svg" style="">
+<title style="fill:rgb(0, 0, 0);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">Arthur MCP Adapter logo — versão modo claro</title>
+<desc style="fill:rgb(0, 0, 0);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">Logo do Arthur MCP Adapter com fundo branco e ícone com gradiente azul-roxo</desc>
+<defs>
+  <linearGradient id="nodeGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" style="stop-color:#3B82F6"/>
+    <stop offset="100%" style="stop-color:#7C3AED"/>
+  </linearGradient>
+  <linearGradient id="lineGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" style="stop-color:#4FC3F7"/>
+    <stop offset="100%" style="stop-color:#7C3AED"/>
+  </linearGradient>
+</defs>
+
+<rect width="680" height="260" fill="white" rx="16" stroke="#E5E7EB" stroke-width="1" style="fill:rgb(255, 255, 255);stroke:rgb(229, 231, 235);color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+<g transform="translate(40, 30)" style="fill:rgb(0, 0, 0);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">
+  <path d="M100 10 C100 10 60 10 40 50 L10 190 L50 190 L75 130 L125 130 L150 190 L190 190 L160 50 C140 10 100 10 100 10 Z" fill="#152044" style="fill:rgb(21, 32, 68);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+  <path d="M100 18 C100 18 65 18 47 55 L20 185 L45 185 L72 122 L128 122 L155 185 L180 185 L153 55 C135 18 100 18 100 18 Z" fill="white" opacity="0.12" style="fill:rgb(255, 255, 255);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:0.12;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+  <line x1="100" y1="65" x2="55" y2="145" stroke="url(#lineGrad2)" stroke-width="7" stroke-linecap="round" style="fill:rgb(0, 0, 0);color:rgb(0, 0, 0);stroke-width:7px;stroke-linecap:round;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+  <line x1="100" y1="65" x2="145" y2="145" stroke="url(#lineGrad2)" stroke-width="7" stroke-linecap="round" style="fill:rgb(0, 0, 0);color:rgb(0, 0, 0);stroke-width:7px;stroke-linecap:round;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+  <circle cx="100" cy="65" r="16" fill="#4A90D9" stroke="white" stroke-width="3" style="fill:rgb(74, 144, 217);stroke:rgb(255, 255, 255);color:rgb(0, 0, 0);stroke-width:3px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+  <circle cx="55" cy="145" r="14" fill="#4FC3F7" stroke="white" stroke-width="3" style="fill:rgb(79, 195, 247);stroke:rgb(255, 255, 255);color:rgb(0, 0, 0);stroke-width:3px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+  <circle cx="145" cy="145" r="14" fill="#7C3AED" stroke="white" stroke-width="3" style="fill:rgb(124, 58, 237);stroke:rgb(255, 255, 255);color:rgb(0, 0, 0);stroke-width:3px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+</g>
+
+<text x="265" y="145" font-family="system-ui, sans-serif" font-weight="700" font-size="72" fill="#152044" letter-spacing="-1" style="fill:rgb(21, 32, 68);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:system-ui, sans-serif;font-size:72px;font-weight:700;text-anchor:start;dominant-baseline:auto">Arthur</text>
+<text x="268" y="192" font-family="system-ui, sans-serif" font-weight="600" font-size="28" letter-spacing="4" fill="url(#nodeGrad2)" style="stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:system-ui, sans-serif;font-size:28px;font-weight:600;text-anchor:start;dominant-baseline:auto">MCP ADAPTER</text>
+</svg>

@@ -20,6 +20,7 @@ import { EmailFeaturesModule } from './email/email-features.module';
 import { OAuthModule } from './oauth/oauth.module';
 import { PromptsModule } from './prompts/prompts.module';
 import { SecretsModule } from './secrets/secrets.module';
+import { RolesModule } from './roles/roles.module';
 
 @Module({
   imports: [
@@ -39,16 +40,11 @@ import { SecretsModule } from './secrets/secrets.module';
     OAuthModule,
     PromptsModule,
     SecretsModule,
+    RolesModule,
   ],
   providers: [
-    {
-      provide: APP_FILTER,
-      useClass: McpExceptionFilter,
-    },
-    {
-      provide: APP_INTERCEPTOR,
-      useClass: McpLoggingInterceptor,
-    },
+    { provide: APP_FILTER, useClass: McpExceptionFilter },
+    { provide: APP_INTERCEPTOR, useClass: McpLoggingInterceptor },
   ],
 })
 export class AppModule {}

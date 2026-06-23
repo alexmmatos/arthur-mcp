@@ -15,6 +15,9 @@ export function buildRequest(
   let path = endpointRef.path;
   const query: Record<string, string> = {};
   const headers: Record<string, string> = { ...extraHeaders };
+  for (const h of endpointRef.staticHeaders ?? []) {
+    if (h.name) headers[h.name] = h.value;
+  }
   const bodyParts: Record<string, unknown> = {};
   let hasBody = false;
 

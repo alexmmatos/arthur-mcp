@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link as RouterLink, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import {
   Alert,
   Box,
@@ -19,6 +20,7 @@ import api from '../api'
 
 export default function Login() {
   const navigate = useNavigate()
+  const { reload } = useAuth()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -34,6 +36,7 @@ export default function Login() {
         password,
       })
       localStorage.setItem('token', res.data.access_token)
+      reload()
       navigate('/')
     } catch {
       setError('Invalid username or password.')

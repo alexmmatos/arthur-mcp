@@ -67,7 +67,7 @@ export class ProjectStateGuard implements CanActivate {
             : entries.map((e) => `${DAY_NAMES[e.day]} ${e.startHour}:00–${e.endHour}:00`).join(', ');
         res.status(503).json({
           error: 'Outside availability window',
-          message: `This project is not available right now (${DAY_NAMES[day]} ${hour}:xx ${tz}). Allowed: ${summary}.`,
+          message: `This server is not available right now (${DAY_NAMES[day]} ${hour}:xx ${tz}). Allowed: ${summary}.`,
         });
         return false;
       }

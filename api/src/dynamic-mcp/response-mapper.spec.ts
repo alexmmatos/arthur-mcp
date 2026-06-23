@@ -51,17 +51,17 @@ describe('mapResponse', () => {
     expect(result.content[0].text).toContain('image/png');
   });
 
-  it('truncates body text over 5000 chars', () => {
-    const longBody = 'a'.repeat(10_000);
+  it('truncates body text over 100000 chars', () => {
+    const longBody = 'a'.repeat(110_000);
     const result = mapResponse(res({ body: longBody, contentType: 'text/plain' }));
-    expect(result.content[0].text.length).toBeLessThan(10_000);
+    expect(result.content[0].text.length).toBeLessThan(110_000);
     expect(result.content[0].text).toContain('truncated');
   });
 
-  it('slices large JSON arrays and adds "mais itens" note', () => {
+  it('slices large JSON arrays and adds "more items" note', () => {
     const arr = Array.from({ length: 50 }, (_, i) => ({ id: i }));
     const result = mapResponse(res({ body: JSON.stringify(arr), contentType: 'application/json' }));
-    expect(result.content[0].text).toContain('mais itens');
+    expect(result.content[0].text).toContain('more items');
   });
 
   it('all content items have type "text"', () => {

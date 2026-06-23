@@ -7,10 +7,7 @@ import {
   CardContent,
   Chip,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
+  Drawer,
   Grid,
   IconButton,
   InputAdornment,
@@ -31,6 +28,7 @@ import {
   IconX,
 } from '@tabler/icons-react'
 import api from '../api'
+import { useAuth, Permission } from '../context/AuthContext'
 import ConfirmDialog from '../components/ConfirmDialog'
 import AppSnackbar from '../components/AppSnackbar'
 
@@ -48,11 +46,13 @@ interface Prompt {
 
 // ─── Prompt card ──────────────────────────────────────────────────────────────
 
-function PromptCard({ prompt, onEdit, onDelete, onCopy }: {
+function PromptCard({ prompt, onEdit, onDelete, onCopy, canEdit, canDelete }: {
   prompt: Prompt
   onEdit: (p: Prompt) => void
   onDelete: (p: Prompt) => void
   onCopy: (p: Prompt) => void
+  canEdit: boolean
+  canDelete: boolean
 }) {
   return (
     <Card
@@ -84,18 +84,22 @@ function PromptCard({ prompt, onEdit, onDelete, onCopy }: {
             <IconCopy size={15} />
           </IconButton>
         </Tooltip>
-        <Tooltip title="Edit prompt">
-          <IconButton size="small" onClick={() => onEdit(prompt)}
-            sx={{ p: 0.5, bgcolor: 'background.paper', '&:hover': { bgcolor: 'action.hover' } }}>
-            <IconEdit size={15} />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="Delete prompt">
-          <IconButton size="small" color="error" onClick={() => onDelete(prompt)}
-            sx={{ p: 0.5, bgcolor: 'background.paper', '&:hover': { bgcolor: 'action.hover' } }}>
-            <IconTrash size={15} />
-          </IconButton>
-        </Tooltip>
+        {canEdit && (
+          <Tooltip title="Edit prompt">
+            <IconButton size="small" onClick={() => onEdit(prompt)}
+              sx={{ p: 0.5, bgcolor: 'background.paper', '&:hover': { bgcolor: 'action.hover' } }}>
+              <IconEdit size={15} />
+            </IconButton>
+          </Tooltip>
+        )}
+        {canDelete && (
+          <Tooltip title="Delete prompt">
+            <IconButton size="small" color="error" onClick={() => onDelete(prompt)}
+              sx={{ p: 0.5, bgcolor: 'background.paper', '&:hover': { bgcolor: 'action.hover' } }}>
+              <IconTrash size={15} />
+            </IconButton>
+          </Tooltip>
+        )}
       </Box>
 
       <CardContent sx={{ flexGrow: 1, pb: '12px !important', pr: 5 }}>
@@ -283,9 +287,13 @@ function PromptDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth scroll="paper">
-      <DialogTitle>{editTarget ? `Edit — ${editTarget.name}` : 'New prompt'}</DialogTitle>
-      <DialogContent dividers>
+    <Drawer anchor="right" open={open} onClose={onClose}
+      PaperProps={{ sx: { width: { xs: '100vw', sm: 600 }, display: 'flex', flexDirection: 'column' } }}>
+      <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+        <Typography variant="h6" fontWeight={700} flexGrow={1}>{editTarget ? `Edit — ${editTarget.name}` : 'New prompt'}</Typography>
+        <IconButton size="small" onClick={onClose}><IconX size={18} /></IconButton>
+      </Box>
+      <Box sx={{ flex: 1, overflowY: 'auto', px: 3, py: 2.5 }}>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         <Box display="flex" flexDirection="column" gap={2}>
           <TextField
@@ -313,8 +321,8 @@ function PromptDialog({
             <TagInput tags={form.tags} onChange={(t) => setField('tags', t)} />
           </Box>
         </Box>
-      </DialogContent>
-      <DialogActions sx={{ px: 3, py: 2 }}>
+      </Box>
+      <Box sx={{ px: 3, py: 2, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1, flexShrink: 0 }}>
         <Button onClick={onClose}>Cancel</Button>
         <Button
           variant="contained" onClick={handleSave} disabled={saving}
@@ -322,14 +330,15 @@ function PromptDialog({
         >
           {saving ? 'Saving…' : editTarget ? 'Save changes' : 'Create prompt'}
         </Button>
-      </DialogActions>
-    </Dialog>
+      </Box>
+    </Drawer>
   )
 }
 
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function Prompts() {
+  const { can, loading: authLoading } = useAuth()
   const [prompts, setPrompts] = useState<Prompt[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -341,11 +350,13 @@ export default function Prompts() {
   const [snack, setSnack] = useState<{ message: string; severity?: 'success' | 'error' } | null>(null)
 
   useEffect(() => {
+    if (authLoading) return
+    if (!can(Permission.PromptsView)) { setLoading(false); return }
     api.get<Prompt[]>('/prompts')
       .then((r) => setPrompts(r.data))
       .catch(() => setSnack({ message: 'Failed to load prompts.', severity: 'error' }))
       .finally(() => setLoading(false))
-  }, [])
+  }, [authLoading])
 
   const allTags = [...new Set(prompts.flatMap((p) => p.tags))].sort()
 
@@ -406,9 +417,11 @@ export default function Prompts() {
             Save and organize your prompt templates for reuse across projects.
           </Typography>
         </Box>
-        <Button variant="contained" startIcon={<IconPlus size={18} />} onClick={openCreate}>
-          New prompt
-        </Button>
+        {can(Permission.PromptsCreate) && (
+          <Button variant="contained" startIcon={<IconPlus size={18} />} onClick={openCreate}>
+            New prompt
+          </Button>
+        )}
       </Box>
 
       {/* Search + tag filter */}
@@ -472,6 +485,8 @@ export default function Prompts() {
                 onEdit={openEdit}
                 onDelete={setDeleteTarget}
                 onCopy={handleCopy}
+                canEdit={can(Permission.PromptsEdit)}
+                canDelete={can(Permission.PromptsDelete)}
               />
             </Grid>
           ))}

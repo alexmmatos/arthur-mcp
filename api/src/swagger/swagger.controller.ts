@@ -33,7 +33,7 @@ export class SwaggerController {
     @UploadedFile() file: Express.Multer.File,
     @Query('baseUrl') baseUrl?: string,
   ) {
-    if (!file) throw new BadRequestException('Nenhum arquivo enviado.');
+    if (!file) throw new BadRequestException('No file uploaded.');
     const lower = file.originalname.toLowerCase();
     if (!lower.endsWith('.yaml') && !lower.endsWith('.yml') && !lower.endsWith('.json')) {
       throw new BadRequestException('Invalid format. Please upload a .yaml, .yml, or .json file.');
@@ -53,7 +53,7 @@ export class SwaggerController {
     @UploadedFile() file: Express.Multer.File,
     @Query('baseUrl') baseUrl?: string,
   ) {
-    if (!file) throw new BadRequestException('Nenhum arquivo enviado.');
+    if (!file) throw new BadRequestException('No file uploaded.');
 
     const lower = file.originalname.toLowerCase();
     if (!lower.endsWith('.yaml') && !lower.endsWith('.yml') && !lower.endsWith('.json')) {
@@ -189,7 +189,7 @@ export class SwaggerController {
     @UploadedFile() file: Express.Multer.File,
     @Query('baseUrl') baseUrl?: string,
   ) {
-    if (!file) throw new BadRequestException('Nenhum arquivo enviado.');
+    if (!file) throw new BadRequestException('No file uploaded.');
     const lower = file.originalname.toLowerCase();
     if (!lower.endsWith('.yaml') && !lower.endsWith('.yml') && !lower.endsWith('.json')) {
       throw new BadRequestException('Invalid format. Please upload a .yaml, .yml, or .json file.');
@@ -239,7 +239,7 @@ export class SwaggerController {
 
   @Patch('servers/:id/tags')
   updateTags(@Param('id') id: string, @Body('tags') tags: string[]) {
-    if (!Array.isArray(tags)) throw new BadRequestException('tags deve ser um array de strings.');
+    if (!Array.isArray(tags)) throw new BadRequestException('tags must be an array of strings.');
     return this.swaggerService.updateTags(id, tags);
   }
 
@@ -275,6 +275,16 @@ export class SwaggerController {
   @Patch('servers/:id/alert-config')
   setAlertConfig(@Param('id') id: string, @Body() dto: { enabled: boolean; errorThresholdPct: number; notifyEmail: string }) {
     return this.swaggerService.setAlertConfig(id, dto);
+  }
+
+  // ── Tenant config ─────────────────────────────────────────────────────────────
+
+  @Patch('servers/:id/tenant-config')
+  setTenantConfig(
+    @Param('id') id: string,
+    @Body() dto: { enabled: boolean; params: Array<{ name: string; type: string; description?: string }> },
+  ) {
+    return this.swaggerService.setTenantConfig(id, dto);
   }
 
   // ── Resources ─────────────────────────────────────────────────────────────────

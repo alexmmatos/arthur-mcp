@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useAuth, Permission } from '../context/AuthContext'
 import {
   Alert,
   Badge,
@@ -63,6 +64,7 @@ const ENTITY_LABELS: Record<string, string> = {
 const LIMIT = 50
 
 export default function AuditLogs() {
+  const { can, loading: authLoading } = useAuth()
   const [logs, setLogs] = useState<AuditEntry[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -81,11 +83,18 @@ export default function AuditLogs() {
         setTotal(r.data.total)
         setSkip(s)
       })
-      .catch(() => setError('Failed to load logs. Administrator access required.'))
+      .catch((err) => {
+        if (err?.response?.status === 403) setError('forbidden')
+        else setError('Failed to load logs.')
+      })
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    if (authLoading) return
+    if (!can(Permission.AuditView)) { setLoading(false); return }
+    load()
+  }, [authLoading])
 
   const handlePageChange = (_: React.ChangeEvent<unknown>, page: number) => {
     load((page - 1) * LIMIT)
@@ -101,7 +110,7 @@ export default function AuditLogs() {
               The Audit Log is a complete, tamper-proof record of every administrative change made on this Arthur MCP Adapter server. It is intended for security monitoring, compliance auditing, and debugging unexpected behaviour.
             </Typography>
             <Typography variant="body2" gutterBottom>
-              Every time a user creates, modifies, or deletes a project, tool, API key, or system setting, an entry is automatically written here. Login events are also recorded. <strong>Entries cannot be edited or deleted by any user.</strong>
+              Every time a user creates, modifies, or deletes a server, tool, API key, or system setting, an entry is automatically written here. Login events are also recorded. <strong>Entries cannot be edited or deleted by any user.</strong>
             </Typography>
             <Typography variant="body2" gutterBottom>How to use it:</Typography>
             <Box component="ul" sx={{ mt: 0, mb: 1, pl: 2.5 }}>
@@ -125,8 +134,6 @@ export default function AuditLogs() {
         Record of all administrative actions.{total > 0 && ` ${total} entries total.`}
       </Typography>
 
-      {error && <Alert severity="error">{error}</Alert>}
-
       {loading ? (
         <Paper variant="outlined" sx={{ overflow: 'hidden', mb: 2 }}>
           <Table size="small">
@@ -144,6 +151,16 @@ export default function AuditLogs() {
             </TableBody>
           </Table>
         </Paper>
+      ) : error === 'forbidden' || !can(Permission.AuditView) ? (
+        <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={12}>
+          <Typography color="text.secondary" variant="h6">Access restricted</Typography>
+          <Typography color="text.secondary" variant="body2">You don't have permission to view audit logs.</Typography>
+        </Box>
+      ) : error ? (
+        <Box display="flex" alignItems="center" gap={2} py={4}>
+          <Alert severity="error" sx={{ flexGrow: 1 }}>{error}</Alert>
+          <Button variant="outlined" onClick={() => load(skip)}>Retry</Button>
+        </Box>
       ) : (
         <>
           <Paper variant="outlined" sx={{ overflow: 'hidden', mb: 2 }}>
@@ -166,15 +183,15 @@ export default function AuditLogs() {
                           ['Created (green)', 'A new object was added to the system.'],
                           ['Updated (yellow)', 'An existing object was modified.'],
                           ['Deleted (red)', 'An object was permanently removed.'],
-                          ['Generated key (grey)', 'An MCP API key was created for a project.'],
+                          ['Generated key (grey)', 'An MCP API key was created for a server.'],
                           ['Revoked key (red)', 'An MCP API key was deleted, revoking all client access.'],
                           ['Login (grey)', 'A user successfully signed in.'],
                         ].map(([a, d]) => <Box component="li" key={a}><Typography variant="body2"><strong>{a}</strong> — {d}</Typography></Box>)}
                       </Box>
                     </>],
                     ['Entity', <>
-                      <Typography variant="body2" gutterBottom>The <em>type</em> of object that was affected by the action. Possible values: <strong>Project</strong>, <strong>Tool</strong>, <strong>User</strong>, <strong>Settings</strong>, <strong>API Key</strong>.</Typography>
-                      <Typography variant="body2">Combined with the Action column, this tells you exactly what kind of change occurred — for example, Action = "Deleted" + Entity = "Tool" means a tool was permanently removed from a project.</Typography>
+                      <Typography variant="body2" gutterBottom>The <em>type</em> of object that was affected by the action. Possible values: <strong>Server</strong>, <strong>Tool</strong>, <strong>User</strong>, <strong>Settings</strong>, <strong>API Key</strong>.</Typography>
+                      <Typography variant="body2">Combined with the Action column, this tells you exactly what kind of change occurred — for example, Action = "Deleted" + Entity = "Tool" means a tool was permanently removed from a server.</Typography>
                     </>],
                     ['Item', <>
                       <Typography variant="body2" gutterBottom>The name or unique identifier of the <em>specific</em> object that was changed. For example, if a project named "Stripe API" was deleted, the Entity column shows "Project" and this column shows "Stripe API".</Typography>

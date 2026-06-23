@@ -39,6 +39,9 @@ export class SqliteSwaggerProjectRepository implements ISwaggerProjectRepository
       alertConfig: e.alertConfig
         ? JSON.parse(e.alertConfig)
         : { enabled: false, errorThresholdPct: 20, notifyEmail: '' },
+      tenantConfig: (e as any).tenantConfig
+        ? JSON.parse((e as any).tenantConfig)
+        : { enabled: false, params: [] },
       createdAt: e.createdAt,
       updatedAt: e.updatedAt,
     };
@@ -68,6 +71,7 @@ export class SqliteSwaggerProjectRepository implements ISwaggerProjectRepository
     if (data.maintenanceMode !== undefined) e.maintenanceMode = JSON.stringify(data.maintenanceMode);
     if (data.availabilityWindow !== undefined) e.availabilityWindow = JSON.stringify(data.availabilityWindow);
     if (data.alertConfig !== undefined) e.alertConfig = JSON.stringify(data.alertConfig);
+    if ((data as any).tenantConfig !== undefined) (e as any).tenantConfig = JSON.stringify((data as any).tenantConfig);
     return e;
   }
 

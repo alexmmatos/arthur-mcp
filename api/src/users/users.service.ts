@@ -61,9 +61,9 @@ export class UsersService implements OnApplicationBootstrap {
     const updates: Partial<Omit<UserRecord, '_id'>> = {};
 
     if (dto.newPassword) {
-      if (!dto.currentPassword) throw new BadRequestException('Informe a senha atual para definir uma nova.');
+      if (!dto.currentPassword) throw new BadRequestException('Please provide your current password to set a new one.');
       const valid = await bcrypt.compare(dto.currentPassword, user.password);
-      if (!valid) throw new BadRequestException('Senha atual incorreta.');
+      if (!valid) throw new BadRequestException('Incorrect current password.');
       updates.password = await bcrypt.hash(dto.newPassword, 10);
     }
 

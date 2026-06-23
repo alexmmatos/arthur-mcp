@@ -25,6 +25,7 @@ import {
   IconSparkles,
 } from '@tabler/icons-react'
 import api from '../api'
+import { useAuth, Permission } from '../context/AuthContext'
 import HelpButton from '../components/HelpButton'
 import ConfirmDialog from '../components/ConfirmDialog'
 import AppSnackbar from '../components/AppSnackbar'
@@ -88,6 +89,7 @@ function ProjectCard({ p, health, onDelete, onDuplicate }: {
   onDuplicate: (id: string) => void
 }) {
   const navigate = useNavigate()
+  const { can } = useAuth()
   return (
     <Card
       variant="outlined"
@@ -117,16 +119,20 @@ function ProjectCard({ p, health, onDelete, onDuplicate }: {
           transition: 'opacity 0.15s',
         }}
       >
-        <Tooltip title="Duplicate server">
-          <IconButton size="small" onClick={() => onDuplicate(p._id)} sx={{ p: 0.5, bgcolor: 'background.paper', '&:hover': { bgcolor: 'action.hover' } }}>
-            <IconCopy size={15} />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="Delete server">
-          <IconButton size="small" color="error" onClick={() => onDelete(p._id)} sx={{ p: 0.5, bgcolor: 'background.paper', '&:hover': { bgcolor: 'action.hover' } }}>
-            <IconTrash size={15} />
-          </IconButton>
-        </Tooltip>
+        {can(Permission.ServersCreate) && (
+          <Tooltip title="Duplicate server">
+            <IconButton size="small" onClick={() => onDuplicate(p._id)} sx={{ p: 0.5, bgcolor: 'background.paper', '&:hover': { bgcolor: 'action.hover' } }}>
+              <IconCopy size={15} />
+            </IconButton>
+          </Tooltip>
+        )}
+        {can(Permission.ServersDelete) && (
+          <Tooltip title="Delete server">
+            <IconButton size="small" color="error" onClick={() => onDelete(p._id)} sx={{ p: 0.5, bgcolor: 'background.paper', '&:hover': { bgcolor: 'action.hover' } }}>
+              <IconTrash size={15} />
+            </IconButton>
+          </Tooltip>
+        )}
       </Box>
 
       <CardActionArea sx={{ height: '100%', alignItems: 'flex-start' }} onClick={() => navigate(`/servers/${p._id}`)}>
@@ -170,14 +176,13 @@ function ProjectCard({ p, health, onDelete, onDuplicate }: {
 
           <Box display="flex" gap={0.75} flexWrap="wrap" alignItems="center">
             {p.isPaused
-              ? <Chip label="Paused" size="small" sx={{ bgcolor: '#e0e0e0', color: '#757575', fontWeight: 600 }} />
+              ? <Chip label="Paused" size="small" color="default" sx={{ fontWeight: 600 }} />
               : <Chip
                   label={p.status === 'active' ? 'Active' : 'Error'}
                   size="small"
-                  sx={p.status === 'active'
-                    ? { bgcolor: '#e6fffa', color: '#02b3a9', fontWeight: 600 }
-                    : { bgcolor: '#FDEDE8', color: '#f3704d', fontWeight: 600 }
-                  }
+                  color={p.status === 'active' ? 'success' : 'error'}
+                  variant="outlined"
+                  sx={{ fontWeight: 600 }}
                 />
             }
             <Chip
@@ -243,6 +248,7 @@ export default function Servers() {
   const [search, setSearch] = useState('')
   const [tagFilter, setTagFilter] = useState('')
   const navigate = useNavigate()
+  const { can, loading: authLoading } = useAuth()
 
   // Confirm dialog state
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -269,11 +275,18 @@ export default function Servers() {
         }
         setHealth(map)
       })
-      .catch((err) => setError(err?.response?.data?.message || 'Failed to load servers.'))
+      .catch((err) => {
+        if (err?.response?.status === 403) setError('forbidden')
+        else setError('Failed to load servers.')
+      })
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    if (authLoading) return
+    if (!can(Permission.ServersView)) { setLoading(false); return }
+    load()
+  }, [authLoading])
 
   const handleDeleteRequest = (id: string) => {
     setConfirmTarget(id)
@@ -361,12 +374,16 @@ export default function Servers() {
           </HelpButton>
         </Box>
         <Box display="flex" gap={1}>
-          <Button variant="outlined" startIcon={<IconSparkles size={18} />} onClick={() => navigate('/templates')}>
-            Browse templates
-          </Button>
-          <Button variant="contained" startIcon={<IconPlus size={18} />} onClick={() => navigate('/servers/new')}>
-            New server
-          </Button>
+          {can(Permission.TemplatesUse) && (
+            <Button variant="outlined" startIcon={<IconSparkles size={18} />} onClick={() => navigate('/templates')}>
+              Browse templates
+            </Button>
+          )}
+          {can(Permission.ServersCreate) && (
+            <Button variant="contained" startIcon={<IconPlus size={18} />} onClick={() => navigate('/servers/new')}>
+              New server
+            </Button>
+          )}
         </Box>
       </Box>
 
@@ -392,6 +409,11 @@ export default function Servers() {
 
       {loading ? (
         <ProjectsSkeleton />
+      ) : error === 'forbidden' || !can(Permission.ServersView) ? (
+        <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={12}>
+          <Typography color="text.secondary" variant="h6">Access restricted</Typography>
+          <Typography color="text.secondary" variant="body2">You don't have permission to view servers.</Typography>
+        </Box>
       ) : error ? (
         <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={10}>
           <Alert severity="error" sx={{ width: '100%', maxWidth: 560 }}>{error}</Alert>
@@ -402,9 +424,11 @@ export default function Servers() {
           {projects.length === 0 ? (
             <>
               <Typography color="text.secondary" variant="h6">No servers yet</Typography>
-              <Button variant="contained" startIcon={<IconPlus size={18} />} onClick={() => navigate('/servers/new')}>
-                Create your first server
-              </Button>
+              {can(Permission.ServersCreate) && (
+                <Button variant="contained" startIcon={<IconPlus size={18} />} onClick={() => navigate('/servers/new')}>
+                  Create your first server
+                </Button>
+              )}
             </>
           ) : (
             <Typography color="text.secondary">No servers match the filters.</Typography>

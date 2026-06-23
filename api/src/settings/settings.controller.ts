@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  ForbiddenException,
   Get,
   Patch,
   Request,
@@ -26,7 +25,6 @@ export class SettingsController {
 
   @Patch()
   async update(@Request() req: any, @Body() dto: any) {
-    if (req.user.role !== 'admin') throw new ForbiddenException('Acesso restrito a administradores.');
     const updated = await this.settings.update(dto);
     this.auditLogs.log({
       userId: req.user.userId,

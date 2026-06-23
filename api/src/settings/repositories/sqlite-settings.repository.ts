@@ -19,6 +19,7 @@ export class SqliteSettingsRepository implements ISettingsRepository {
       smtpUser: e.smtpUser ?? '',
       smtpPass: e.smtpPass ?? '',
       smtpFrom: e.smtpFrom ?? '',
+      globalRequestHeaders: e.globalRequestHeaders ?? [],
     };
   }
 

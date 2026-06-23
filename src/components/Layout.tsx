@@ -3,13 +3,12 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import {
   AppBar,
   Avatar,
-  Badge,
   Box,
-  Chip,
   Container,
   Drawer,
   IconButton,
   List,
+  Switch,
   ListItem,
   ListItemButton,
   ListItemIcon,
@@ -25,11 +24,8 @@ import {
   useTheme,
 } from '@mui/material'
 import {
-  IconBellRinging,
   IconFolder,
   IconMenu2,
-  IconUpload,
-  IconBook,
   IconLogout,
   IconUser,
   IconLayoutDashboard,
@@ -37,39 +33,43 @@ import {
   IconClipboardList,
   IconMessage2,
   IconLock,
+  IconSun,
+  IconMoon,
 } from '@tabler/icons-react'
 import api from '../api'
 import { avatarLetter, avatarColor } from '../pages/Profile'
+import { useColorMode, ColorMode } from '../theme/ColorModeContext'
+import { useAuth, type UserPermissions } from '../context/AuthContext'
 
 const SIDEBAR_WIDTH = 248
 
-const NAV_SECTIONS = [
+const NAV_SECTIONS: Array<{
+  subheader: string
+  items: Array<{ title: string; icon: React.ElementType; path: string; permission?: keyof UserPermissions; adminOnly?: boolean }>
+}> = [
   {
     subheader: 'OVERVIEW',
     items: [
-      { title: 'Dashboard', icon: IconLayoutDashboard, path: '/dashboard' },
+      { title: 'Dashboard', icon: IconLayoutDashboard, path: '/dashboard', permission: 'servers_view' },
     ],
   },
   {
     subheader: 'MAIN',
     items: [
-      { title: 'Servers', icon: IconFolder, path: '/' },
-      { title: 'Prompts', icon: IconMessage2, path: '/prompts' },
-      { title: 'Secrets', icon: IconLock, path: '/secrets' },
+      { title: 'Servers', icon: IconFolder, path: '/', permission: 'servers_view' },
+      { title: 'Prompts', icon: IconMessage2, path: '/prompts', permission: 'prompts_view' },
+      { title: 'Secrets', icon: IconLock, path: '/secrets', permission: 'secrets_view_names' },
     ],
   },
   {
     subheader: 'ADMINISTRATION',
     items: [
-      { title: 'Settings', icon: IconSettings, path: '/settings' },
-      { title: 'Audit Logs', icon: IconClipboardList, path: '/audit-logs' },
+      { title: 'Settings', icon: IconSettings, path: '/settings', permission: 'settings_manage' },
+      { title: 'Audit Logs', icon: IconClipboardList, path: '/audit-logs', permission: 'audit_view' },
     ],
   },
 ]
 
-// Suppress unused-import warnings for icons only used in NAV_SECTIONS
-void IconUpload
-void IconBook
 
 const AppBarStyled = styled(AppBar)(({ theme }) => ({
   boxShadow: 'none',
@@ -95,11 +95,13 @@ function SidebarContent() {
   const navigate = useNavigate()
   const theme = useTheme()
   const [logoError, setLogoError] = useState(false)
+  const { can, isAdmin } = useAuth()
 
+  const { mode } = useColorMode()
   const scrollbarStyles = {
     '&::-webkit-scrollbar': { width: '7px' },
     '&::-webkit-scrollbar-thumb': {
-      backgroundColor: '#eff2f7',
+      backgroundColor: mode === ColorMode.Dark ? '#3c4043' : '#e8eaed',
       borderRadius: '15px',
     },
   }
@@ -137,9 +139,9 @@ function SidebarContent() {
         ) : (
           <Box
             component="img"
-            src="/images/logos/arthur-mcp-adapter-logo.svg"
+            src={mode === ColorMode.Dark ? '/images/logos/arthur_mcp_logo_dark_mode.svg' : '/images/logos/arthur_mcp_logo_light_mode.svg'}
             alt="Arthur MCP Adapter"
-            sx={{ height: 28, maxWidth: '100%' }}
+            sx={{ height: '100%', maxWidth: '100%' }}
             onError={() => setLogoError(true)}
           />
         )}
@@ -147,7 +149,14 @@ function SidebarContent() {
 
       {/* Menu */}
       <Box sx={{ flexGrow: 1, py: 1 }}>
-        {NAV_SECTIONS.map((section) => (
+        {NAV_SECTIONS.map((section) => {
+          const visibleItems = section.items.filter((item) => {
+            if (item.adminOnly) return isAdmin
+            if (item.permission) return can(item.permission)
+            return true
+          })
+          if (visibleItems.length === 0) return null
+          return (
           <List
             key={section.subheader}
             subheader={
@@ -171,7 +180,7 @@ function SidebarContent() {
             dense
             disablePadding
           >
-            {section.items.map((item) => {
+            {visibleItems.map((item) => {
               const Icon = item.icon
               const selected = location.pathname === item.path
               return (
@@ -184,12 +193,12 @@ function SidebarContent() {
                       minHeight: 38,
                       px: 1.5,
                       '&.Mui-selected': {
-                        bgcolor: 'primary.light',
+                        bgcolor: 'rgba(26,115,232,0.08)',
                         color: 'primary.main',
                         '& .MuiListItemIcon-root': { color: 'primary.main' },
-                        '&:hover': { bgcolor: 'primary.light' },
+                        '&:hover': { bgcolor: 'rgba(26,115,232,0.12)' },
                       },
-                      '&:hover': { bgcolor: 'action.hover' },
+                      '&:hover': { bgcolor: 'rgba(0,0,0,0.04)' },
                     }}
                   >
                     <ListItemIcon sx={{ minWidth: 32, color: selected ? 'primary.main' : 'text.secondary' }}>
@@ -208,7 +217,8 @@ function SidebarContent() {
               )
             })}
           </List>
-        ))}
+          )
+        })}
       </Box>
 
       {/* Bottom promo box */}
@@ -242,6 +252,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [profileAnchor, setProfileAnchor] = useState<null | HTMLElement>(null)
   const [username, setUsername] = useState('')
   const navigate = useNavigate()
+  const { mode, toggle } = useColorMode()
+  const { logout } = useAuth()
 
   useEffect(() => {
     api.get('/health')
@@ -262,7 +274,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }
 
   const handleLogout = () => {
-    localStorage.removeItem('token')
+    logout()
     navigate('/login')
   }
 
@@ -336,6 +348,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             )}
 
             <Box flexGrow={1} />
+
+            {/* Dark mode toggle */}
+            <Tooltip title={mode === ColorMode.Dark ? 'Light mode' : 'Dark mode'}>
+              <Box display="flex" alignItems="center" gap={0.5} mr={0.5}>
+                <IconSun size={15} style={{ opacity: mode === ColorMode.Light ? 1 : 0.4 }} />
+                <Switch
+                  size="small"
+                  checked={mode === ColorMode.Dark}
+                  onChange={toggle}
+                  color="default"
+                  sx={{
+                    '& .MuiSwitch-thumb': { bgcolor: mode === ColorMode.Dark ? '#e8eaed' : '#5f6368' },
+                    '& .MuiSwitch-track': { bgcolor: mode === ColorMode.Dark ? '#5f6368 !important' : undefined },
+                  }}
+                />
+                <IconMoon size={15} style={{ opacity: mode === ColorMode.Dark ? 1 : 0.4 }} />
+              </Box>
+            </Tooltip>
 
             {/* Profile */}
             <Tooltip title="Account menu">
