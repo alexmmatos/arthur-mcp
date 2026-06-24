@@ -21,29 +21,34 @@ import {
   StepLabel,
   Stepper,
   Switch,
+  Tab,
+  Tabs,
   TextField,
   Tooltip,
   Typography,
 } from '@mui/material'
-import ArrowBackIcon from '@mui/icons-material/ArrowBack'
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
-import AddIcon from '@mui/icons-material/Add'
-import CloudUploadIcon from '@mui/icons-material/CloudUpload'
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
-import CloseIcon from '@mui/icons-material/Close'
-import DeleteIcon from '@mui/icons-material/Delete'
-import LockIcon from '@mui/icons-material/Lock'
-import SpeedIcon from '@mui/icons-material/Speed'
-import VpnKeyIcon from '@mui/icons-material/VpnKey'
-import VisibilityIcon from '@mui/icons-material/Visibility'
-import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
-import SearchIcon from '@mui/icons-material/Search'
-import BuildIcon from '@mui/icons-material/Build'
+import {
+  IconArrowLeft,
+  IconArrowRight,
+  IconPlus,
+  IconCloudUpload,
+  IconFile,
+  IconX,
+  IconTrash,
+  IconKey,
+  IconEye,
+  IconEyeOff,
+  IconTool,
+  IconSparkles,
+  IconPackage,
+  IconTag,
+  IconCircleCheck,
+} from '@tabler/icons-react'
 import api from '../api'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const STEPS = ['Server details', 'Import API spec', 'Preview tools', 'API Authentication', 'MCP Protection']
+const STEPS = ['Server details', 'Import API spec', 'Tools overview', 'API Authentication']
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const
 
@@ -71,7 +76,7 @@ interface LocalTool {
   method: string
   path: string
   enabled: boolean
-  fromSpec: boolean  // came from spec upload vs manually added
+  fromSpec: boolean
 }
 
 interface SpecMeta {
@@ -96,30 +101,28 @@ export default function NewServer() {
   const { can, loading: authLoading } = useAuth()
   const [activeStep, setActiveStep] = useState(0)
 
-  // Step 0
+  // Step 0 — Server details
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [tags, setTags] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState('')
 
-  // Step 1
+  // Step 1 — Import
+  const [importTab, setImportTab] = useState(0) // 0 = OpenAPI, 1 = Postman
   const [file, setFile] = useState<File | null>(null)
+  const [postmanFile, setPostmanFile] = useState<File | null>(null)
   const [fetchedForFile, setFetchedForFile] = useState<File | null>(null)
   const [baseUrl, setBaseUrl] = useState('')
   const [dragging, setDragging] = useState(false)
+  const [discovering, setDiscovering] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const postmanInputRef = useRef<HTMLInputElement>(null)
 
-  // Step 2 — Preview / tool editor
+  // Step 2 — Tools overview
   const [specMeta, setSpecMeta] = useState<SpecMeta | null>(null)
   const [localTools, setLocalTools] = useState<LocalTool[]>([])
   const [deletedSpecTools, setDeletedSpecTools] = useState<string[]>([])
   const [previewing, setPreviewing] = useState(false)
-  const [toolSearch, setToolSearch] = useState('')
-  // Add tool dialog
-  const [addOpen, setAddOpen] = useState(false)
-  const [newName, setNewName] = useState('')
-  const [newMethod, setNewMethod] = useState<string>('GET')
-  const [newPath, setNewPath] = useState('')
-  const [newDesc, setNewDesc] = useState('')
-  const [addError, setAddError] = useState('')
 
   // Step 3 — API Authentication
   const [authType, setAuthType] = useState<AuthType>('none')
@@ -136,22 +139,18 @@ export default function NewServer() {
   const [oauthScope, setOauthScope] = useState('')
   const [customHeaders, setCustomHeaders] = useState<{ name: string; value: string }[]>([{ name: '', value: '' }])
 
-  // Step 4 — MCP Protection
-  const [mcpAuthEnabled, setMcpAuthEnabled] = useState(false)
-  const [mcpKeyNames, setMcpKeyNames] = useState<string[]>(['Default'])
-  const [rateLimitEnabled, setRateLimitEnabled] = useState(false)
-  const [rateLimitRpm, setRateLimitRpm] = useState(60)
-
   // Submit
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
 
-  // ── Validation ──────────────────────────────────────────────────────────────
+  // ── Validation ────────────────────────────────────────────────────────────
 
   const step0Valid = name.trim().length > 0
-  const step1Valid = file
-    ? (baseUrl.trim() === '' || isValidUrl(baseUrl.trim()))
-    : (baseUrl.trim().length > 0 && isValidUrl(baseUrl.trim()))
+
+  const activeFile = importTab === 0 ? file : postmanFile
+  const step1Valid = importTab === 0
+    ? (file ? (baseUrl.trim() === '' || isValidUrl(baseUrl.trim())) : (baseUrl.trim().length > 0 && isValidUrl(baseUrl.trim())))
+    : !!postmanFile
 
   const canNext = () => {
     if (activeStep === 0) return step0Valid
@@ -161,89 +160,113 @@ export default function NewServer() {
 
   const isLastStep = activeStep === STEPS.length - 1
 
-  // ── File handling ────────────────────────────────────────────────────────────
+  // ── Tags ─────────────────────────────────────────────────────────────────
+
+  const addTag = (raw: string) => {
+    const trimmed = raw.trim().toLowerCase().replace(/\s+/g, '-')
+    if (trimmed && !tags.includes(trimmed)) setTags((t) => [...t, trimmed])
+    setTagInput('')
+  }
+
+  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(tagInput) }
+    if (e.key === 'Backspace' && !tagInput && tags.length > 0) setTags((t) => t.slice(0, -1))
+  }
+
+  // ── File handling ─────────────────────────────────────────────────────────
 
   const clearSpecState = () => {
-    setSpecMeta(null)
-    setLocalTools([])
-    setDeletedSpecTools([])
-    setFetchedForFile(null)
+    setSpecMeta(null); setLocalTools([]); setDeletedSpecTools([]); setFetchedForFile(null)
   }
 
-  const acceptFile = (f: File) => {
+  const acceptOpenApiFile = (f: File) => {
     const n = f.name.toLowerCase()
     if (!n.endsWith('.yaml') && !n.endsWith('.yml') && !n.endsWith('.json')) {
-      setError('Unsupported format. Use .yaml, .yml or .json')
-      return
+      setError('Unsupported format. Use .yaml, .yml or .json'); return
     }
     if (f !== fetchedForFile) clearSpecState()
-    setFile(f)
-    setError('')
+    setFile(f); setError('')
   }
 
-  // ── Tool operations ──────────────────────────────────────────────────────────
-
-  const handleAddTool = () => {
-    const trimName = newName.trim()
-    const trimPath = newPath.trim()
-    if (!trimName) { setAddError('Name is required.'); return }
-    if (!trimPath) { setAddError('Path is required.'); return }
-    if (localTools.some(t => t.name === trimName)) { setAddError(`A tool named "${trimName}" already exists.`); return }
-    setLocalTools(prev => [...prev, {
-      id: uid(), name: trimName, description: newDesc.trim() || undefined,
-      method: newMethod, path: trimPath, enabled: true, fromSpec: false,
-    }])
-    setNewName(''); setNewMethod('GET'); setNewPath(''); setNewDesc(''); setAddError('')
-    setAddOpen(false)
+  const acceptPostmanFile = (f: File) => {
+    if (!f.name.toLowerCase().endsWith('.json')) { setError('Postman collections must be .json'); return }
+    setPostmanFile(f); clearSpecState(); setError('')
   }
 
-  const handleDeleteTool = (tool: LocalTool) => {
-    if (tool.fromSpec) setDeletedSpecTools(prev => [...prev, tool.name])
-    setLocalTools(prev => prev.filter(t => t.id !== tool.id))
+  // ── Auto-discover ─────────────────────────────────────────────────────────
+
+  const handleDiscover = async () => {
+    if (!isValidUrl(baseUrl.trim())) return
+    setDiscovering(true); setError('')
+    try {
+      const { data } = await api.post<SpecMeta & { tools?: Array<{ name: string; description?: string; method: string; path: string }> }>(
+        '/swagger/discover', { baseUrl: baseUrl.trim() }
+      )
+      if (data.tools?.length) {
+        setSpecMeta({ name: data.name, version: data.version, description: data.description, resolvedBaseUrl: data.resolvedBaseUrl ?? baseUrl.trim() })
+        setLocalTools(data.tools.map((t) => ({ id: uid(), name: t.name, description: t.description, method: t.method, path: t.path, enabled: true, fromSpec: true })))
+        setFetchedForFile(null)
+      } else {
+        setError('No spec found at this URL. Try uploading the file manually.')
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.message ?? 'Could not discover spec from this URL.')
+    } finally {
+      setDiscovering(false)
+    }
   }
 
-  const handleToggleTool = (id: string) => {
-    setLocalTools(prev => prev.map(t => t.id === id ? { ...t, enabled: !t.enabled } : t))
-  }
-
-  // ── Navigation ───────────────────────────────────────────────────────────────
+  // ── Navigation ────────────────────────────────────────────────────────────
 
   const handleNext = async () => {
     if (activeStep === 1) {
-      if (file && file !== fetchedForFile) {
-        // Fetch preview for new/changed file
-        setPreviewing(true)
-        setError('')
+      if (importTab === 0 && file && file !== fetchedForFile) {
+        setPreviewing(true); setError('')
         try {
           const form = new FormData()
           form.append('file', file)
           const params = baseUrl.trim() ? { baseUrl: baseUrl.trim() } : {}
           const { data } = await api.post<SpecMeta & { totalTools: number; tools: Array<{ name: string; description?: string; method: string; path: string }> }>(
-            '/swagger/preview', form, { params, headers: { 'Content-Type': 'multipart/form-data' } },
+            '/swagger/preview', form, { params, headers: { 'Content-Type': 'multipart/form-data' } }
           )
           setSpecMeta({ name: data.name, version: data.version, description: data.description, resolvedBaseUrl: data.resolvedBaseUrl })
-          setLocalTools(data.tools.map(t => ({ id: uid(), name: t.name, description: t.description, method: t.method, path: t.path, enabled: true, fromSpec: true })))
+          setLocalTools(data.tools.map((t) => ({ id: uid(), name: t.name, description: t.description, method: t.method, path: t.path, enabled: true, fromSpec: true })))
           setDeletedSpecTools([])
           setFetchedForFile(file)
         } catch (err: any) {
           const msg = err?.response?.data?.message ?? 'Error parsing spec.'
-          setError(Array.isArray(msg) ? msg.join(', ') : msg)
-          return
+          setError(Array.isArray(msg) ? msg.join(', ') : msg); return
         } finally {
           setPreviewing(false)
         }
-      } else if (!file && fetchedForFile !== null) {
-        // File removed → clear spec tools, keep manual ones
-        setLocalTools(prev => prev.filter(t => !t.fromSpec))
-        setSpecMeta(null)
-        setDeletedSpecTools([])
-        setFetchedForFile(null)
+      } else if (importTab === 0 && !file && fetchedForFile !== null) {
+        setLocalTools((prev) => prev.filter((t) => !t.fromSpec))
+        setSpecMeta(null); setDeletedSpecTools([]); setFetchedForFile(null)
+      } else if (importTab === 1 && postmanFile && postmanFile !== fetchedForFile) {
+        setPreviewing(true); setError('')
+        try {
+          const form = new FormData()
+          form.append('file', postmanFile)
+          const params = baseUrl.trim() ? { baseUrl: baseUrl.trim() } : {}
+          const { data } = await api.post<SpecMeta & { tools?: Array<{ name: string; description?: string; method: string; path: string }> }>(
+            '/swagger/parse-postman', form, { params, headers: { 'Content-Type': 'multipart/form-data' } }
+          )
+          setSpecMeta({ name: data.name ?? 'Postman Collection', version: data.version, description: data.description, resolvedBaseUrl: data.resolvedBaseUrl ?? baseUrl.trim() })
+          setLocalTools((data.tools ?? []).map((t) => ({ id: uid(), name: t.name, description: t.description, method: t.method, path: t.path, enabled: true, fromSpec: true })))
+          setDeletedSpecTools([])
+          setFetchedForFile(postmanFile)
+        } catch (err: any) {
+          const msg = err?.response?.data?.message ?? 'Error parsing Postman collection.'
+          setError(Array.isArray(msg) ? msg.join(', ') : msg); return
+        } finally {
+          setPreviewing(false)
+        }
       }
     }
-    setActiveStep(s => s + 1)
+    setActiveStep((s) => s + 1)
   }
 
-  // ── Create project ───────────────────────────────────────────────────────────
+  // ── Create project ────────────────────────────────────────────────────────
 
   const buildAuth = () => {
     switch (authType) {
@@ -251,86 +274,48 @@ export default function NewServer() {
       case 'api-key': return { type: 'api-key', name: keyName, value: keyValue, in: keyIn }
       case 'basic': return { type: 'basic', username: basicUser, password: basicPass }
       case 'oauth2-client': return { type: 'oauth2-client', tokenUrl: oauthTokenUrl, clientId: oauthClientId, clientSecret: oauthClientSecret, scope: oauthScope || undefined }
-      case 'custom': return { type: 'custom', headers: customHeaders.filter(h => h.name.trim()) }
+      case 'custom': return { type: 'custom', headers: customHeaders.filter((h) => h.name.trim()) }
       default: return { type: 'none' }
     }
   }
 
   const handleCreate = async () => {
-    setError('')
-    setCreating(true)
+    setError(''); setCreating(true)
     try {
-      // 1. Create project
       let projectId: string
-      let projectBaseUrl: string
 
-      if (file) {
+      if (importTab === 1 && postmanFile) {
+        // Postman import — backend creates server + tools
+        const form = new FormData()
+        form.append('file', postmanFile)
+        const params = baseUrl.trim() ? { baseUrl: baseUrl.trim() } : {}
+        const { data } = await api.post<{ _id: string }>('/swagger/import-postman', form, { params, headers: { 'Content-Type': 'multipart/form-data' } })
+        projectId = data._id
+      } else if (importTab === 0 && file) {
+        // OpenAPI spec upload
         const form = new FormData()
         form.append('file', file)
         const params = baseUrl.trim() ? { baseUrl: baseUrl.trim() } : {}
-        const { data } = await api.post<{ _id: string; baseUrl: string }>('/swagger/upload', form, {
-          params,
-          headers: { 'Content-Type': 'multipart/form-data' },
-        })
+        const { data } = await api.post<{ _id: string; baseUrl: string }>('/swagger/upload', form, { params, headers: { 'Content-Type': 'multipart/form-data' } })
         projectId = data._id
-        projectBaseUrl = data.baseUrl
       } else {
+        // Empty server
         const { data } = await api.post<{ _id: string; baseUrl: string }>('/swagger/servers', {
           name: name.trim(),
           baseUrl: baseUrl.trim(),
           description: description.trim() || undefined,
         })
         projectId = data._id
-        projectBaseUrl = data.baseUrl
       }
 
-      // 2. Reconcile tools from the preview step
-      const toolBaseUrl = specMeta?.resolvedBaseUrl || projectBaseUrl || baseUrl.trim()
-
-      if (file) {
-        // Delete tools the user removed
-        for (const toolName of deletedSpecTools) {
-          await api.delete(`/swagger/servers/${projectId}/tools/${encodeURIComponent(toolName)}`)
-        }
-        // Disable tools the user toggled off
-        for (const tool of localTools.filter(t => t.fromSpec && !t.enabled)) {
-          await api.patch(`/swagger/servers/${projectId}/tools/${encodeURIComponent(tool.name)}`, { enabled: false })
-        }
-      }
-
-      // Add all manually created tools (from spec or empty project)
-      for (const tool of localTools.filter(t => !t.fromSpec)) {
-        await api.post(`/swagger/servers/${projectId}/tools`, {
-          name: tool.name,
-          description: tool.description,
-          method: tool.method,
-          path: tool.path,
-          baseUrl: toolBaseUrl,
-          contentType: 'application/json',
-          parameterMap: [],
-          inputSchema: { type: 'object', properties: {} },
-        })
-        if (!tool.enabled) {
-          await api.patch(`/swagger/servers/${projectId}/tools/${encodeURIComponent(tool.name)}`, { enabled: false })
-        }
-      }
-
-      // 3. Apply auth
+      // Apply auth
       if (authType !== 'none') {
         await api.patch(`/swagger/servers/${projectId}/auth`, buildAuth())
       }
 
-      // 4. MCP keys
-      if (mcpAuthEnabled) {
-        const names = mcpKeyNames.map(n => n.trim()).filter(Boolean)
-        for (const name of names.length > 0 ? names : ['Default']) {
-          await api.post(`/swagger/servers/${projectId}/api-keys`, { name })
-        }
-      }
-
-      // 5. Rate limit
-      if (rateLimitEnabled) {
-        await api.patch(`/swagger/servers/${projectId}/rate-limit`, { enabled: true, requestsPerMinute: rateLimitRpm })
+      // Apply tags
+      if (tags.length > 0) {
+        await api.patch(`/swagger/servers/${projectId}/tags`, { tags })
       }
 
       navigate(`/servers/${projectId}`)
@@ -341,16 +326,7 @@ export default function NewServer() {
     }
   }
 
-  // ── Filtered preview list ─────────────────────────────────────────────────────
-
-  const filteredTools = localTools.filter(t =>
-    !toolSearch
-    || t.name.toLowerCase().includes(toolSearch.toLowerCase())
-    || t.path.toLowerCase().includes(toolSearch.toLowerCase())
-    || (t.description ?? '').toLowerCase().includes(toolSearch.toLowerCase())
-  )
-
-  // ── Secret input helper ───────────────────────────────────────────────────────
+  // ── Secret input helper ───────────────────────────────────────────────────
 
   const secretInput = (value: string, onChange: (v: string) => void, label: string) => (
     <TextField size="small" fullWidth label={label}
@@ -359,8 +335,8 @@ export default function NewServer() {
       InputProps={{
         endAdornment: (
           <InputAdornment position="end">
-            <IconButton size="small" onClick={() => setShowSecrets(s => !s)} edge="end">
-              {showSecrets ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+            <IconButton size="small" onClick={() => setShowSecrets((s) => !s)} edge="end">
+              {showSecrets ? <IconEyeOff size={16} /> : <IconEye size={16} />}
             </IconButton>
           </InputAdornment>
         ),
@@ -368,7 +344,7 @@ export default function NewServer() {
     />
   )
 
-  // ── Render ────────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
 
   if (!authLoading && !can(Permission.ServersCreate)) {
     return (
@@ -380,10 +356,10 @@ export default function NewServer() {
   }
 
   return (
-    <Box p={3} maxWidth={700} mx="auto">
+    <Box py={3} maxWidth={700} mx="auto">
       {/* Header */}
       <Box display="flex" alignItems="center" gap={1.5} mb={4}>
-        <Button size="small" startIcon={<ArrowBackIcon fontSize="small" />} onClick={() => navigate('/')} sx={{ mr: 0.5 }}>
+        <Button size="small" startIcon={<IconArrowLeft size={16} />} onClick={() => navigate('/')} sx={{ mr: 0.5 }}>
           Servers
         </Button>
         <Typography variant="h5" fontWeight={700}>New server</Typography>
@@ -400,10 +376,10 @@ export default function NewServer() {
 
       {error && <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>{error}</Alert>}
 
-      {/* ── Step 0: Project details ─────────────────────────────────────── */}
+      {/* ── Step 0: Server details ─────────────────────────────────────── */}
       {activeStep === 0 && (
         <Paper variant="outlined" sx={{ p: 3 }}>
-          <Typography variant="subtitle1" fontWeight={700} mb={0.5}>Server details</Typography>
+          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Server details</Typography>
           <Typography variant="body2" color="text.secondary" mb={3}>
             Give your server a name so you can identify it later. Everything else can be configured after creation.
           </Typography>
@@ -415,11 +391,34 @@ export default function NewServer() {
               onKeyDown={(e) => e.key === 'Enter' && step0Valid && handleNext()}
               helperText="A short name that identifies this API integration"
             />
-            <TextField label="Description" fullWidth multiline minRows={4} maxRows={10}
+            <TextField label="Description" fullWidth multiline minRows={3} maxRows={8}
               placeholder="What does this server do? What API does it connect to?"
               value={description} onChange={(e) => setDescription(e.target.value)}
               helperText="Optional — helps team members understand the purpose of this server"
             />
+            {/* Tags */}
+            <Box>
+              <TextField
+                size="small" fullWidth label="Tags" placeholder="Press Enter or comma to add…"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={handleTagKeyDown}
+                onBlur={() => tagInput.trim() && addTag(tagInput)}
+                helperText="Optional — used to filter and organize servers"
+                InputProps={{
+                  startAdornment: tags.length > 0 ? (
+                    <InputAdornment position="start" sx={{ flexWrap: 'wrap', gap: 0.5, py: 0.5, maxWidth: '60%' }}>
+                      {tags.map((tag) => (
+                        <Chip key={tag} label={tag} size="small" icon={<IconTag size={12} />}
+                          onDelete={() => setTags((t) => t.filter((x) => x !== tag))}
+                          sx={{ height: 20, fontSize: '0.7rem' }}
+                        />
+                      ))}
+                    </InputAdornment>
+                  ) : undefined,
+                }}
+              />
+            </Box>
           </Box>
         </Paper>
       )}
@@ -427,482 +426,363 @@ export default function NewServer() {
       {/* ── Step 1: Import API spec ─────────────────────────────────────── */}
       {activeStep === 1 && (
         <Box display="flex" flexDirection="column" gap={2.5}>
-          <Paper variant="outlined"
-            onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={(e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) acceptFile(f) }}
-            onClick={() => !file && fileInputRef.current?.click()}
-            sx={{
-              p: 5, textAlign: 'center', cursor: file ? 'default' : 'pointer',
-              border: '2px dashed',
-              borderColor: dragging ? 'primary.main' : file ? 'success.main' : 'divider',
-              bgcolor: dragging ? 'primary.light' : file ? 'rgba(73,204,144,0.08)' : 'background.paper',
-              transition: 'all 0.18s',
-              '&:hover': file ? {} : { bgcolor: 'action.hover', borderColor: 'primary.light' },
-            }}
-          >
-            <input ref={fileInputRef} type="file" accept=".yaml,.yml,.json" hidden
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) acceptFile(f); e.target.value = '' }} />
-            {file ? (
-              <Box display="flex" flexDirection="column" alignItems="center" gap={1}>
-                <InsertDriveFileIcon sx={{ fontSize: 40, color: 'success.main' }} />
-                <Typography fontWeight={700} color="success.main">{file.name}</Typography>
-                <Typography variant="body2" color="text.secondary">MCP tools will be generated automatically from this spec</Typography>
-                <Button size="small" startIcon={<CloseIcon fontSize="small" />}
-                  onClick={(e) => { e.stopPropagation(); setFile(null); clearSpecState(); setError('') }} sx={{ mt: 0.5 }}>
-                  Remove file
-                </Button>
+          <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+            <Tabs value={importTab} onChange={(_, v) => { setImportTab(v); setError('') }}
+              sx={{ borderBottom: 1, borderColor: 'divider', px: 1 }}>
+              <Tab label="OpenAPI / Swagger" icon={<IconCloudUpload size={15} />} iconPosition="start"
+                sx={{ minHeight: 44, fontSize: '0.82rem', gap: 0.5 }} />
+              <Tab label="Postman collection" icon={<IconPackage size={15} />} iconPosition="start"
+                sx={{ minHeight: 44, fontSize: '0.82rem', gap: 0.5 }} />
+            </Tabs>
+
+            {/* OpenAPI tab */}
+            {importTab === 0 && (
+              <Box p={2.5}>
+                <Box
+                  onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+                  onDragLeave={() => setDragging(false)}
+                  onDrop={(e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) acceptOpenApiFile(f) }}
+                  onClick={() => !file && fileInputRef.current?.click()}
+                  sx={{
+                    p: 4, textAlign: 'center', cursor: file ? 'default' : 'pointer', borderRadius: 1,
+                    border: '2px dashed', borderColor: dragging ? 'primary.main' : file ? 'success.main' : 'divider',
+                    bgcolor: dragging ? 'primary.light' : file ? 'rgba(73,204,144,0.08)' : 'action.hover',
+                    transition: 'all 0.18s',
+                    '&:hover': file ? {} : { borderColor: 'primary.light' },
+                  }}
+                >
+                  <input ref={fileInputRef} type="file" accept=".yaml,.yml,.json" hidden
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) acceptOpenApiFile(f); e.target.value = '' }} />
+                  {file ? (
+                    <Box display="flex" flexDirection="column" alignItems="center" gap={1}>
+                      <IconFile size={36} color="var(--mui-palette-success-main)" />
+                      <Typography fontWeight={700} color="success.main">{file.name}</Typography>
+                      <Typography variant="body2" color="text.secondary">Tools will be generated automatically from this spec</Typography>
+                      <Button size="small" startIcon={<IconX size={14} />}
+                        onClick={(e) => { e.stopPropagation(); setFile(null); clearSpecState(); setError('') }} sx={{ mt: 0.5 }}>
+                        Remove file
+                      </Button>
+                    </Box>
+                  ) : (
+                    <Box display="flex" flexDirection="column" alignItems="center" gap={0.5}>
+                      <IconCloudUpload size={40} style={{ opacity: 0.4 }} />
+                      <Typography fontWeight={500} mt={0.5}>Drag your OpenAPI / Swagger spec here</Typography>
+                      <Typography variant="body2" color="text.secondary">or click to browse · .yaml · .yml · .json</Typography>
+                      <Typography variant="caption" color="text.disabled" mt={1} display="block">
+                        Optional — skip to start with an empty server and add tools manually
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
               </Box>
-            ) : (
-              <Box display="flex" flexDirection="column" alignItems="center" gap={0.5}>
-                <CloudUploadIcon sx={{ fontSize: 44, color: 'text.secondary', mb: 0.5 }} />
-                <Typography fontWeight={500}>Drag your OpenAPI / Swagger spec here</Typography>
-                <Typography variant="body2" color="text.secondary">or click to browse · .yaml · .yml · .json</Typography>
-                <Typography variant="caption" color="text.disabled" mt={1} display="block">
-                  Optional — skip this step to start with an empty server and add tools manually
-                </Typography>
+            )}
+
+            {/* Postman tab */}
+            {importTab === 1 && (
+              <Box p={2.5}>
+                <Box
+                  onClick={() => !postmanFile && postmanInputRef.current?.click()}
+                  sx={{
+                    p: 4, textAlign: 'center', cursor: postmanFile ? 'default' : 'pointer', borderRadius: 1,
+                    border: '2px dashed', borderColor: postmanFile ? 'success.main' : 'divider',
+                    bgcolor: postmanFile ? 'rgba(73,204,144,0.08)' : 'action.hover',
+                    transition: 'all 0.18s',
+                    '&:hover': postmanFile ? {} : { borderColor: 'primary.light' },
+                  }}
+                >
+                  <input ref={postmanInputRef} type="file" accept=".json" hidden
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) acceptPostmanFile(f); e.target.value = '' }} />
+                  {postmanFile ? (
+                    <Box display="flex" flexDirection="column" alignItems="center" gap={1}>
+                      <IconFile size={36} color="var(--mui-palette-success-main)" />
+                      <Typography fontWeight={700} color="success.main">{postmanFile.name}</Typography>
+                      <Typography variant="body2" color="text.secondary">Postman collection will be imported as MCP tools</Typography>
+                      <Button size="small" startIcon={<IconX size={14} />}
+                        onClick={(e) => { e.stopPropagation(); setPostmanFile(null); clearSpecState(); setError('') }} sx={{ mt: 0.5 }}>
+                        Remove file
+                      </Button>
+                    </Box>
+                  ) : (
+                    <Box display="flex" flexDirection="column" alignItems="center" gap={0.5}>
+                      <IconPackage size={40} style={{ opacity: 0.4 }} />
+                      <Typography fontWeight={500} mt={0.5}>Drag your Postman Collection v2 here</Typography>
+                      <Typography variant="body2" color="text.secondary">or click to browse · .json</Typography>
+                    </Box>
+                  )}
+                </Box>
               </Box>
             )}
           </Paper>
 
+          {/* Base URL */}
           <Paper variant="outlined" sx={{ p: 3 }}>
             <Typography variant="subtitle2" fontWeight={700} mb={0.5}>
-              {file ? 'Base URL override' : 'API Base URL'}
-              {!file && <Typography component="span" color="error.main"> *</Typography>}
+              {importTab === 0 && file ? 'Base URL override' : 'API Base URL'}
+              {importTab === 0 && !file && <Typography component="span" color="error.main"> *</Typography>}
             </Typography>
             <Typography variant="body2" color="text.secondary" mb={1.5}>
-              {file
-                ? 'Leave blank to use the server URL declared inside the spec. Fill this in to point to a different environment.'
-                : 'The root address of the external API. All tool endpoints will be appended to this URL.'}
+              {importTab === 0 && file
+                ? 'Leave blank to use the server URL declared inside the spec. Fill in to point to a different environment.'
+                : importTab === 1
+                  ? 'Override the base URL from the Postman collection. Leave blank to use the URL defined in the collection.'
+                  : 'The root address of the external API. All tool endpoints will be appended to this URL.'}
             </Typography>
-            <TextField fullWidth required={!file} placeholder="https://api.example.com"
-              value={baseUrl}
-              onChange={(e) => { setBaseUrl(e.target.value); setError('') }}
-              error={baseUrl.trim().length > 0 && !isValidUrl(baseUrl.trim())}
-              helperText={baseUrl.trim().length > 0 && !isValidUrl(baseUrl.trim())
-                ? 'Invalid URL — include the protocol (e.g. https://api.example.com)' : ''}
-            />
+            <Box display="flex" gap={1}>
+              <TextField fullWidth size="small" required={importTab === 0 && !file} placeholder="https://api.example.com"
+                value={baseUrl}
+                onChange={(e) => { setBaseUrl(e.target.value); setError('') }}
+                error={baseUrl.trim().length > 0 && !isValidUrl(baseUrl.trim())}
+                helperText={baseUrl.trim().length > 0 && !isValidUrl(baseUrl.trim())
+                  ? 'Invalid URL — include the protocol (e.g. https://api.example.com)' : ''}
+              />
+              {importTab === 0 && !file && (
+                <Tooltip title="Try to auto-discover the OpenAPI spec from this URL">
+                  <span>
+                    <Button variant="outlined" size="small" startIcon={discovering ? <CircularProgress size={13} color="inherit" /> : <IconSparkles size={15} />}
+                      onClick={handleDiscover}
+                      disabled={!isValidUrl(baseUrl.trim()) || discovering}
+                      sx={{ whiteSpace: 'nowrap', flexShrink: 0, height: 40 }}>
+                      {discovering ? 'Discovering…' : 'Auto-discover'}
+                    </Button>
+                  </span>
+                </Tooltip>
+              )}
+            </Box>
+            {localTools.length > 0 && !activeFile && (
+              <Alert severity="success" icon={<IconCircleCheck size={16} />} sx={{ mt: 1.5, py: 0.5, fontSize: '0.82rem' }}>
+                Discovered <strong>{localTools.length} tools</strong> from the spec at this URL.
+              </Alert>
+            )}
           </Paper>
 
-          {file && (
+          {importTab === 0 && file && (
             <Alert severity="info" sx={{ fontSize: '0.82rem' }}>
-              When importing a spec, the <strong>server name</strong> will be taken from the spec's <code>info.title</code> field
-              instead of the name you entered. You can rename it from the server detail page.
+              When importing a spec, the <strong>server name</strong> is taken from the spec's <code>info.title</code> field. You can rename it from the server detail page.
             </Alert>
           )}
         </Box>
       )}
 
-      {/* ── Step 2: Preview tools ───────────────────────────────────────── */}
+      {/* ── Step 2: Tools overview ──────────────────────────────────────── */}
       {activeStep === 2 && (
         <Box display="flex" flexDirection="column" gap={2}>
-          {/* Spec header (only when spec was imported) */}
-          {specMeta && (
-            <Paper variant="outlined" sx={{ p: 2 }}>
-              <Box display="flex" alignItems="center" gap={1.5} flexWrap="wrap">
-                <BuildIcon color="primary" fontSize="small" />
-                <Box flexGrow={1}>
-                  <Box display="flex" alignItems="center" gap={1}>
-                    <Typography variant="subtitle2" fontWeight={700}>{specMeta.name}</Typography>
-                    {specMeta.version && <Chip label={`v${specMeta.version}`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 20 }} />}
-                  </Box>
-                  {specMeta.description && <Typography variant="caption" color="text.secondary">{specMeta.description}</Typography>}
-                </Box>
-              </Box>
-            </Paper>
-          )}
-
-          {/* Toolbar: search + count + add */}
-          <Box display="flex" alignItems="center" gap={1.5} flexWrap="wrap">
-            <TextField size="small" placeholder="Search tools…" value={toolSearch}
-              onChange={(e) => setToolSearch(e.target.value)} sx={{ flexGrow: 1, minWidth: 200 }}
-              InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" color="action" /></InputAdornment> }}
-            />
-            {toolSearch && (
-              <Typography variant="body2" color="text.secondary" whiteSpace="nowrap">
-                {filteredTools.length} / {localTools.length}
-              </Typography>
-            )}
-            {!toolSearch && localTools.length > 0 && (
-              <Chip
-                label={`${localTools.filter(t => t.enabled).length} enabled · ${localTools.filter(t => !t.enabled).length} disabled`}
-                size="small" color="default" variant="outlined"
-              />
-            )}
-            <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => setAddOpen(true)}>
-              Add tool
-            </Button>
-          </Box>
-
-          {/* Tool list */}
-          {localTools.length === 0 ? (
-            <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
-              <BuildIcon sx={{ fontSize: 44, color: 'text.disabled', mb: 1.5 }} />
-              <Typography variant="subtitle1" color="text.secondary" gutterBottom>
-                {file ? 'No tools were found in the spec.' : 'No tools yet'}
-              </Typography>
-              <Typography variant="body2" color="text.disabled" mb={2}>
-                Click <strong>Add tool</strong> to create MCP tools manually.
-                You can add parameters and configure endpoints from the server detail page after creation.
-              </Typography>
-              <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setAddOpen(true)}>Add first tool</Button>
-            </Paper>
-          ) : (
-            <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
-              {filteredTools.length === 0 ? (
-                <Box py={4} textAlign="center">
-                  <Typography color="text.secondary" fontSize="0.875rem">No tools match the search.</Typography>
-                </Box>
-              ) : filteredTools.map((tool, i) => (
-                <Box key={tool.id} display="flex" alignItems="center" gap={1.5} px={2} py={1.25}
-                  sx={{
-                    borderBottom: i < filteredTools.length - 1 ? '1px solid' : 'none',
-                    borderColor: 'divider',
-                    opacity: tool.enabled ? 1 : 0.5,
-                    filter: tool.enabled ? 'none' : 'grayscale(0.5)',
-                    transition: 'opacity 0.15s, filter 0.15s',
-                    bgcolor: tool.fromSpec ? 'transparent' : 'action.hover',
-                  }}>
-                  {/* Enable/disable switch */}
-                  <Tooltip title={tool.enabled ? 'Disable tool' : 'Enable tool'}>
-                    <Switch size="small" checked={tool.enabled} onChange={() => handleToggleTool(tool.id)}
-                      color="primary" sx={{ flexShrink: 0 }} />
-                  </Tooltip>
-
-                  {/* Method badge */}
-                  <Box sx={{
-                    px: 1, py: 0.3, borderRadius: '4px',
-                    bgcolor: METHOD_COLOR[tool.method] ?? '#888', color: '#fff',
-                    fontWeight: 700, fontSize: '0.68rem', fontFamily: 'monospace',
-                    minWidth: 54, textAlign: 'center', flexShrink: 0,
-                  }}>
-                    {tool.method}
-                  </Box>
-
-                  {/* Name + path + desc */}
-                  <Box minWidth={0} flexGrow={1}>
-                    <Box display="flex" alignItems="center" gap={0.75}>
-                      <Typography fontWeight={600} fontSize="0.875rem" noWrap>{tool.name}</Typography>
-                      {!tool.fromSpec && (
-                        <Chip label="custom" size="small" color="primary"
-                          sx={{ fontSize: '0.62rem', height: 16, flexShrink: 0 }} />
+          {specMeta ? (
+            <>
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Box display="flex" alignItems="center" gap={1.5} flexWrap="wrap">
+                  <IconTool size={18} style={{ flexShrink: 0, opacity: 0.6 }} />
+                  <Box flexGrow={1} minWidth={0}>
+                    <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                      <Typography variant="subtitle2" fontWeight={700}>{specMeta.name}</Typography>
+                      {specMeta.version && (
+                        <Chip label={`v${specMeta.version}`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 20 }} />
                       )}
-                      {!tool.enabled && (
-                        <Chip label="disabled" size="small"
-                          sx={{ fontSize: '0.62rem', height: 16, bgcolor: '#9e9e9e', color: '#fff', flexShrink: 0 }} />
-                      )}
+                      <Chip label={`${localTools.length} tool${localTools.length !== 1 ? 's' : ''}`} size="small" color="primary" sx={{ fontSize: '0.7rem', height: 20 }} />
                     </Box>
-                    <Typography variant="caption" color="text.secondary" fontFamily="monospace" display="block" noWrap>{tool.path}</Typography>
-                    {tool.description && (
-                      <Typography variant="caption" color="text.disabled" display="block"
-                        sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {tool.description}
-                      </Typography>
+                    {specMeta.description && (
+                      <Typography variant="caption" color="text.secondary" display="block" mt={0.25}>{specMeta.description}</Typography>
                     )}
                   </Box>
-
-                  {/* Delete */}
-                  <Tooltip title="Remove tool">
-                    <IconButton size="small" color="error" onClick={() => handleDeleteTool(tool)} sx={{ flexShrink: 0 }}>
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
                 </Box>
-              ))}
+              </Paper>
+
+              {localTools.length > 0 && (
+                <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+                  {localTools.slice(0, 8).map((t, i) => (
+                    <Box key={t.id} display="flex" alignItems="center" gap={1.5} px={2} py={1}
+                      sx={{ borderBottom: i < Math.min(localTools.length, 8) - 1 ? '1px solid' : 'none', borderColor: 'divider' }}>
+                      <Box sx={{
+                        px: 0.75, py: 0.2, borderRadius: '4px', fontFamily: 'monospace', fontWeight: 700,
+                        fontSize: '0.65rem', color: METHOD_COLOR[t.method] ?? '#888',
+                        bgcolor: 'action.selected', minWidth: 44, textAlign: 'center', flexShrink: 0,
+                      }}>
+                        {t.method}
+                      </Box>
+                      <Typography fontSize="0.82rem" fontWeight={600} noWrap flexGrow={1}>{t.name}</Typography>
+                      <Typography variant="caption" color="text.secondary" fontFamily="monospace" noWrap flexShrink={0}>{t.path}</Typography>
+                    </Box>
+                  ))}
+                  {localTools.length > 8 && (
+                    <Box px={2} py={1} sx={{ borderTop: '1px solid', borderColor: 'divider', bgcolor: 'action.hover' }}>
+                      <Typography variant="caption" color="text.secondary">
+                        +{localTools.length - 8} more tools — all will be created and available to configure after creation
+                      </Typography>
+                    </Box>
+                  )}
+                </Paper>
+              )}
+            </>
+          ) : (
+            <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
+              <IconTool size={40} style={{ opacity: 0.25, marginBottom: 8 }} />
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>No spec imported</Typography>
+              <Typography variant="body2" color="text.disabled">
+                The server will be created empty. You can add tools manually from the server detail page.
+              </Typography>
             </Paper>
           )}
 
-          {localTools.length > 0 && (
-            <Alert severity="info" sx={{ fontSize: '0.82rem' }}>
-              <strong>{localTools.filter(t => t.enabled).length}</strong> tool{localTools.filter(t => t.enabled).length !== 1 ? 's' : ''} will be active after creation.
-              Disabled tools are created but hidden from MCP clients — you can enable them at any time.
-            </Alert>
-          )}
+          <Alert severity="info" sx={{ fontSize: '0.82rem' }}>
+            Tool parameters, descriptions, output schemas, and test configurations are all editable from the server detail page after creation.
+          </Alert>
         </Box>
       )}
 
       {/* ── Step 3: API Authentication ──────────────────────────────────── */}
       {activeStep === 3 && (
-        <Paper variant="outlined" sx={{ p: 3 }}>
-          <Box display="flex" alignItems="center" gap={1} mb={0.5}>
-            <VpnKeyIcon fontSize="small" color={authType !== 'none' ? 'primary' : 'disabled'} />
-            <Typography variant="subtitle1" fontWeight={700}>API Authentication</Typography>
-          </Box>
-          <Typography variant="body2" color="text.secondary" mb={3}>
-            Credentials Arthur attaches to every outgoing HTTP request when calling your API. The AI never sees these — they are injected automatically.
-          </Typography>
-
-          <FormControl size="small" fullWidth sx={{ mb: 3 }}>
-            <InputLabel>Authentication type</InputLabel>
-            <Select value={authType} label="Authentication type" onChange={(e) => setAuthType(e.target.value as AuthType)}>
-              {(Object.keys(AUTH_TYPE_LABELS) as AuthType[]).map((t) => (
-                <MenuItem key={t} value={t}>{AUTH_TYPE_LABELS[t]}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          {authType === 'none' && (
-            <Typography variant="body2" color="text.secondary">No credentials will be attached. Use for public APIs.</Typography>
-          )}
-
-          {authType === 'bearer' && (
-            <Box display="flex" flexDirection="column" gap={1.5}>
-              {secretInput(token, setToken, 'Bearer Token')}
-              <Typography variant="caption" color="text.secondary">Sent as: <code>Authorization: Bearer &lt;token&gt;</code></Typography>
-            </Box>
-          )}
-
-          {authType === 'api-key' && (
-            <Box display="flex" flexDirection="column" gap={1.5}>
-              <Grid container spacing={1.5}>
-                <Grid item xs={12} sm={5}>
-                  <TextField size="small" fullWidth label="Parameter name" placeholder="X-Api-Key" value={keyName} onChange={(e) => setKeyName(e.target.value)} />
-                </Grid>
-                <Grid item xs={12} sm={7}>{secretInput(keyValue, setKeyValue, 'Value')}</Grid>
-              </Grid>
-              <FormControl size="small" fullWidth>
-                <InputLabel>Send as</InputLabel>
-                <Select value={keyIn} label="Send as" onChange={(e) => setKeyIn(e.target.value as 'header' | 'query')}>
-                  <MenuItem value="header">Header HTTP</MenuItem>
-                  <MenuItem value="query">Query param (?{keyName || 'key'}=…)</MenuItem>
-                </Select>
-              </FormControl>
-              <Typography variant="caption" color="text.secondary">
-                {keyIn === 'header' ? `Sent as: ${keyName || '<name>'}: <value>` : `Added to URL: ?${keyName || '<name>'}=<value>`}
-              </Typography>
-            </Box>
-          )}
-
-          {authType === 'basic' && (
-            <Box display="flex" flexDirection="column" gap={1.5}>
-              <TextField size="small" fullWidth label="Username" value={basicUser} onChange={(e) => setBasicUser(e.target.value)} />
-              {secretInput(basicPass, setBasicPass, 'Password')}
-              <Typography variant="caption" color="text.secondary">Sent as: <code>Authorization: Basic &lt;base64(username:password)&gt;</code></Typography>
-            </Box>
-          )}
-
-          {authType === 'oauth2-client' && (
-            <Box display="flex" flexDirection="column" gap={1.5}>
-              <TextField size="small" fullWidth label="Token URL" placeholder="https://auth.example.com/oauth/token"
-                value={oauthTokenUrl} onChange={(e) => setOauthTokenUrl(e.target.value)} />
-              <Grid container spacing={1.5}>
-                <Grid item xs={12} sm={6}><TextField size="small" fullWidth label="Client ID" value={oauthClientId} onChange={(e) => setOauthClientId(e.target.value)} /></Grid>
-                <Grid item xs={12} sm={6}>{secretInput(oauthClientSecret, setOauthClientSecret, 'Client Secret')}</Grid>
-              </Grid>
-              <TextField size="small" fullWidth label="Scope (optional)" placeholder="read write" value={oauthScope} onChange={(e) => setOauthScope(e.target.value)} />
-              <Typography variant="caption" color="text.secondary">Uses <strong>client_credentials</strong> flow. Token fetched and renewed automatically.</Typography>
-            </Box>
-          )}
-
-          {authType === 'custom' && (
-            <Box display="flex" flexDirection="column" gap={1}>
-              <Typography variant="caption" color="text.secondary" mb={0.5}>
-                Add any HTTP headers to every request (e.g. <code>X-Tenant-Id</code>, <code>X-Auth-Token</code>).
-              </Typography>
-              {customHeaders.map((h, i) => (
-                <Box key={i} display="flex" gap={1} alignItems="center">
-                  <TextField size="small" label="Header" placeholder="X-Custom-Header" sx={{ flex: 1 }}
-                    value={h.name} onChange={(e) => setCustomHeaders(customHeaders.map((x, idx) => idx === i ? { ...x, name: e.target.value } : x))} />
-                  <TextField size="small" label="Value" sx={{ flex: 2 }}
-                    type={showSecrets ? 'text' : 'password'}
-                    value={h.value} onChange={(e) => setCustomHeaders(customHeaders.map((x, idx) => idx === i ? { ...x, value: e.target.value } : x))}
-                    InputProps={{
-                      endAdornment: i === 0 ? (
-                        <InputAdornment position="end">
-                          <IconButton size="small" onClick={() => setShowSecrets(s => !s)} edge="end">
-                            {showSecrets ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-                          </IconButton>
-                        </InputAdornment>
-                      ) : undefined,
-                    }}
-                  />
-                  <IconButton size="small" color="error" onClick={() => setCustomHeaders(customHeaders.filter((_, idx) => idx !== i))} disabled={customHeaders.length === 1}>
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </Box>
-              ))}
-              <Button size="small" startIcon={<AddIcon />} onClick={() => setCustomHeaders(prev => [...prev, { name: '', value: '' }])} sx={{ alignSelf: 'flex-start', mt: 0.5 }}>
-                Add header
-              </Button>
-            </Box>
-          )}
-
-          {authType !== 'none' && (
-            <Alert severity="warning" sx={{ mt: 2.5, py: 0.5, fontSize: '0.78rem' }}>
-              Use tokens with minimum required scope. Credentials are stored in the database.
-            </Alert>
-          )}
-        </Paper>
-      )}
-
-      {/* ── Step 4: MCP Protection ──────────────────────────────────────── */}
-      {activeStep === 4 && (
         <Box display="flex" flexDirection="column" gap={2.5}>
           <Paper variant="outlined" sx={{ p: 3 }}>
             <Box display="flex" alignItems="center" gap={1} mb={0.5}>
-              <LockIcon fontSize="small" color={mcpAuthEnabled ? 'success' : 'disabled'} />
-              <Typography variant="subtitle1" fontWeight={700}>MCP Authentication</Typography>
+              <IconKey size={16} style={{ opacity: authType !== 'none' ? 1 : 0.4 }} />
+              <Typography variant="subtitle2" fontWeight={700}>API Authentication</Typography>
             </Box>
-            <Typography variant="body2" color="text.secondary" mb={2}>
-              Named API keys that AI clients must include in every request (<code>auth: &lt;key&gt;</code>).
-              Use multiple keys to give different clients independent credentials you can rotate separately.
+            <Typography variant="body2" color="text.secondary" mb={3}>
+              Credentials attached to every outgoing HTTP request when calling your API. The AI never sees these — they are injected automatically.
             </Typography>
-            <FormControlLabel
-              control={
-                <Switch checked={mcpAuthEnabled}
-                  onChange={(e) => {
-                    setMcpAuthEnabled(e.target.checked)
-                    if (e.target.checked && mcpKeyNames.length === 0) setMcpKeyNames(['Default'])
-                  }}
-                  color="success" />
-              }
-              label={<Typography variant="body2">{mcpAuthEnabled ? 'Keys will be created after server is saved.' : 'No key — endpoint will be publicly accessible.'}</Typography>}
-            />
-            {mcpAuthEnabled && (
-              <Box mt={2} display="flex" flexDirection="column" gap={1}>
-                {mcpKeyNames.map((n, i) => (
+
+            <FormControl size="small" fullWidth sx={{ mb: 3 }}>
+              <InputLabel>Authentication type</InputLabel>
+              <Select value={authType} label="Authentication type" onChange={(e) => setAuthType(e.target.value as AuthType)}>
+                {(Object.keys(AUTH_TYPE_LABELS) as AuthType[]).map((t) => (
+                  <MenuItem key={t} value={t}>{AUTH_TYPE_LABELS[t]}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {authType === 'none' && (
+              <Typography variant="body2" color="text.secondary">No credentials will be attached. Use for public APIs.</Typography>
+            )}
+
+            {authType === 'bearer' && (
+              <Box display="flex" flexDirection="column" gap={1.5}>
+                {secretInput(token, setToken, 'Bearer Token')}
+                <Typography variant="caption" color="text.secondary">Sent as: <code>Authorization: Bearer &lt;token&gt;</code></Typography>
+              </Box>
+            )}
+
+            {authType === 'api-key' && (
+              <Box display="flex" flexDirection="column" gap={1.5}>
+                <Grid container spacing={1.5}>
+                  <Grid item xs={12} sm={5}>
+                    <TextField size="small" fullWidth label="Parameter name" placeholder="X-Api-Key" value={keyName} onChange={(e) => setKeyName(e.target.value)} />
+                  </Grid>
+                  <Grid item xs={12} sm={7}>{secretInput(keyValue, setKeyValue, 'Value')}</Grid>
+                </Grid>
+                <FormControl size="small" fullWidth>
+                  <InputLabel>Send as</InputLabel>
+                  <Select value={keyIn} label="Send as" onChange={(e) => setKeyIn(e.target.value as 'header' | 'query')}>
+                    <MenuItem value="header">Header HTTP</MenuItem>
+                    <MenuItem value="query">Query param (?{keyName || 'key'}=…)</MenuItem>
+                  </Select>
+                </FormControl>
+                <Typography variant="caption" color="text.secondary">
+                  {keyIn === 'header' ? `Sent as: ${keyName || '<name>'}: <value>` : `Added to URL: ?${keyName || '<name>'}=<value>`}
+                </Typography>
+              </Box>
+            )}
+
+            {authType === 'basic' && (
+              <Box display="flex" flexDirection="column" gap={1.5}>
+                <TextField size="small" fullWidth label="Username" value={basicUser} onChange={(e) => setBasicUser(e.target.value)} />
+                {secretInput(basicPass, setBasicPass, 'Password')}
+                <Typography variant="caption" color="text.secondary">Sent as: <code>Authorization: Basic &lt;base64(username:password)&gt;</code></Typography>
+              </Box>
+            )}
+
+            {authType === 'oauth2-client' && (
+              <Box display="flex" flexDirection="column" gap={1.5}>
+                <TextField size="small" fullWidth label="Token URL" placeholder="https://auth.example.com/oauth/token"
+                  value={oauthTokenUrl} onChange={(e) => setOauthTokenUrl(e.target.value)} />
+                <Grid container spacing={1.5}>
+                  <Grid item xs={12} sm={6}><TextField size="small" fullWidth label="Client ID" value={oauthClientId} onChange={(e) => setOauthClientId(e.target.value)} /></Grid>
+                  <Grid item xs={12} sm={6}>{secretInput(oauthClientSecret, setOauthClientSecret, 'Client Secret')}</Grid>
+                </Grid>
+                <TextField size="small" fullWidth label="Scope (optional)" placeholder="read write" value={oauthScope} onChange={(e) => setOauthScope(e.target.value)} />
+                <Typography variant="caption" color="text.secondary">Uses <strong>client_credentials</strong> flow. Token fetched and renewed automatically.</Typography>
+              </Box>
+            )}
+
+            {authType === 'custom' && (
+              <Box display="flex" flexDirection="column" gap={1}>
+                <Typography variant="caption" color="text.secondary" mb={0.5}>
+                  Add any HTTP headers to every request (e.g. <code>X-Tenant-Id</code>, <code>X-Auth-Token</code>).
+                </Typography>
+                {customHeaders.map((h, i) => (
                   <Box key={i} display="flex" gap={1} alignItems="center">
-                    <TextField size="small" fullWidth label={`Key ${i + 1} name`}
-                      placeholder="e.g. Claude Desktop, Production"
-                      value={n}
-                      onChange={(e) => setMcpKeyNames(prev => prev.map((v, idx) => idx === i ? e.target.value : v))}
+                    <TextField size="small" label="Header" placeholder="X-Custom-Header" sx={{ flex: 1 }}
+                      value={h.name} onChange={(e) => setCustomHeaders(customHeaders.map((x, idx) => idx === i ? { ...x, name: e.target.value } : x))} />
+                    <TextField size="small" label="Value" sx={{ flex: 2 }}
+                      type={showSecrets ? 'text' : 'password'}
+                      value={h.value} onChange={(e) => setCustomHeaders(customHeaders.map((x, idx) => idx === i ? { ...x, value: e.target.value } : x))}
+                      InputProps={{
+                        endAdornment: i === 0 ? (
+                          <InputAdornment position="end">
+                            <IconButton size="small" onClick={() => setShowSecrets((s) => !s)} edge="end">
+                              {showSecrets ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+                            </IconButton>
+                          </InputAdornment>
+                        ) : undefined,
+                      }}
                     />
-                    <IconButton size="small" color="error"
-                      disabled={mcpKeyNames.length === 1}
-                      onClick={() => setMcpKeyNames(prev => prev.filter((_, idx) => idx !== i))}>
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
+                    <Tooltip title="Remove header">
+                      <span>
+                        <IconButton size="small" color="error" onClick={() => setCustomHeaders(customHeaders.filter((_, idx) => idx !== i))} disabled={customHeaders.length === 1}>
+                          <IconTrash size={16} />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
                   </Box>
                 ))}
-                <Button size="small" startIcon={<AddIcon />}
-                  onClick={() => setMcpKeyNames(prev => [...prev, ''])}
+                <Button size="small" variant="outlined" startIcon={<IconPlus size={14} />}
+                  onClick={() => setCustomHeaders((prev) => [...prev, { name: '', value: '' }])}
                   sx={{ alignSelf: 'flex-start', mt: 0.5 }}>
-                  Add another key
+                  Add header
                 </Button>
               </Box>
             )}
-          </Paper>
 
-          <Paper variant="outlined" sx={{ p: 3 }}>
-            <Box display="flex" alignItems="center" gap={1} mb={0.5}>
-              <SpeedIcon fontSize="small" color={rateLimitEnabled ? 'warning' : 'disabled'} />
-              <Typography variant="subtitle1" fontWeight={700}>Rate Limiting</Typography>
-            </Box>
-            <Typography variant="body2" color="text.secondary" mb={2}>
-              Cap the number of MCP requests per minute. Helps protect your upstream API from being overwhelmed by AI agents.
-            </Typography>
-            <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
-              <FormControlLabel
-                control={<Switch checked={rateLimitEnabled} onChange={(e) => setRateLimitEnabled(e.target.checked)} color="warning" />}
-                label={<Typography variant="body2">{rateLimitEnabled ? 'Active' : 'Inactive'}</Typography>}
-                sx={{ mr: 0 }}
-              />
-              {rateLimitEnabled && (
-                <TextField size="small" type="number" label="Req / min" value={rateLimitRpm}
-                  onChange={(e) => setRateLimitRpm(Math.max(1, Math.min(10000, Number(e.target.value))))}
-                  inputProps={{ min: 1, max: 10000 }} sx={{ width: 130 }}
-                />
-              )}
-            </Box>
-            {rateLimitEnabled && (
-              <Typography variant="caption" color="text.secondary" display="block" mt={1}>
-                Exceeding {rateLimitRpm} req/min returns HTTP 429.
-              </Typography>
+            {authType !== 'none' && (
+              <Alert severity="warning" sx={{ mt: 2.5, py: 0.5, fontSize: '0.78rem' }}>
+                Use tokens with minimum required scope. Credentials are stored in the database.
+              </Alert>
             )}
           </Paper>
+
+          <Alert severity="info" sx={{ fontSize: '0.82rem' }}>
+            <strong>MCP API keys</strong> and <strong>rate limiting</strong> are available in the server settings after creation.
+          </Alert>
         </Box>
       )}
 
       {/* ── Navigation ─────────────────────────────────────────────────── */}
       <Box display="flex" justifyContent="space-between" mt={4}>
-        <Button
-          startIcon={<ArrowBackIcon />}
-          onClick={() => activeStep === 0 ? navigate('/') : setActiveStep(s => s - 1)}
+        <Button size="small"
+          startIcon={<IconArrowLeft size={16} />}
+          onClick={() => activeStep === 0 ? navigate('/') : setActiveStep((s) => s - 1)}
           disabled={creating || previewing}
         >
           {activeStep === 0 ? 'Cancel' : 'Back'}
         </Button>
 
         {!isLastStep && (
-          <Button variant="contained"
-            endIcon={previewing ? undefined : <ArrowForwardIcon />}
-            startIcon={previewing ? <CircularProgress size={15} color="inherit" /> : undefined}
+          <Button variant="contained" size="small"
+            endIcon={previewing ? undefined : <IconArrowRight size={16} />}
+            startIcon={previewing ? <CircularProgress size={14} color="inherit" /> : undefined}
             onClick={handleNext} disabled={!canNext() || previewing}
           >
-            {previewing ? 'Analyzing spec…' : 'Next'}
+            {previewing ? 'Analyzing…' : 'Next'}
           </Button>
         )}
 
         {isLastStep && (
-          <Button variant="contained"
-            startIcon={creating ? <CircularProgress size={15} color="inherit" /> : <AddIcon />}
+          <Button variant="contained" size="small"
+            startIcon={creating ? <CircularProgress size={14} color="inherit" /> : <IconPlus size={16} />}
             onClick={handleCreate} disabled={creating}
           >
             {creating ? 'Creating server…' : 'Create server'}
           </Button>
         )}
       </Box>
-
-      {/* ── Add tool dialog ─────────────────────────────────────────────── */}
-      <Drawer anchor="right" open={addOpen} onClose={() => { setAddOpen(false); setAddError('') }}
-        PaperProps={{ sx: { width: { xs: '100vw', sm: 480 }, display: 'flex', flexDirection: 'column' } }}>
-        <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
-          <Typography variant="h6" fontWeight={700} flexGrow={1}>Add MCP tool</Typography>
-          <IconButton size="small" onClick={() => { setAddOpen(false); setAddError('') }}><CloseIcon fontSize="small" /></IconButton>
-        </Box>
-        <Box sx={{ flex: 1, overflowY: 'auto', px: 3, py: 2.5 }}>
-          <Typography variant="body2" color="text.secondary" mb={2.5}>
-            Define the basic endpoint for this tool. You can add parameters and fine-tune the configuration from the server detail page after creation.
-          </Typography>
-          {addError && <Alert severity="error" sx={{ mb: 2 }}>{addError}</Alert>}
-          <Box display="flex" flexDirection="column" gap={2}>
-            <Grid container spacing={1.5}>
-              <Grid item xs={12} sm={8}>
-                <TextField size="small" fullWidth required label="Tool name"
-                  placeholder="e.g. get_user, create_order"
-                  value={newName}
-                  onChange={(e) => { setNewName(e.target.value); setAddError('') }}
-                  helperText="The identifier the AI uses to call this tool"
-                  InputProps={{ sx: { fontFamily: 'monospace' } }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <FormControl size="small" fullWidth required>
-                  <InputLabel>Method</InputLabel>
-                  <Select value={newMethod} label="Method" onChange={(e) => setNewMethod(e.target.value)}>
-                    {METHODS.map(m => (
-                      <MenuItem key={m} value={m}>
-                        <Box display="flex" alignItems="center" gap={1}>
-                          <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: METHOD_COLOR[m] ?? '#888', flexShrink: 0 }} />
-                          <Typography fontFamily="monospace" fontWeight={600} fontSize="0.85rem">{m}</Typography>
-                        </Box>
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-            </Grid>
-
-            <TextField size="small" fullWidth required label="Path"
-              placeholder="/users/{id}"
-              value={newPath}
-              onChange={(e) => { setNewPath(e.target.value); setAddError('') }}
-              helperText="API endpoint path — will be appended to the server's base URL"
-              InputProps={{ sx: { fontFamily: 'monospace' } }}
-            />
-
-            <TextField size="small" fullWidth multiline minRows={3} maxRows={8} label="Description"
-              placeholder="Describe what this tool does so the AI knows when to use it…"
-              value={newDesc} onChange={(e) => setNewDesc(e.target.value)}
-              helperText="Optional but recommended — a clear description improves AI tool selection accuracy"
-            />
-          </Box>
-        </Box>
-        <Box sx={{ px: 3, py: 2, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1, flexShrink: 0 }}>
-          <Button onClick={() => { setAddOpen(false); setAddError('') }}>Cancel</Button>
-          <Button variant="contained" onClick={handleAddTool} startIcon={<AddIcon />}>Add tool</Button>
-        </Box>
-      </Drawer>
     </Box>
   )
 }

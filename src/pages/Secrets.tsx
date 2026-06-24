@@ -3,13 +3,12 @@ import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
   CircularProgress,
   Drawer,
   Grid,
   IconButton,
   InputAdornment,
+  Paper,
   Skeleton,
   TextField,
   Tooltip,
@@ -44,26 +43,26 @@ interface Secret {
 
 // ─── Secret card ──────────────────────────────────────────────────────────────
 
-function SecretCard({ secret, onEdit, onCopy }: {
+function SecretCard({ secret, onEdit, onCopy, copied }: {
   secret: Secret
   onEdit: (s: Secret) => void
   onCopy: (s: Secret) => void
+  copied: boolean
 }) {
   const [revealed, setRevealed] = useState(false)
   const { can } = useAuth()
 
   return (
-    <Card
+    <Paper
       variant="outlined"
       sx={{
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
-        transition: 'border-color 0.15s, box-shadow 0.15s',
+        transition: 'border-color 0.15s',
         '&:hover': {
           borderColor: 'warning.main',
-          boxShadow: '0 2px 12px rgba(255,180,0,0.12)',
           '& .card-actions': { opacity: 1 },
         },
       }}
@@ -75,8 +74,9 @@ function SecretCard({ secret, onEdit, onCopy }: {
           display: 'flex', gap: 0.25, opacity: 0, transition: 'opacity 0.15s',
         }}
       >
-        <Tooltip title="Copy value">
+        <Tooltip title={copied ? 'Copied!' : 'Copy value'}>
           <IconButton size="small" onClick={() => onCopy(secret)}
+            color={copied ? 'success' : 'default'}
             sx={{ p: 0.5, bgcolor: 'background.paper', '&:hover': { bgcolor: 'action.hover' } }}>
             <IconCopy size={15} />
           </IconButton>
@@ -91,7 +91,7 @@ function SecretCard({ secret, onEdit, onCopy }: {
         )}
       </Box>
 
-      <CardContent sx={{ flexGrow: 1, pb: '12px !important', pr: 5 }}>
+      <Box sx={{ flexGrow: 1, p: 2, pr: 5 }}>
         <Box display="flex" alignItems="center" gap={1} mb={0.5}>
           <Box sx={{ color: 'warning.main', flexShrink: 0 }}><IconLock size={16} /></Box>
           <Typography fontWeight={700} fontSize="0.9375rem" noWrap lineHeight={1.3}>
@@ -136,8 +136,8 @@ function SecretCard({ secret, onEdit, onCopy }: {
         <Typography variant="caption" color="text.disabled" display="block" mt={1}>
           {secret.updatedAt && `Updated ${new Date(secret.updatedAt).toLocaleDateString()}`}
         </Typography>
-      </CardContent>
-    </Card>
+      </Box>
+    </Paper>
   )
 }
 
@@ -301,6 +301,7 @@ export default function Secrets() {
   const [search, setSearch] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<Secret | null>(null)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
   const [snack, setSnack] = useState<{ message: string; severity?: 'success' | 'error' } | null>(null)
   const { can, loading: authLoading } = useAuth()
 
@@ -333,7 +334,8 @@ export default function Secrets() {
   const handleCopy = async (s: Secret) => {
     try {
       await navigator.clipboard.writeText(s.value)
-      setSnack({ message: 'Value copied to clipboard.', severity: 'success' })
+      setCopiedId(s.id)
+      setTimeout(() => setCopiedId(null), 1500)
     } catch {
       setSnack({ message: 'Could not copy.', severity: 'error' })
     }
@@ -355,7 +357,7 @@ export default function Secrets() {
           </Typography>
         </Box>
         {can(Permission.SecretsCreate) && (
-          <Button variant="contained" startIcon={<IconPlus size={18} />} onClick={openCreate}>
+          <Button size="small" variant="contained" startIcon={<IconPlus size={18} />} onClick={openCreate}>
             New secret
           </Button>
         )}
@@ -399,6 +401,7 @@ export default function Secrets() {
                 secret={s}
                 onEdit={openEdit}
                 onCopy={handleCopy}
+                copied={copiedId === s.id}
               />
             </Grid>
           ))}

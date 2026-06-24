@@ -3706,8 +3706,8 @@ function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged,
 
           {/* Disabled chip */}
           {isDisabled && (
-            <Chip label="Disabled" size="small"
-              sx={{ fontSize: '0.65rem', height: 18, bgcolor: '#9e9e9e', color: '#fff', flexShrink: 0 }} />
+            <Chip label="Disabled" size="small" color="default"
+              sx={{ fontSize: '0.65rem', height: 18, flexShrink: 0 }} />
           )}
 
           {/* HTML template chip */}
@@ -5131,7 +5131,7 @@ function ChainDialog({
           <Box>
             <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
               <Typography variant="subtitle2" fontWeight={700}>Steps</Typography>
-              <Button size="small" startIcon={<IconPlus size={14} />} onClick={addStep}
+              <Button size="small" variant="outlined" startIcon={<IconPlus size={14} />} onClick={addStep}
                 disabled={tools.length === 0}>
                 Add step
               </Button>
@@ -5206,9 +5206,10 @@ function ChainsTab({ projectId, initialChains, tools, onChange }: {
   const [editTarget, setEditTarget] = useState<ToolChain | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ToolChain | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [chainError, setChainError] = useState<string | null>(null)
 
-  const openCreate = () => { setEditTarget(null); setDialogOpen(true) }
-  const openEdit = (c: ToolChain) => { setEditTarget(c); setDialogOpen(true) }
+  const openCreate = () => { setEditTarget(null); setChainError(null); setDialogOpen(true) }
+  const openEdit = (c: ToolChain) => { setEditTarget(c); setChainError(null); setDialogOpen(true) }
 
   const handleSaved = async (chain: ToolChain) => {
     try {
@@ -5223,7 +5224,7 @@ function ChainsTab({ projectId, initialChains, tools, onChange }: {
       }
       setDialogOpen(false)
     } catch (err: any) {
-      alert(err?.response?.data?.message ?? 'Failed to save chain.')
+      setChainError(err?.response?.data?.message ?? 'Failed to save chain.')
     }
   }
 
@@ -5319,11 +5320,13 @@ function ChainsTab({ projectId, initialChains, tools, onChange }: {
         </Box>
       )}
 
+      {chainError && <Alert severity="error" sx={{ mt: 1 }} onClose={() => setChainError(null)}>{chainError}</Alert>}
+
       <ChainDialog
         open={dialogOpen}
         editTarget={editTarget}
         tools={tools}
-        onClose={() => setDialogOpen(false)}
+        onClose={() => { setDialogOpen(false); setChainError(null) }}
         onSaved={handleSaved}
       />
 

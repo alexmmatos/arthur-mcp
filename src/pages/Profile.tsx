@@ -4,7 +4,6 @@ import {
   Avatar,
   Box,
   Button,
-  Checkbox,
   Chip,
   CircularProgress,
   Divider,
@@ -17,6 +16,7 @@ import {
   MenuItem,
   Paper,
   Select,
+  Switch,
   Tab,
   Table,
   TableBody,
@@ -524,7 +524,7 @@ function MyProfileTab({ me, onUpdated }: { me: UserProfile; onUpdated: (u: UserP
       <Grid container spacing={3}>
         {/* Basic info */}
         <Grid item xs={12}>
-          <Typography variant="subtitle1" fontWeight={700} mb={2}>Account information</Typography>
+          <Typography variant="subtitle2" fontWeight={700} mb={2}>Account information</Typography>
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
               <TextField size="small" fullWidth label="Username" value={username}
@@ -539,7 +539,7 @@ function MyProfileTab({ me, onUpdated }: { me: UserProfile; onUpdated: (u: UserP
 
         {/* Change password */}
         <Grid item xs={12}>
-          <Typography variant="subtitle1" fontWeight={700} mb={2}>Change password</Typography>
+          <Typography variant="subtitle2" fontWeight={700} mb={2}>Change password</Typography>
           <Grid container spacing={2}>
             <Grid item xs={12} sm={4}>
               <TextField size="small" fullWidth label="Current password" type="password"
@@ -559,7 +559,7 @@ function MyProfileTab({ me, onUpdated }: { me: UserProfile; onUpdated: (u: UserP
         </Grid>
 
         <Grid item xs={12}>
-          <Button variant="contained" onClick={handleSave} disabled={saving}
+          <Button size="small" variant="contained" onClick={handleSave} disabled={saving}
             startIcon={saving ? <CircularProgress size={14} color="inherit" /> : undefined}>
             {saving ? 'Saving…' : 'Save changes'}
           </Button>
@@ -654,8 +654,12 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
                 </TableCell>
                 <TableCell><Typography fontSize="0.82rem" color="text.secondary">{u.email}</Typography></TableCell>
                 <TableCell>
-                  <Chip label={u.role === 'admin' ? 'Admin' : 'User'} size="small"
-                    color={u.role === 'admin' ? 'primary' : 'default'} sx={{ fontSize: '0.72rem', height: 22 }} />
+                  <Chip
+                    label={u.role.charAt(0).toUpperCase() + u.role.slice(1).replace(/_/g, ' ')}
+                    size="small"
+                    color={u.role === 'admin' ? 'primary' : u.role === 'developer' ? 'secondary' : 'default'}
+                    sx={{ fontSize: '0.72rem', height: 22 }}
+                  />
                 </TableCell>
                 <TableCell>
                   <Typography fontSize="0.78rem" color="text.secondary">
@@ -734,7 +738,6 @@ function RoleDrawer({
 
   const allKeys = PERMISSION_GROUPS.flatMap((g) => g.keys)
   const allOn = allKeys.every((k) => permissions[k])
-  const someOn = !allOn && allKeys.some((k) => permissions[k])
 
   const handleSave = async () => {
     if (!name.trim()) { setError('Name is required.'); return }
@@ -786,10 +789,9 @@ function RoleDrawer({
             <Typography variant="subtitle2" fontWeight={700}>Permissions</Typography>
             <FormControlLabel
               control={
-                <Checkbox
+                <Switch
                   size="small"
                   checked={allOn}
-                  indeterminate={someOn}
                   onChange={toggleAll}
                 />
               }
@@ -800,7 +802,6 @@ function RoleDrawer({
           <Box display="flex" flexDirection="column" gap={0}>
             {PERMISSION_GROUPS.map((group, gi) => {
               const groupAllOn = group.keys.every((k) => permissions[k])
-              const groupSomeOn = !groupAllOn && group.keys.some((k) => permissions[k])
               return (
                 <Box key={group.label}>
                   {gi > 0 && <Divider sx={{ my: 1.5 }} />}
@@ -811,10 +812,9 @@ function RoleDrawer({
                     </Typography>
                     <FormControlLabel
                       control={
-                        <Checkbox
+                        <Switch
                           size="small"
                           checked={groupAllOn}
-                          indeterminate={groupSomeOn}
                           onChange={() => toggleGroup(group.keys)}
                         />
                       }
@@ -826,7 +826,7 @@ function RoleDrawer({
                     <FormControlLabel
                       key={key}
                       control={
-                        <Checkbox
+                        <Switch
                           size="small"
                           checked={permissions[key]}
                           onChange={() => toggle(key)}

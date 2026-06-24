@@ -28,11 +28,13 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material'
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
-import ArrowBackIcon from '@mui/icons-material/ArrowBack'
-import ContentCopyIcon from '@mui/icons-material/ContentCopy'
-import PlayArrowIcon from '@mui/icons-material/PlayArrow'
-import SearchIcon from '@mui/icons-material/Search'
+import {
+  IconArrowLeft,
+  IconChevronDown,
+  IconCopy,
+  IconPlayerPlay,
+  IconSearch,
+} from '@tabler/icons-react'
 import api from '../api'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -94,11 +96,12 @@ export interface DocsProject {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const SOURCE_COLOR: Record<string, string> = {
-  path: '#6750a4',
-  query: '#0277bd',
-  body: '#2e7d32',
-  header: '#e65100',
+const METHOD_BG: Record<string, string> = {
+  GET: 'rgba(97,175,254,0.12)',
+  POST: 'rgba(73,204,144,0.12)',
+  PUT: 'rgba(252,161,48,0.12)',
+  PATCH: 'rgba(80,227,194,0.12)',
+  DELETE: 'rgba(249,62,62,0.12)',
 }
 
 // ─── MCP response parser ──────────────────────────────────────────────────────
@@ -114,18 +117,6 @@ function parseMcpResponse(data: unknown): any {
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
-
-function SourceBadge({ source }: { source: string }) {
-  return (
-    <Box component="span" sx={{
-      display: 'inline-block', px: 0.8, py: 0.15, borderRadius: '3px',
-      fontSize: '0.68rem', fontWeight: 700, color: '#fff',
-      bgcolor: SOURCE_COLOR[source] ?? '#555', fontFamily: 'monospace', letterSpacing: '0.03em',
-    }}>
-      {source}
-    </Box>
-  )
-}
 
 function TypeBadge({ type }: { type?: string }) {
   return (
@@ -221,15 +212,16 @@ function ToolCard({ tool, projectId, mcpApiKey }: { tool: GeneratedTool; project
       const text = content?.[0]?.text ?? JSON.stringify(rpc?.result ?? rpc, null, 2)
       try { setResponse(JSON.stringify(JSON.parse(text), null, 2)) } catch { setResponse(text) }
     } catch (err: any) {
-      setResponse(err?.response?.data?.message ?? err?.message ?? 'Erro desconhecido')
+      setResponse(err?.response?.data?.message ?? err?.message ?? 'Unknown error')
       setResponseIsError(true)
     } finally { setExecuting(false) }
   }
 
   return (
     <Accordion variant="outlined" sx={{ mb: '6px', '&:before': { display: 'none' } }}>
-      <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{
-        bgcolor: 'action.hover', borderRadius: '7px 7px 0 0',
+      <AccordionSummary expandIcon={<IconChevronDown size={18} />} sx={{
+        bgcolor: METHOD_BG[tool.endpointRef?.method?.toUpperCase()] ?? 'action.hover',
+        borderRadius: '7px 7px 0 0',
         minHeight: '52px !important', '&.Mui-expanded': { borderRadius: '7px 7px 0 0' }, px: 2,
       }}>
         <Box display="flex" alignItems="center" gap={1.5} width="100%" minWidth={0}>
@@ -268,7 +260,7 @@ function ToolCard({ tool, projectId, mcpApiKey }: { tool: GeneratedTool; project
                     return (
                       <TableRow key={name} sx={{ '&:last-child td': { border: 0 } }}>
                         <TableCell><Typography fontFamily="monospace" fontSize="0.8rem" fontWeight={600}>{name}</Typography></TableCell>
-                        <TableCell><SourceBadge source={mapping?.source ?? 'query'} /></TableCell>
+                        <TableCell>{(() => { const source = mapping?.source ?? 'query'; return <Chip label={source} size="small" variant="outlined" color={source === 'path' ? 'secondary' : source === 'body' ? 'warning' : source === 'header' ? 'error' : 'primary'} sx={{ height: 18, fontSize: '0.65rem' }} /> })()}</TableCell>
                         <TableCell><TypeBadge type={schema.type} /></TableCell>
                         <TableCell>
                           {isRequired
@@ -308,10 +300,10 @@ function ToolCard({ tool, projectId, mcpApiKey }: { tool: GeneratedTool; project
                 </Box>
               : <Typography variant="body2" color="text.secondary" mt={1} mb={2}>This tool has no parameters.</Typography>}
             <Button variant="contained" size="small"
-              startIcon={executing ? <CircularProgress size={13} color="inherit" /> : <PlayArrowIcon fontSize="small" />}
+              startIcon={executing ? <CircularProgress size={13} color="inherit" /> : <IconPlayerPlay size={16} />}
               onClick={handleExecute} disabled={executing}
               sx={{ mb: response !== null ? 2 : 0, fontWeight: 600 }}>
-              {executing ? 'Executing...' : 'Execute'}
+              {executing ? 'Executing…' : 'Execute'}
             </Button>
             {response !== null && (
               <Box component="pre" sx={{
@@ -336,7 +328,7 @@ function ToolCard({ tool, projectId, mcpApiKey }: { tool: GeneratedTool; project
               <Tooltip title={exampleCopied ? 'Copied!' : 'Copy'}>
                 <IconButton size="small" onClick={handleCopyExample}
                   sx={{ position: 'absolute', top: 8, right: 8, color: exampleCopied ? 'primary.light' : '#abb2bf', '&:hover': { color: '#fff' } }}>
-                  <ContentCopyIcon sx={{ fontSize: 15 }} />
+                  <IconCopy size={15} />
                 </IconButton>
               </Tooltip>
               {mcpExample}
@@ -387,7 +379,7 @@ function ResourceCard({ resource, projectId, mcpApiKey }: { resource: DocsResour
 
   return (
     <Accordion variant="outlined" sx={{ mb: '6px', '&:before': { display: 'none' } }}>
-      <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{
+      <AccordionSummary expandIcon={<IconChevronDown size={18} />} sx={{
         bgcolor: 'action.hover', borderRadius: '7px 7px 0 0',
         minHeight: '52px !important', '&.Mui-expanded': { borderRadius: '7px 7px 0 0' }, px: 2,
       }}>
@@ -429,10 +421,10 @@ function ResourceCard({ resource, projectId, mcpApiKey }: { resource: DocsResour
         {tryMode && (
           <Box>
             <Button variant="contained" size="small"
-              startIcon={executing ? <CircularProgress size={13} color="inherit" /> : <PlayArrowIcon fontSize="small" />}
+              startIcon={executing ? <CircularProgress size={13} color="inherit" /> : <IconPlayerPlay size={16} />}
               onClick={handleExecute} disabled={executing}
               sx={{ mb: response !== null ? 2 : 0, fontWeight: 600 }}>
-              {executing ? 'Executing...' : 'Execute'}
+              {executing ? 'Executing…' : 'Execute'}
             </Button>
             {response !== null && (
               <Box component="pre" sx={{
@@ -457,7 +449,7 @@ function ResourceCard({ resource, projectId, mcpApiKey }: { resource: DocsResour
               <Tooltip title={exampleCopied ? 'Copied!' : 'Copy'}>
                 <IconButton size="small" onClick={handleCopyExample}
                   sx={{ position: 'absolute', top: 8, right: 8, color: exampleCopied ? 'primary.light' : '#abb2bf', '&:hover': { color: '#fff' } }}>
-                  <ContentCopyIcon sx={{ fontSize: 15 }} />
+                  <IconCopy size={15} />
                 </IconButton>
               </Tooltip>
               {mcpExample}
@@ -515,7 +507,7 @@ function PromptCard({ prompt, projectId, mcpApiKey }: { prompt: GlobalPrompt; pr
 
   return (
     <Accordion variant="outlined" sx={{ mb: '6px', '&:before': { display: 'none' } }}>
-      <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{
+      <AccordionSummary expandIcon={<IconChevronDown size={18} />} sx={{
         bgcolor: 'action.hover', borderRadius: '7px 7px 0 0',
         minHeight: '52px !important', '&.Mui-expanded': { borderRadius: '7px 7px 0 0' }, px: 2,
       }}>
@@ -603,10 +595,10 @@ function PromptCard({ prompt, projectId, mcpApiKey }: { prompt: GlobalPrompt; pr
                 </Box>
               : <Typography variant="body2" color="text.secondary" mt={1} mb={2}>This prompt has no arguments.</Typography>}
             <Button variant="contained" size="small"
-              startIcon={executing ? <CircularProgress size={13} color="inherit" /> : <PlayArrowIcon fontSize="small" />}
+              startIcon={executing ? <CircularProgress size={13} color="inherit" /> : <IconPlayerPlay size={16} />}
               onClick={handleExecute} disabled={executing}
               sx={{ mb: response !== null ? 2 : 0, fontWeight: 600 }}>
-              {executing ? 'Executing...' : 'Execute'}
+              {executing ? 'Executing…' : 'Execute'}
             </Button>
             {response !== null && (
               <Box component="pre" sx={{
@@ -631,7 +623,7 @@ function PromptCard({ prompt, projectId, mcpApiKey }: { prompt: GlobalPrompt; pr
               <Tooltip title={exampleCopied ? 'Copied!' : 'Copy'}>
                 <IconButton size="small" onClick={handleCopyExample}
                   sx={{ position: 'absolute', top: 8, right: 8, color: exampleCopied ? 'primary.light' : '#abb2bf', '&:hover': { color: '#fff' } }}>
-                  <ContentCopyIcon sx={{ fontSize: 15 }} />
+                  <IconCopy size={15} />
                 </IconButton>
               </Tooltip>
               {mcpExample}
@@ -679,17 +671,17 @@ export function McpDocsContent({ project: server, projectId }: { project: DocsPr
   return (
     <Box>
       {/* Header */}
-      <Paper variant="outlined" sx={{ mb: 3, overflow: 'hidden', borderColor: 'primary.light' }}>
-        <Box sx={{ bgcolor: 'primary.main', px: 3, py: 2.5 }}>
+      <Paper variant="outlined" sx={{ mb: 3, overflow: 'hidden' }}>
+        <Box sx={{ bgcolor: 'background.paper', px: 3, py: 2.5, borderBottom: 1, borderColor: 'divider' }}>
           <Box display="flex" alignItems="center" gap={1.5} flexWrap="wrap">
-            <Typography variant="h5" fontWeight={700} color="#fff" lineHeight={1.2}>{server.name}</Typography>
+            <Typography variant="h5" fontWeight={700} lineHeight={1.2}>{server.name}</Typography>
             {server.version && (
-              <Box sx={{ px: 1, py: 0.2, bgcolor: 'rgba(255,255,255,0.25)', borderRadius: 1, fontSize: '0.75rem', color: '#fff', fontWeight: 700, alignSelf: 'flex-start', mt: 0.3 }}>
+              <Box sx={{ px: 1, py: 0.2, bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider', borderRadius: 1, fontSize: '0.75rem', color: 'text.secondary', fontWeight: 700, alignSelf: 'flex-start', mt: 0.3 }}>
                 {server.version}
               </Box>
             )}
           </Box>
-          {server.description && <Typography color="rgba(255,255,255,0.8)" variant="body2" mt={0.5}>{server.description}</Typography>}
+          {server.description && <Typography color="text.secondary" variant="body2" mt={0.5}>{server.description}</Typography>}
         </Box>
 
         <Box px={3} py={2}>
@@ -699,7 +691,7 @@ export function McpDocsContent({ project: server, projectId }: { project: DocsPr
           </Box>
 
           <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" mb={0.75} sx={{ letterSpacing: '0.06em' }}>
-            ENDPOINT MCP
+            MCP ENDPOINT
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, bgcolor: 'action.hover', borderRadius: 1, px: 2, py: 1.25, border: '1px solid', borderColor: 'divider' }}>
             <Typography fontFamily="monospace" fontSize="0.85rem" flexGrow={1} sx={{ wordBreak: 'break-all', color: 'text.primary' }}>
@@ -707,7 +699,7 @@ export function McpDocsContent({ project: server, projectId }: { project: DocsPr
             </Typography>
             <Tooltip title={urlCopied ? 'Copied!' : 'Copy URL'}>
               <IconButton size="small" onClick={() => { navigator.clipboard.writeText(mcpUrl); setUrlCopied(true); setTimeout(() => setUrlCopied(false), 2000) }} color={urlCopied ? 'primary' : 'default'}>
-                <ContentCopyIcon fontSize="small" />
+                <IconCopy size={16} />
               </IconButton>
             </Tooltip>
           </Box>
@@ -727,7 +719,7 @@ export function McpDocsContent({ project: server, projectId }: { project: DocsPr
       {/* Search */}
       <Box display="flex" alignItems="center" gap={1.5} mb={2.5} flexWrap="wrap">
         <TextField size="small" placeholder="Search tool..." value={search} onChange={(e) => setSearch(e.target.value)} sx={{ width: 260 }}
-          InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" color="action" /></InputAdornment> }} />
+          InputProps={{ startAdornment: <InputAdornment position="start"><IconSearch size={16} /></InputAdornment> }} />
         <Typography variant="body2" color="text.secondary" ml="auto">{filteredTools.length} / {enabledTools.length}</Typography>
       </Box>
 
@@ -791,8 +783,8 @@ export default function McpDocs() {
   if (error || !project) return <Box p={3}><Alert severity="error">{error || 'Error loading server.'}</Alert></Box>
 
   return (
-    <Box p={3}>
-      <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(`/servers/${id}`)} sx={{ mb: 2 }}>
+    <Box py={3}>
+      <Button size="small" startIcon={<IconArrowLeft size={18} />} onClick={() => navigate(`/servers/${id}`)} sx={{ mb: 2 }}>
         Back to server
       </Button>
       <McpDocsContent project={project} projectId={id!} />

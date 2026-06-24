@@ -3,8 +3,6 @@ import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
   Chip,
   CircularProgress,
   Drawer,
@@ -50,24 +48,24 @@ interface Prompt {
 
 // ─── Prompt card ──────────────────────────────────────────────────────────────
 
-function PromptCard({ prompt, onEdit, onCopy, canEdit }: {
+function PromptCard({ prompt, onEdit, onCopy, canEdit, copied }: {
   prompt: Prompt
   onEdit: (p: Prompt) => void
   onCopy: (p: Prompt) => void
   canEdit: boolean
+  copied: boolean
 }) {
   return (
-    <Card
+    <Paper
       variant="outlined"
       sx={{
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
-        transition: 'border-color 0.15s, box-shadow 0.15s',
+        transition: 'border-color 0.15s',
         '&:hover': {
           borderColor: 'primary.main',
-          boxShadow: '0 2px 12px rgba(93,135,255,0.12)',
           '& .card-actions': { opacity: 1 },
         },
       }}
@@ -80,8 +78,9 @@ function PromptCard({ prompt, onEdit, onCopy, canEdit }: {
           display: 'flex', gap: 0.25, opacity: 0, transition: 'opacity 0.15s',
         }}
       >
-        <Tooltip title="Copy content">
+        <Tooltip title={copied ? 'Copied!' : 'Copy content'}>
           <IconButton size="small" onClick={() => onCopy(prompt)}
+            color={copied ? 'success' : 'default'}
             sx={{ p: 0.5, bgcolor: 'background.paper', '&:hover': { bgcolor: 'action.hover' } }}>
             <IconCopy size={15} />
           </IconButton>
@@ -96,7 +95,7 @@ function PromptCard({ prompt, onEdit, onCopy, canEdit }: {
         )}
       </Box>
 
-      <CardContent sx={{ flexGrow: 1, pb: '12px !important', pr: 5 }}>
+      <Box sx={{ flexGrow: 1, p: 2, pr: 5 }}>
         {/* Name */}
         <Box display="flex" alignItems="center" gap={1} mb={0.5}>
           <Box sx={{ color: 'primary.main', flexShrink: 0 }}><IconMessage2 size={16} /></Box>
@@ -161,8 +160,8 @@ function PromptCard({ prompt, onEdit, onCopy, canEdit }: {
           {prompt.content.length} chars
           {prompt.updatedAt && ` · Updated ${new Date(prompt.updatedAt).toLocaleDateString()}`}
         </Typography>
-      </CardContent>
-    </Card>
+      </Box>
+    </Paper>
   )
 }
 
@@ -432,6 +431,7 @@ export default function Prompts() {
   const [tagFilter, setTagFilter] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<Prompt | null>(null)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
   const [snack, setSnack] = useState<{ message: string; severity?: 'success' | 'error' } | null>(null)
 
   useEffect(() => {
@@ -471,7 +471,8 @@ export default function Prompts() {
   const handleCopy = async (p: Prompt) => {
     try {
       await navigator.clipboard.writeText(p.content)
-      setSnack({ message: 'Copied to clipboard.', severity: 'success' })
+      setCopiedId(p.id)
+      setTimeout(() => setCopiedId(null), 1500)
     } catch {
       setSnack({ message: 'Could not copy.', severity: 'error' })
     }
@@ -494,7 +495,7 @@ export default function Prompts() {
           </Typography>
         </Box>
         {can(Permission.PromptsCreate) && (
-          <Button variant="contained" startIcon={<IconPlus size={18} />} onClick={openCreate}>
+          <Button size="small" variant="contained" startIcon={<IconPlus size={18} />} onClick={openCreate}>
             New prompt
           </Button>
         )}
@@ -561,6 +562,7 @@ export default function Prompts() {
                 onEdit={openEdit}
                 onCopy={handleCopy}
                 canEdit={can(Permission.PromptsEdit)}
+                copied={copiedId === p.id}
               />
             </Grid>
           ))}
