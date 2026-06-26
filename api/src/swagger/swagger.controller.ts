@@ -17,7 +17,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt.guard';
-import type { AuthConfig, EndpointRef } from '../dynamic-mcp/types';
+import type { AuthConfig, DbConnectionConfig, DbQuery, EndpointRef, ExecutionRef } from '../dynamic-mcp/types';
 import { SwaggerService } from './swagger.service';
 
 @Controller('swagger')
@@ -82,8 +82,7 @@ export class SwaggerController {
   @Post('servers')
   createEmpty(@Body() dto: { name?: string; description?: string; baseUrl?: string }) {
     if (!dto.name?.trim()) throw new BadRequestException('Name is required.');
-    if (!dto.baseUrl?.trim()) throw new BadRequestException('Base URL is required.');
-    return this.swaggerService.createEmpty(dto as any);
+    return this.swaggerService.createEmpty({ ...dto, baseUrl: dto.baseUrl?.trim() || '' } as any);
   }
 
   @Get('servers')
@@ -420,6 +419,86 @@ export class SwaggerController {
   ) {
     if (!endpointRef) throw new BadRequestException('endpointRef is required.');
     return this.swaggerService.testEndpoint(id, endpointRef, args ?? {});
+  }
+
+  // ── DB connection management ──────────────────────────────────────────────────
+
+  @Patch('servers/:id/connection')
+  updateConnection(@Param('id') id: string, @Body() cfg: DbConnectionConfig) {
+    return this.swaggerService.updateConnectionConfig(id, cfg);
+  }
+
+  @Post('servers/:id/test-db-connection')
+  @HttpCode(200)
+  testDbConnection(@Param('id') id: string) {
+    return this.swaggerService.testDbConnection(id);
+  }
+
+  @Post('servers/:id/introspect')
+  @HttpCode(200)
+  introspect(@Param('id') id: string) {
+    return this.swaggerService.introspectDbSchema(id);
+  }
+
+  @Post('servers/:id/test-db-query')
+  @HttpCode(200)
+  testDbQuery(
+    @Param('id') id: string,
+    @Body('executionRef') executionRef: ExecutionRef,
+    @Body('args') args: Record<string, unknown>,
+  ) {
+    if (!executionRef) throw new BadRequestException('executionRef is required.');
+    return this.swaggerService.testDbQuery(id, executionRef, args ?? {});
+  }
+
+  // ── DbQuery CRUD ──────────────────────────────────────────────────────────────
+
+  @Get('servers/:id/queries')
+  listDbQueries(@Param('id') id: string) {
+    return this.swaggerService.listDbQueries(id);
+  }
+
+  @Post('servers/:id/queries')
+  addDbQuery(@Param('id') id: string, @Body() dto: Omit<DbQuery, 'id'>) {
+    if (!dto.name?.trim()) throw new BadRequestException('name is required.');
+    if (!dto.sourceType) throw new BadRequestException('sourceType is required.');
+    return this.swaggerService.addDbQuery(id, dto);
+  }
+
+  @Put('servers/:id/queries/:queryId')
+  updateDbQuery(
+    @Param('id') id: string,
+    @Param('queryId') queryId: string,
+    @Body() dto: Partial<Omit<DbQuery, 'id'>>,
+  ) {
+    return this.swaggerService.updateDbQuery(id, queryId, dto);
+  }
+
+  @Delete('servers/:id/queries/:queryId')
+  @HttpCode(204)
+  deleteDbQuery(@Param('id') id: string, @Param('queryId') queryId: string) {
+    return this.swaggerService.deleteDbQuery(id, queryId);
+  }
+
+  @Post('servers/:id/queries/:queryId/run')
+  @HttpCode(200)
+  runDbQuery(
+    @Param('id') id: string,
+    @Param('queryId') queryId: string,
+    @Body('args') args: Record<string, unknown>,
+  ) {
+    return this.swaggerService.runDbQuery(id, queryId, args ?? {});
+  }
+
+  @Post('servers/:id/run-query-inline')
+  @HttpCode(200)
+  runQueryInline(
+    @Param('id') id: string,
+    @Body('query') query: DbQuery,
+    @Body('args') args: Record<string, unknown>,
+  ) {
+    if (!query) throw new BadRequestException('query is required.');
+    return this.swaggerService.runQueryInline(id, query, args ?? {});
   }
 
   // ── Share link ────────────────────────────────────────────────────────────────

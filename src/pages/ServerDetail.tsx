@@ -1,4 +1,8 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from 'react'
+import {
+  getSourceType, isDbSource, isSqlSource, isNoSqlSource, isBlankSource,
+  SOURCE_DISPLAY, SourceType, SQL_SOURCES, NOSQL_SOURCES,
+} from '../utils/sourceType'
 import Handlebars from 'handlebars'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
@@ -17,6 +21,7 @@ import {
   DialogTitle,
   Drawer,
   Divider,
+  Checkbox,
   FormControl,
   FormControlLabel,
   Grid,
@@ -79,11 +84,15 @@ import {
   IconArrowsMinimize,
   IconExternalLink,
   IconLink,
+  IconTable,
+  IconColumns,
+  IconChevronRight,
 } from '@tabler/icons-react'
 import { QRCodeSVG } from 'qrcode.react'
 import MonacoEditor from '@monaco-editor/react'
 import { useColorMode } from '../theme/ColorModeContext'
 import { useAuth, Permission } from '../context/AuthContext'
+import { useServerNav, type ServerNavItem } from '../context/ServerNavContext'
 import api from '../api'
 import HelpButton from '../components/HelpButton'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -123,6 +132,66 @@ interface ToolComment {
   createdAt: string
 }
 
+interface ExecutionRef {
+  type: 'sql' | 'mongodb' | 'redis' | 'elasticsearch' | 'dynamodb' | 'firestore' | 'db' | 'static'
+  dialect?: string
+  query?: string
+  paramStyle?: string
+  resultMode?: string
+  collection?: string
+  operation?: string
+  filterTemplate?: string
+  projectionTemplate?: string
+  pipeline?: unknown[]
+  documentTemplate?: string
+  command?: string
+  keyPattern?: string
+  valueTemplate?: string
+  dbQueryId?: string
+  responseTemplate?: string
+  mimeType?: string
+}
+
+interface DbQueryParameter {
+  name: string
+  type: 'string' | 'number' | 'boolean' | 'array' | 'object'
+  required?: boolean
+  description?: string
+  default?: unknown
+}
+
+interface DbQuery {
+  id: string
+  name: string
+  description?: string
+  sourceType: string
+  query?: string
+  resultMode?: 'rows' | 'first' | 'count'
+  collection?: string
+  operationType?: 'find' | 'findOne' | 'insertOne' | 'updateOne' | 'deleteOne' | 'aggregate' | 'count'
+  filterTemplate?: string
+  projectionTemplate?: string
+  updateTemplate?: string
+  pipeline?: string
+  sortTemplate?: string
+  limitValue?: number
+  command?: string
+  keyPattern?: string
+  valueTemplate?: string
+  tableName?: string
+  dynamoOperation?: string
+  esIndex?: string
+  esOperation?: string
+  esBodyTemplate?: string
+  gqlDocument?: string
+  gqlOperationType?: 'query' | 'mutation'
+  grpcService?: string
+  grpcMethod?: string
+  grpcRequestTemplate?: string
+  parameters?: DbQueryParameter[]
+  iteratorPath?: string
+}
+
 interface GeneratedTool {
   name: string
   description?: string
@@ -130,7 +199,8 @@ interface GeneratedTool {
   outputSchema?: JsonSchema
   outputTemplate?: string
   errorConfig?: { message: string }
-  endpointRef: EndpointRef
+  endpointRef?: EndpointRef
+  executionRef?: ExecutionRef
   endpointSource?: string
   enabled?: boolean
   comments?: ToolComment[]
@@ -214,12 +284,15 @@ interface Project {
   resources?: McpResource[]
   prompts?: McpPrompt[]
   chains?: ToolChain[]
+  dbQueries?: DbQuery[]
   mcpApiKey?: string
   mcpApiKeys?: McpApiKeyEntry[]
   oauthClientId?: string
   oauthClientSecret?: string
   rateLimit?: { enabled: boolean; requestsPerMinute: number }
   auth?: AuthConfig
+  tags?: string[]
+  connectionConfig?: Record<string, unknown>
   createdAt: string
   updatedAt: string
 }
@@ -1324,7 +1397,8 @@ function ApiEndpointsTab({ tools, projectId, projectBaseUrl, anyApiKey, onToolAd
   const [createOpen, setCreateOpen] = useState(false)
   const [editEndpoint, setEditEndpoint] = useState<GeneratedTool | null>(null)
 
-  const endpoints = tools.map((t) => ({ tool: t, ...t.endpointRef }))
+  const apiTools = tools.filter((t): t is GeneratedTool & { endpointRef: EndpointRef } => !!t.endpointRef)
+  const endpoints: Array<{ tool: GeneratedTool } & EndpointRef> = apiTools.map((t) => ({ tool: t, ...t.endpointRef }))
 
   const methods = [...new Set(endpoints.map((e) => e.method.toUpperCase()))].sort()
 
@@ -1581,6 +1655,9 @@ function toolToFormState(tool: GeneratedTool | undefined) {
     return { name: '', description: '', method: 'GET', path: '/', contentType: 'application/json', params: [] as ParamEntry[], staticHeaders: [] as HeaderEntry[], useOutputTemplate: false, outputTemplate: '' }
   }
   const { endpointRef, inputSchema } = tool
+  if (!endpointRef) {
+    return { name: tool.name, description: tool.description ?? '', method: 'GET', path: '/', contentType: 'application/json', params: [] as ParamEntry[], staticHeaders: [] as HeaderEntry[], useOutputTemplate: !!tool.outputTemplate, outputTemplate: tool.outputTemplate ?? '' }
+  }
   return {
     name: tool.name,
     description: tool.description ?? '',
@@ -3420,6 +3497,7 @@ function ToolDialog({ open, onClose, onSaved, onDeleted, projectId, projectBaseU
 // ─── Curl snippet ─────────────────────────────────────────────────────────────
 
 function buildCurl(tool: GeneratedTool): string {
+  if (!tool.endpointRef) return `# No HTTP endpoint for this tool`
   const { method, path, baseUrl, parameterMap } = tool.endpointRef
   const properties = tool.inputSchema.properties ?? {}
   let url = `${baseUrl}${path}`
@@ -3616,7 +3694,9 @@ function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged,
   // Sync when parent updates the tool (e.g. after dialog save)
   useEffect(() => { setTool(initialTool) }, [initialTool])
 
-  const { method, path, parameterMap } = tool.endpointRef
+  const method = tool.endpointRef?.method
+  const path = tool.endpointRef?.path
+  const parameterMap = tool.endpointRef?.parameterMap
   const properties = tool.inputSchema.properties ?? {}
   const requiredFields = tool.inputSchema.required ?? []
   const allParams = parameterMap ?? []
@@ -3673,30 +3753,34 @@ function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged,
     } finally { setExecuting(false) }
   }
 
+  const methodKey = method ?? ''
+  const isHttpTool = !!method
   return (
     <Accordion variant="outlined" sx={{
       mb: '6px', '&:before': { display: 'none' },
-      borderColor: isDisabled ? 'divider' : `${METHOD_COLOR[method] ?? '#ddd'}33`,
-      '&.Mui-expanded': { borderColor: isDisabled ? '#ccc' : `${METHOD_COLOR[method] ?? '#ddd'}88` },
+      borderColor: isDisabled ? 'divider' : isHttpTool ? `${METHOD_COLOR[methodKey] ?? '#ddd'}33` : 'divider',
+      '&.Mui-expanded': { borderColor: isDisabled ? '#ccc' : isHttpTool ? `${METHOD_COLOR[methodKey] ?? '#ddd'}88` : 'primary.main' },
       opacity: isDisabled ? 0.6 : 1,
       transition: 'opacity 0.2s',
     }}>
       <AccordionSummary expandIcon={<IconChevronDown />} sx={{
-        bgcolor: isDisabled ? 'action.hover' : METHOD_BG[method] ?? 'background.paper',
+        bgcolor: isDisabled ? 'action.hover' : isHttpTool ? (METHOD_BG[methodKey] ?? 'background.paper') : 'background.paper',
         borderRadius: '7px 7px 0 0',
         minHeight: '52px !important', px: 2,
         filter: isDisabled ? 'grayscale(0.5)' : 'none',
       }}>
         <Box display="flex" alignItems="center" gap={1.5} minWidth={0} width="100%">
-          {/* Method badge */}
-          <Box sx={{
-            px: 1.2, py: 0.4, borderRadius: '4px',
-            bgcolor: METHOD_COLOR[method] ?? '#888', color: '#fff',
-            fontWeight: 700, fontSize: '0.72rem', fontFamily: 'monospace',
-            minWidth: 58, textAlign: 'center', flexShrink: 0,
-          }}>
-            {method}
-          </Box>
+          {/* Method badge — only for HTTP tools */}
+          {isHttpTool && (
+            <Box sx={{
+              px: 1.2, py: 0.4, borderRadius: '4px',
+              bgcolor: METHOD_COLOR[methodKey] ?? '#888', color: '#fff',
+              fontWeight: 700, fontSize: '0.72rem', fontFamily: 'monospace',
+              minWidth: 58, textAlign: 'center', flexShrink: 0,
+            }}>
+              {method}
+            </Box>
+          )}
 
           {/* Tool name — editable */}
           <Box onClick={(e) => e.stopPropagation()} sx={{ flexShrink: 0 }}>
@@ -4117,8 +4201,8 @@ function DynamicResourceDialog({
                     {tools.filter((t) => !!t.endpointRef).map((t) => (
                       <MenuItem key={t.name} value={t.name}>
                         <Box display="flex" alignItems="center" gap={1}>
-                          <Chip label={t.endpointRef.method.toUpperCase()} size="small" sx={{ fontSize: '0.65rem', height: 18 }} />
-                          <Typography variant="body2" fontFamily="monospace">{t.endpointRef.path}</Typography>
+                          <Chip label={t.endpointRef!.method.toUpperCase()} size="small" sx={{ fontSize: '0.65rem', height: 18 }} />
+                          <Typography variant="body2" fontFamily="monospace">{t.endpointRef!.path}</Typography>
                           <Typography variant="caption" color="text.secondary">{t.name}</Typography>
                         </Box>
                       </MenuItem>
@@ -4131,13 +4215,13 @@ function DynamicResourceDialog({
                       <Box sx={{
                         px: 1, py: 0.3, borderRadius: '4px', fontFamily: 'monospace', fontWeight: 700,
                         fontSize: '0.72rem', minWidth: 52, textAlign: 'center', flexShrink: 0,
-                        bgcolor: METHOD_COLOR[selectedTool.endpointRef.method.toUpperCase()] ?? '#888',
+                        bgcolor: METHOD_COLOR[selectedTool.endpointRef?.method.toUpperCase() ?? ''] ?? '#888',
                         color: '#fff',
                       }}>
-                        {selectedTool.endpointRef.method.toUpperCase()}
+                        {selectedTool.endpointRef?.method.toUpperCase()}
                       </Box>
                       <Typography fontFamily="monospace" fontSize="0.84rem" fontWeight={600} flexGrow={1} minWidth={0} noWrap>
-                        {selectedTool.endpointRef.path}
+                        {selectedTool.endpointRef?.path}
                       </Typography>
                       <Chip size="small" label={selectedTool.name}
                         sx={{ fontFamily: 'monospace', fontSize: '0.68rem', height: 20, bgcolor: 'action.hover', flexShrink: 0 }} />
@@ -4151,10 +4235,10 @@ function DynamicResourceDialog({
                 )}
               </>
             )}
-            {selectedTool && selectedTool.endpointRef.parameterMap.length > 0 && (
+            {selectedTool && (selectedTool.endpointRef?.parameterMap?.length ?? 0) > 0 && (
               <Box display="flex" flexDirection="column" gap={1}>
                 <Typography variant="caption" color="text.secondary" fontWeight={600}>Fixed parameter values</Typography>
-                {selectedTool.endpointRef.parameterMap.map((p) => (
+                {selectedTool.endpointRef?.parameterMap?.map((p) => (
                   <TextField key={p.toolParamName} size="small" fullWidth
                     label={p.toolParamName}
                     helperText={`source: ${p.source}${p.required ? ' · required' : ''}`}
@@ -5983,6 +6067,2100 @@ function FromEndpointPickerDialog({ open, tools, onPick, onClose, onBlank, title
   )
 }
 
+// ─── ConnectionTab ────────────────────────────────────────────────────────────
+
+function maskSecret(val: string | undefined | null, visibleChars = 0): string {
+  if (!val) return '—'
+  if (visibleChars > 0) {
+    return '••••••' + val.slice(-visibleChars)
+  }
+  return '••••••'
+}
+
+function ConnectionConfigDisplay({ config, sourceType }: { config: Record<string, unknown>; sourceType: SourceType }) {
+  if (isSqlSource(sourceType) && sourceType !== 'mongodb' && sourceType !== 'redis') {
+    const rows: Array<{ label: string; value: string; mask?: boolean }> = [
+      { label: 'Host', value: String(config.host ?? '—') },
+      { label: 'Port', value: String(config.port ?? '—') },
+      { label: 'Database', value: String(config.database ?? '—') },
+      { label: 'Username', value: String(config.username ?? '—') },
+      { label: 'Password', value: String(config.password ?? ''), mask: true },
+      { label: 'SSL', value: config.ssl ? 'Enabled' : 'Disabled' },
+    ]
+    return (
+      <Table size="small">
+        <TableBody>
+          {rows.map((r) => (
+            <TableRow key={r.label} sx={{ '&:last-child td': { border: 0 } }}>
+              <TableCell sx={{ fontWeight: 600, width: 140, color: 'text.secondary', fontSize: '0.82rem' }}>{r.label}</TableCell>
+              <TableCell sx={{ fontFamily: r.mask ? 'monospace' : undefined, fontSize: '0.85rem' }}>
+                {r.mask ? maskSecret(config.password as string) : r.value}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    )
+  }
+  if (sourceType === 'mongodb') {
+    const uri = String(config.uri ?? '—')
+    const maskedUri = uri.replace(/:([^@/]+)@/, ':••••••@')
+    return (
+      <Table size="small">
+        <TableBody>
+          <TableRow>
+            <TableCell sx={{ fontWeight: 600, width: 140, color: 'text.secondary', fontSize: '0.82rem' }}>URI</TableCell>
+            <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.82rem', wordBreak: 'break-all' }}>{maskedUri}</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    )
+  }
+  if (sourceType === 'redis') {
+    return (
+      <Table size="small">
+        <TableBody>
+          {[
+            { label: 'Host', value: String(config.host ?? '—') },
+            { label: 'Port', value: String(config.port ?? '6379') },
+            { label: 'Password', value: maskSecret(config.password as string) },
+          ].map((r) => (
+            <TableRow key={r.label} sx={{ '&:last-child td': { border: 0 } }}>
+              <TableCell sx={{ fontWeight: 600, width: 140, color: 'text.secondary', fontSize: '0.82rem' }}>{r.label}</TableCell>
+              <TableCell sx={{ fontSize: '0.85rem', fontFamily: r.label === 'Password' ? 'monospace' : undefined }}>{r.value}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    )
+  }
+  if (sourceType === 'dynamodb') {
+    return (
+      <Table size="small">
+        <TableBody>
+          {[
+            { label: 'Region', value: String(config.region ?? '—') },
+            { label: 'Access Key', value: maskSecret(config.accessKeyId as string, 4) },
+            { label: 'Secret Key', value: '••••••' },
+          ].map((r) => (
+            <TableRow key={r.label} sx={{ '&:last-child td': { border: 0 } }}>
+              <TableCell sx={{ fontWeight: 600, width: 140, color: 'text.secondary', fontSize: '0.82rem' }}>{r.label}</TableCell>
+              <TableCell sx={{ fontSize: '0.85rem', fontFamily: 'monospace' }}>{r.value}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    )
+  }
+  if (sourceType === 'elasticsearch') {
+    return (
+      <Table size="small">
+        <TableBody>
+          {[
+            { label: 'URL', value: String(config.url ?? '—') },
+            { label: 'Auth method', value: String(config.authMethod ?? 'none') },
+          ].map((r) => (
+            <TableRow key={r.label} sx={{ '&:last-child td': { border: 0 } }}>
+              <TableCell sx={{ fontWeight: 600, width: 140, color: 'text.secondary', fontSize: '0.82rem' }}>{r.label}</TableCell>
+              <TableCell sx={{ fontSize: '0.85rem' }}>{r.value}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    )
+  }
+  if (sourceType === 'snowflake') {
+    return (
+      <Table size="small">
+        <TableBody>
+          {[
+            { label: 'Account', value: String(config.account ?? '—') },
+            { label: 'Warehouse', value: String(config.warehouse ?? '—') },
+            { label: 'Database', value: String(config.database ?? '—') },
+            { label: 'Schema', value: String(config.schema ?? '—') },
+            { label: 'Username', value: String(config.username ?? '—') },
+            { label: 'Password', value: maskSecret(config.password as string) },
+          ].map((r) => (
+            <TableRow key={r.label} sx={{ '&:last-child td': { border: 0 } }}>
+              <TableCell sx={{ fontWeight: 600, width: 140, color: 'text.secondary', fontSize: '0.82rem' }}>{r.label}</TableCell>
+              <TableCell sx={{ fontSize: '0.85rem', fontFamily: r.label === 'Password' ? 'monospace' : undefined }}>{r.value}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    )
+  }
+  if (sourceType === 'firestore') {
+    const sa = config.serviceAccount as Record<string, unknown> | undefined
+    return (
+      <Table size="small">
+        <TableBody>
+          {[
+            { label: 'Project ID', value: String(config.projectId ?? sa?.project_id ?? '—') },
+            { label: 'Service account', value: String(sa?.client_email ?? '—') },
+          ].map((r) => (
+            <TableRow key={r.label} sx={{ '&:last-child td': { border: 0 } }}>
+              <TableCell sx={{ fontWeight: 600, width: 140, color: 'text.secondary', fontSize: '0.82rem' }}>{r.label}</TableCell>
+              <TableCell sx={{ fontSize: '0.85rem' }}>{r.value}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    )
+  }
+  // Fallback: show all keys
+  return (
+    <Table size="small">
+      <TableBody>
+        {Object.entries(config).map(([k, v]) => (
+          <TableRow key={k} sx={{ '&:last-child td': { border: 0 } }}>
+            <TableCell sx={{ fontWeight: 600, width: 140, color: 'text.secondary', fontSize: '0.82rem' }}>{k}</TableCell>
+            <TableCell sx={{ fontSize: '0.85rem', fontFamily: 'monospace' }}>{String(v)}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  )
+}
+
+function ConnectionTab({ projectId, connectionConfig, sourceType, onUpdated }: {
+  projectId: string
+  connectionConfig: Record<string, unknown> | undefined
+  sourceType: SourceType
+  onUpdated: () => void
+}) {
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ ok: boolean; latencyMs?: number; error?: string } | null>(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [formData, setFormData] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [saveSuccess, setSaveSuccess] = useState(false)
+
+  const display = SOURCE_DISPLAY[sourceType]
+
+  const handleTest = async () => {
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const res = await api.post<{ ok: boolean; latencyMs?: number; error?: string }>(
+        `/swagger/servers/${projectId}/test-db-connection`
+      )
+      setTestResult(res.data)
+    } catch (e: any) {
+      setTestResult({ ok: false, error: e?.response?.data?.message ?? 'Connection failed' })
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    setSaveError('')
+    setSaveSuccess(false)
+    try {
+      await api.patch(`/swagger/servers/${projectId}/connection`, formData)
+      setSaveSuccess(true)
+      setDrawerOpen(false)
+      onUpdated()
+    } catch (e: any) {
+      setSaveError(e?.response?.data?.message ?? 'Failed to save connection')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const openDrawer = () => {
+    // Pre-fill form with existing non-sensitive values
+    const prefill: Record<string, string> = {}
+    if (connectionConfig) {
+      for (const [k, v] of Object.entries(connectionConfig)) {
+        if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
+          prefill[k] = String(v)
+        }
+      }
+    }
+    setFormData(prefill)
+    setSaveError('')
+    setSaveSuccess(false)
+    setDrawerOpen(true)
+  }
+
+  const setField = (key: string, val: string) => setFormData((prev) => ({ ...prev, [key]: val }))
+
+  const renderConnectionForm = () => {
+    if (isSqlSource(sourceType) && sourceType !== 'mongodb') {
+      const fields = [
+        { key: 'host', label: 'Host', required: true },
+        { key: 'port', label: 'Port', required: false },
+        { key: 'database', label: 'Database', required: true },
+        { key: 'username', label: 'Username', required: true },
+        { key: 'password', label: 'Password', required: false, password: true },
+      ]
+      return (
+        <Box display="flex" flexDirection="column" gap={2}>
+          {fields.map((f) => (
+            <TextField
+              key={f.key} label={f.label} value={formData[f.key] ?? ''} size="small" fullWidth required={f.required}
+              type={f.password ? 'password' : 'text'} onChange={(e) => setField(f.key, e.target.value)}
+            />
+          ))}
+          <FormControlLabel
+            control={<Switch checked={formData.ssl === 'true'} onChange={(e) => setField('ssl', e.target.checked ? 'true' : 'false')} />}
+            label="SSL"
+          />
+        </Box>
+      )
+    }
+    if (sourceType === 'mongodb') {
+      return (
+        <Box display="flex" flexDirection="column" gap={2}>
+          <TextField label="MongoDB URI" value={formData.uri ?? ''} size="small" fullWidth required
+            placeholder="mongodb+srv://user:password@cluster.mongodb.net/dbname"
+            onChange={(e) => setField('uri', e.target.value)}
+          />
+        </Box>
+      )
+    }
+    if (sourceType === 'redis') {
+      return (
+        <Box display="flex" flexDirection="column" gap={2}>
+          <TextField label="Host" value={formData.host ?? ''} size="small" fullWidth required onChange={(e) => setField('host', e.target.value)} />
+          <TextField label="Port" value={formData.port ?? '6379'} size="small" fullWidth onChange={(e) => setField('port', e.target.value)} />
+          <TextField label="Password" value={formData.password ?? ''} size="small" fullWidth type="password" onChange={(e) => setField('password', e.target.value)} />
+        </Box>
+      )
+    }
+    if (sourceType === 'dynamodb') {
+      return (
+        <Box display="flex" flexDirection="column" gap={2}>
+          <TextField label="Region" value={formData.region ?? ''} size="small" fullWidth required onChange={(e) => setField('region', e.target.value)} />
+          <TextField label="Access Key ID" value={formData.accessKeyId ?? ''} size="small" fullWidth required onChange={(e) => setField('accessKeyId', e.target.value)} />
+          <TextField label="Secret Access Key" value={formData.secretAccessKey ?? ''} size="small" fullWidth required type="password" onChange={(e) => setField('secretAccessKey', e.target.value)} />
+        </Box>
+      )
+    }
+    if (sourceType === 'elasticsearch') {
+      return (
+        <Box display="flex" flexDirection="column" gap={2}>
+          <TextField label="URL" value={formData.url ?? ''} size="small" fullWidth required placeholder="https://localhost:9200" onChange={(e) => setField('url', e.target.value)} />
+          <FormControl size="small" fullWidth>
+            <InputLabel>Auth method</InputLabel>
+            <Select value={formData.authMethod ?? 'none'} label="Auth method" onChange={(e) => setField('authMethod', e.target.value as string)}>
+              <MenuItem value="none">None</MenuItem>
+              <MenuItem value="basic">Basic (user/password)</MenuItem>
+              <MenuItem value="apiKey">API Key</MenuItem>
+            </Select>
+          </FormControl>
+          {formData.authMethod === 'basic' && (
+            <>
+              <TextField label="Username" value={formData.username ?? ''} size="small" fullWidth onChange={(e) => setField('username', e.target.value)} />
+              <TextField label="Password" value={formData.password ?? ''} size="small" fullWidth type="password" onChange={(e) => setField('password', e.target.value)} />
+            </>
+          )}
+          {formData.authMethod === 'apiKey' && (
+            <TextField label="API Key" value={formData.apiKey ?? ''} size="small" fullWidth type="password" onChange={(e) => setField('apiKey', e.target.value)} />
+          )}
+        </Box>
+      )
+    }
+    if (sourceType === 'snowflake') {
+      return (
+        <Box display="flex" flexDirection="column" gap={2}>
+          {[
+            { key: 'account', label: 'Account', required: true },
+            { key: 'warehouse', label: 'Warehouse', required: true },
+            { key: 'database', label: 'Database', required: true },
+            { key: 'schema', label: 'Schema', required: false },
+            { key: 'username', label: 'Username', required: true },
+            { key: 'password', label: 'Password', required: false, password: true },
+          ].map((f) => (
+            <TextField key={f.key} label={f.label} value={formData[f.key] ?? ''} size="small" fullWidth
+              required={f.required} type={(f as any).password ? 'password' : 'text'}
+              onChange={(e) => setField(f.key, e.target.value)} />
+          ))}
+        </Box>
+      )
+    }
+    if (sourceType === 'firestore') {
+      return (
+        <Box display="flex" flexDirection="column" gap={2}>
+          <TextField label="Project ID" value={formData.projectId ?? ''} size="small" fullWidth required onChange={(e) => setField('projectId', e.target.value)} />
+          <TextField label="Service Account JSON" value={formData.serviceAccountJson ?? ''} size="small" fullWidth multiline minRows={4}
+            placeholder='{"type":"service_account","project_id":"...","client_email":"...",...}'
+            onChange={(e) => setField('serviceAccountJson', e.target.value)} />
+        </Box>
+      )
+    }
+    // Generic fallback
+    return (
+      <Alert severity="info">Connection editor for {display.label} is not yet available. Use the API directly.</Alert>
+    )
+  }
+
+  return (
+    <Box>
+      {/* Connection status */}
+      <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: '10px' }}>
+        <Box display="flex" alignItems="center" justifyContent="space-between" mb={1.5}>
+          <Typography variant="subtitle1" fontWeight={700}>Connection status</Typography>
+          <Button variant="outlined" size="small" startIcon={<IconDatabase size={16} />}
+            onClick={handleTest} disabled={testing}>
+            {testing ? 'Testing…' : 'Test connection'}
+          </Button>
+        </Box>
+        {testing && <Box display="flex" alignItems="center" gap={1}><CircularProgress size={16} /><Typography variant="body2" color="text.secondary">Connecting…</Typography></Box>}
+        {testResult && !testing && (
+          testResult.ok
+            ? <Chip label={`Connected · ${testResult.latencyMs ?? 0}ms`} color="success" size="small" icon={<IconCheck size={14} />} />
+            : <Chip label={`Failed: ${testResult.error ?? 'Unknown error'}`} color="error" size="small" icon={<IconX size={14} />} sx={{ maxWidth: '100%', height: 'auto', '& .MuiChip-label': { whiteSpace: 'normal' } }} />
+        )}
+        {!testResult && !testing && (
+          <Typography variant="body2" color="text.secondary">Click "Test connection" to verify connectivity.</Typography>
+        )}
+      </Paper>
+
+      {/* Connection details */}
+      <Paper variant="outlined" sx={{ p: 2, borderRadius: '10px' }}>
+        <Box display="flex" alignItems="center" justifyContent="space-between" mb={1.5}>
+          <Typography variant="subtitle1" fontWeight={700}>Connection details</Typography>
+          <Button variant="outlined" size="small" startIcon={<IconEdit size={16} />} onClick={openDrawer}>
+            Edit connection
+          </Button>
+        </Box>
+        {connectionConfig
+          ? <ConnectionConfigDisplay config={connectionConfig} sourceType={sourceType} />
+          : (
+            <Box textAlign="center" py={3}>
+              <Typography color="text.secondary" variant="body2" mb={1}>No connection configured yet.</Typography>
+              <Button variant="contained" size="small" startIcon={<IconPlus size={16} />} onClick={openDrawer}>
+                Add connection
+              </Button>
+            </Box>
+          )
+        }
+      </Paper>
+
+      {/* Edit connection drawer */}
+      <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}
+        PaperProps={{ sx: { width: 480, p: 3 } }}>
+        <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
+          <Typography variant="h6" fontWeight={700}>Edit connection — {display.label}</Typography>
+          <IconButton size="small" onClick={() => setDrawerOpen(false)}><IconX size={18} /></IconButton>
+        </Box>
+        {renderConnectionForm()}
+        {saveError && <Alert severity="error" sx={{ mt: 2 }}>{saveError}</Alert>}
+        {saveSuccess && <Alert severity="success" sx={{ mt: 2 }}>Connection saved.</Alert>}
+        <Box display="flex" gap={1} mt={3} justifyContent="flex-end">
+          <Button variant="outlined" size="small" onClick={() => setDrawerOpen(false)}>Cancel</Button>
+          <Button variant="contained" size="small" onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
+        </Box>
+      </Drawer>
+    </Box>
+  )
+}
+
+// ─── QueriesTab + QueryDialog ─────────────────────────────────────────────────
+
+function detectSqlParamsFromQuery(query: string): string[] {
+  const matches = query.match(/:([a-zA-Z_][a-zA-Z0-9_]*)/g) ?? []
+  return [...new Set(matches.map((m) => m.slice(1)))]
+}
+
+function detectTemplateParams(text: string): string[] {
+  const matches = text.match(/\{\{([a-zA-Z_][a-zA-Z0-9_]*)\}\}/g) ?? []
+  return [...new Set(matches.map((m) => m.slice(2, -2)))]
+}
+
+function detectGqlParams(doc: string): string[] {
+  const matches = doc.match(/\$([a-zA-Z_][a-zA-Z0-9_]*)/g) ?? []
+  return [...new Set(matches.map((m) => m.slice(1)))]
+}
+
+const NOSQL_SOURCES_SET = new Set<string>(['mongodb', 'redis', 'dynamodb', 'elasticsearch', 'firestore'])
+const SQL_SOURCES_SET = new Set<string>(['postgresql', 'mysql', 'mariadb', 'mssql', 'oracle', 'cockroachdb', 'clickhouse', 'cassandra', 'snowflake'])
+
+function emptyDbQuery(sourceType: string): Partial<DbQuery> {
+  if (SQL_SOURCES_SET.has(sourceType)) return { name: '', description: '', query: '', resultMode: 'rows', parameters: [] }
+  if (sourceType === 'mongodb' || sourceType === 'firestore') return { name: '', description: '', collection: '', operationType: 'find', filterTemplate: '{}', parameters: [] }
+  if (sourceType === 'redis') return { name: '', description: '', command: 'GET', keyPattern: '', parameters: [] }
+  if (sourceType === 'dynamodb') return { name: '', description: '', tableName: '', dynamoOperation: 'getItem', parameters: [] }
+  if (sourceType === 'elasticsearch') return { name: '', description: '', esIndex: '', esOperation: 'search', esBodyTemplate: '{}', parameters: [] }
+  if (sourceType === 'graphql') return { name: '', description: '', gqlOperationType: 'query', gqlDocument: '', parameters: [] }
+  if (sourceType === 'grpc') return { name: '', description: '', grpcService: '', grpcMethod: '', grpcRequestTemplate: '{}', parameters: [] }
+  return { name: '', description: '', parameters: [] }
+}
+
+function ParamTable({ params, onParamChange }: {
+  params: DbQueryParameter[]
+  onParamChange: (params: DbQueryParameter[]) => void
+}) {
+  if (params.length === 0) return null
+  return (
+    <Box>
+      <Typography variant="subtitle2" mb={1}>Parameters (auto-detected)</Typography>
+      <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              {['Name', 'Type', 'Required', 'Description', 'Default'].map((h) => (
+                <TableCell key={h} sx={{ fontWeight: 700, fontSize: '0.78rem' }}>{h}</TableCell>
+              ))}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {params.map((p, i) => (
+              <TableRow key={p.name} sx={{ '&:last-child td': { border: 0 } }}>
+                <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.82rem' }}>{p.name}</TableCell>
+                <TableCell>
+                  <Select size="small" value={p.type} sx={{ fontSize: '0.82rem', minWidth: 90 }}
+                    onChange={(e) => {
+                      const updated = [...params]
+                      updated[i] = { ...updated[i], type: e.target.value as DbQueryParameter['type'] }
+                      onParamChange(updated)
+                    }}>
+                    {['string', 'number', 'boolean', 'array', 'object'].map((t) => (
+                      <MenuItem key={t} value={t}>{t}</MenuItem>
+                    ))}
+                  </Select>
+                </TableCell>
+                <TableCell>
+                  <Switch size="small" checked={p.required ?? false}
+                    onChange={(e) => {
+                      const updated = [...params]
+                      updated[i] = { ...updated[i], required: e.target.checked }
+                      onParamChange(updated)
+                    }} />
+                </TableCell>
+                <TableCell>
+                  <TextField size="small" value={p.description ?? ''} placeholder="Description"
+                    onChange={(e) => {
+                      const updated = [...params]
+                      updated[i] = { ...updated[i], description: e.target.value }
+                      onParamChange(updated)
+                    }} />
+                </TableCell>
+                <TableCell>
+                  <TextField size="small" value={String(p.default ?? '')} placeholder="—"
+                    onChange={(e) => {
+                      const updated = [...params]
+                      updated[i] = { ...updated[i], default: e.target.value || undefined }
+                      onParamChange(updated)
+                    }} />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Paper>
+    </Box>
+  )
+}
+
+function mergeParams(detected: string[], existing: DbQueryParameter[]): DbQueryParameter[] {
+  const map = new Map(existing.map((p) => [p.name, p]))
+  return detected.map((name) => map.get(name) ?? { name, type: 'string' as const, required: true, description: '' })
+}
+
+function QueryDialog({ open, onClose, onSaved, projectId, sourceType, editQuery }: {
+  open: boolean
+  onClose: () => void
+  onSaved: (q: DbQuery) => void
+  projectId: string
+  sourceType: string
+  editQuery?: DbQuery | null
+}) {
+  const [form, setForm] = useState<Partial<DbQuery>>(emptyDbQuery(sourceType))
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [testOpen, setTestOpen] = useState(false)
+  const [testArgs, setTestArgs] = useState<Record<string, string>>({})
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<unknown>(null)
+  const [testError, setTestError] = useState('')
+
+  useEffect(() => {
+    if (open) {
+      setForm(editQuery ? { ...editQuery } : emptyDbQuery(sourceType))
+      setSaveError('')
+      setTestResult(null)
+      setTestError('')
+      setTestOpen(false)
+    }
+  }, [open, editQuery, sourceType])
+
+  const setField = <K extends keyof DbQuery>(key: K, val: DbQuery[K]) => {
+    setForm((prev) => ({ ...prev, [key]: val }))
+  }
+
+  const syncSqlParams = (query: string) => {
+    const detected = detectSqlParamsFromQuery(query)
+    setForm((prev) => ({
+      ...prev,
+      query,
+      parameters: mergeParams(detected, prev.parameters ?? []),
+    }))
+  }
+
+  const syncTemplateParams = (key: keyof DbQuery, val: string) => {
+    setForm((prev) => {
+      const next = { ...prev, [key]: val }
+      const allText = [
+        next.filterTemplate, next.projectionTemplate, next.updateTemplate,
+        next.pipeline, next.esBodyTemplate, next.grpcRequestTemplate,
+        next.keyPattern, next.valueTemplate,
+      ].filter(Boolean).join(' ')
+      const detected = detectTemplateParams(allText)
+      return { ...next, parameters: mergeParams(detected, prev.parameters ?? []) }
+    })
+  }
+
+  const syncGqlParams = (doc: string) => {
+    const detected = detectGqlParams(doc)
+    setForm((prev) => ({
+      ...prev,
+      gqlDocument: doc,
+      parameters: mergeParams(detected, prev.parameters ?? []),
+    }))
+  }
+
+  const handleSave = async () => {
+    if (!form.name?.trim()) return
+    setSaving(true)
+    setSaveError('')
+    try {
+      const body = { ...form, sourceType }
+      let res: DbQuery
+      if (editQuery) {
+        const r = await api.put<DbQuery>(`/swagger/servers/${projectId}/queries/${editQuery.id}`, body)
+        res = r.data
+      } else {
+        const r = await api.post<DbQuery>(`/swagger/servers/${projectId}/queries`, body)
+        res = r.data
+      }
+      onSaved(res)
+      onClose()
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } }
+      setSaveError(err?.response?.data?.message ?? 'Save failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleTest = async () => {
+    setTesting(true)
+    setTestResult(null)
+    setTestError('')
+    try {
+      let r: { data: { result: unknown; error?: string } }
+      if (editQuery?.id) {
+        // Existing query — run by ID (picks up latest saved version)
+        r = await api.post<{ result: unknown; error?: string }>(
+          `/swagger/servers/${projectId}/queries/${editQuery.id}/run`,
+          { args: testArgs },
+        )
+      } else {
+        // New (unsaved) query — run inline with current form state
+        r = await api.post<{ result: unknown; error?: string }>(
+          `/swagger/servers/${projectId}/run-query-inline`,
+          { query: { ...form, sourceType, id: '__inline__' }, args: testArgs },
+        )
+      }
+      if (r.data.error) setTestError(r.data.error)
+      else setTestResult(r.data.result)
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } }
+      setTestError(err?.response?.data?.message ?? 'Run failed')
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  const isSql = SQL_SOURCES_SET.has(sourceType)
+  const isMongo = sourceType === 'mongodb' || sourceType === 'firestore'
+  const isRedis = sourceType === 'redis'
+  const isDynamo = sourceType === 'dynamodb'
+  const isEs = sourceType === 'elasticsearch'
+  const isGql = sourceType === 'graphql'
+  const isGrpc = sourceType === 'grpc'
+
+  const REDIS_COMMANDS = ['GET', 'SET', 'HGET', 'HSET', 'LPUSH', 'LPOP', 'DEL', 'EXPIRE', 'TTL', 'KEYS', 'SCAN']
+  const DYNAMO_OPS = ['getItem', 'putItem', 'updateItem', 'deleteItem', 'query', 'scan']
+  const ES_OPS = ['search', 'get', 'index', 'update', 'delete']
+
+  return (
+    <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: 580 } }}>
+      <Box display="flex" alignItems="center" justifyContent="space-between" px={2.5} py={2}
+        sx={{ borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
+        <Typography fontWeight={700} fontSize="1rem">{editQuery ? 'Edit query' : 'New query'}</Typography>
+        <IconButton size="small" onClick={onClose}><IconX size={18} /></IconButton>
+      </Box>
+      <Box flexGrow={1} overflow="auto" px={2.5} py={2}>
+        <Box display="flex" flexDirection="column" gap={2}>
+          <Box display="flex" gap={2}>
+            <TextField label="Name" value={form.name ?? ''} size="small" fullWidth required
+              onChange={(e) => setField('name', e.target.value)} />
+            <TextField label="Description" value={form.description ?? ''} size="small" fullWidth
+              onChange={(e) => setField('description', e.target.value)} />
+          </Box>
+
+          {/* SQL */}
+          {isSql && (
+            <>
+              <TextField
+                label="SQL Query" value={form.query ?? ''} size="small" fullWidth multiline minRows={5} maxRows={15}
+                placeholder="SELECT * FROM users WHERE id = :userId"
+                helperText="Use :paramName for parameters"
+                inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
+                onChange={(e) => syncSqlParams(e.target.value)}
+              />
+              <FormControl size="small" sx={{ width: 220 }}>
+                <InputLabel>Result mode</InputLabel>
+                <Select value={form.resultMode ?? 'rows'} label="Result mode"
+                  onChange={(e) => setField('resultMode', e.target.value as DbQuery['resultMode'])}>
+                  <MenuItem value="rows">Rows (array)</MenuItem>
+                  <MenuItem value="first">First row (object)</MenuItem>
+                  <MenuItem value="count">Row count (integer)</MenuItem>
+                </Select>
+              </FormControl>
+            </>
+          )}
+
+          {/* MongoDB / Firestore */}
+          {isMongo && (
+            <>
+              <TextField label="Collection" value={form.collection ?? ''} size="small" fullWidth required
+                onChange={(e) => setField('collection', e.target.value)} />
+              <FormControl size="small" sx={{ width: 200 }}>
+                <InputLabel>Operation type</InputLabel>
+                <Select value={form.operationType ?? 'find'} label="Operation type"
+                  onChange={(e) => setField('operationType', e.target.value as DbQuery['operationType'])}>
+                  {['find', 'findOne', 'insertOne', 'updateOne', 'deleteOne', 'aggregate', 'count'].map((op) => (
+                    <MenuItem key={op} value={op}>{op}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              {(form.operationType === 'find' || form.operationType === 'findOne' || form.operationType === 'updateOne' || form.operationType === 'deleteOne' || form.operationType === 'count') && (
+                <TextField label='Filter template (JSON with {{param}} placeholders)'
+                  value={form.filterTemplate ?? '{}'} size="small" fullWidth multiline minRows={3}
+                  inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
+                  onChange={(e) => syncTemplateParams('filterTemplate', e.target.value)} />
+              )}
+              {(form.operationType === 'find' || form.operationType === 'findOne') && (
+                <TextField label="Projection (optional JSON)" value={form.projectionTemplate ?? ''} size="small" fullWidth multiline minRows={2}
+                  inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
+                  onChange={(e) => syncTemplateParams('projectionTemplate', e.target.value)} />
+              )}
+              {form.operationType === 'insertOne' && (
+                <TextField label='Document template (JSON with {{param}} placeholders)'
+                  value={form.filterTemplate ?? '{}'} size="small" fullWidth multiline minRows={3}
+                  inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
+                  onChange={(e) => syncTemplateParams('filterTemplate', e.target.value)} />
+              )}
+              {form.operationType === 'updateOne' && (
+                <TextField label='Update template (e.g. {"$set": {"name": "{{name}}"}})'
+                  value={form.updateTemplate ?? '{"$set": {}}'} size="small" fullWidth multiline minRows={3}
+                  inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
+                  onChange={(e) => syncTemplateParams('updateTemplate', e.target.value)} />
+              )}
+              {form.operationType === 'aggregate' && (
+                <TextField label="Pipeline stages (JSON array)"
+                  value={form.pipeline ?? '[]'} size="small" fullWidth multiline minRows={4}
+                  inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
+                  onChange={(e) => syncTemplateParams('pipeline', e.target.value)} />
+              )}
+              {(form.operationType === 'find' || form.operationType === 'findOne') && (
+                <Box display="flex" gap={2}>
+                  <TextField label="Sort (optional JSON)" value={form.sortTemplate ?? ''} size="small" sx={{ flex: 1 }}
+                    inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
+                    onChange={(e) => setField('sortTemplate', e.target.value)} />
+                  <TextField label="Limit" value={form.limitValue ?? ''} size="small" type="number" sx={{ width: 120 }}
+                    onChange={(e) => setField('limitValue', e.target.value ? Number(e.target.value) : undefined)} />
+                </Box>
+              )}
+            </>
+          )}
+
+          {/* Redis */}
+          {isRedis && (
+            <>
+              <FormControl size="small" sx={{ width: 160 }}>
+                <InputLabel>Command</InputLabel>
+                <Select value={form.command ?? 'GET'} label="Command"
+                  onChange={(e) => setField('command', e.target.value)}>
+                  {REDIS_COMMANDS.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+                </Select>
+              </FormControl>
+              <TextField label="Key pattern" value={form.keyPattern ?? ''} size="small" fullWidth
+                placeholder="user:{{userId}}" helperText="Use {{paramName}} for parameters"
+                onChange={(e) => syncTemplateParams('keyPattern', e.target.value)} />
+              {['SET', 'HSET', 'LPUSH'].includes(form.command ?? '') && (
+                <TextField label="Value template" value={form.valueTemplate ?? ''} size="small" fullWidth
+                  placeholder="{{value}}"
+                  onChange={(e) => syncTemplateParams('valueTemplate', e.target.value)} />
+              )}
+            </>
+          )}
+
+          {/* DynamoDB */}
+          {isDynamo && (
+            <>
+              <TextField label="Table name" value={form.tableName ?? ''} size="small" fullWidth required
+                onChange={(e) => setField('tableName', e.target.value)} />
+              <FormControl size="small" sx={{ width: 200 }}>
+                <InputLabel>Operation</InputLabel>
+                <Select value={form.dynamoOperation ?? 'getItem'} label="Operation"
+                  onChange={(e) => setField('dynamoOperation', e.target.value)}>
+                  {DYNAMO_OPS.map((op) => <MenuItem key={op} value={op}>{op}</MenuItem>)}
+                </Select>
+              </FormControl>
+              <TextField label="Key condition / filter (JSON with {{param}} placeholders)"
+                value={form.filterTemplate ?? ''} size="small" fullWidth multiline minRows={3}
+                inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
+                onChange={(e) => syncTemplateParams('filterTemplate', e.target.value)} />
+            </>
+          )}
+
+          {/* Elasticsearch */}
+          {isEs && (
+            <>
+              <TextField label="Index" value={form.esIndex ?? ''} size="small" fullWidth required
+                onChange={(e) => setField('esIndex', e.target.value)} />
+              <FormControl size="small" sx={{ width: 160 }}>
+                <InputLabel>Operation</InputLabel>
+                <Select value={form.esOperation ?? 'search'} label="Operation"
+                  onChange={(e) => setField('esOperation', e.target.value)}>
+                  {ES_OPS.map((op) => <MenuItem key={op} value={op}>{op}</MenuItem>)}
+                </Select>
+              </FormControl>
+              <TextField label="Body template (JSON with {{param}} placeholders)"
+                value={form.esBodyTemplate ?? '{}'} size="small" fullWidth multiline minRows={4}
+                inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
+                onChange={(e) => syncTemplateParams('esBodyTemplate', e.target.value)} />
+            </>
+          )}
+
+          {/* GraphQL */}
+          {isGql && (
+            <>
+              <FormControl size="small" sx={{ width: 200 }}>
+                <InputLabel>Operation type</InputLabel>
+                <Select value={form.gqlOperationType ?? 'query'} label="Operation type"
+                  onChange={(e) => setField('gqlOperationType', e.target.value as DbQuery['gqlOperationType'])}>
+                  <MenuItem value="query">Query</MenuItem>
+                  <MenuItem value="mutation">Mutation</MenuItem>
+                </Select>
+              </FormControl>
+              <TextField label="GraphQL document" value={form.gqlDocument ?? ''} size="small" fullWidth multiline minRows={6}
+                placeholder={'query GetUser($userId: ID!) {\n  user(id: $userId) { id name email }\n}'}
+                helperText="Use $variable syntax for parameters"
+                inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
+                onChange={(e) => syncGqlParams(e.target.value)} />
+            </>
+          )}
+
+          {/* gRPC */}
+          {isGrpc && (
+            <>
+              <Box display="flex" gap={2}>
+                <TextField label="Service name" value={form.grpcService ?? ''} size="small" sx={{ flex: 1 }}
+                  onChange={(e) => setField('grpcService', e.target.value)} />
+                <TextField label="Method name" value={form.grpcMethod ?? ''} size="small" sx={{ flex: 1 }}
+                  onChange={(e) => setField('grpcMethod', e.target.value)} />
+              </Box>
+              <TextField label="Request template (JSON with {{param}} placeholders)"
+                value={form.grpcRequestTemplate ?? '{}'} size="small" fullWidth multiline minRows={4}
+                inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
+                onChange={(e) => syncTemplateParams('grpcRequestTemplate', e.target.value)} />
+            </>
+          )}
+
+          {/* Parameters table */}
+          <ParamTable
+            params={form.parameters ?? []}
+            onParamChange={(params) => setField('parameters', params)}
+          />
+
+          {/* Test panel — available in both create and edit modes */}
+          <Box>
+            <Button size="small" variant="outlined" startIcon={<IconPlayerPlay size={16} />}
+              onClick={() => { setTestOpen((v) => !v); setTestResult(null); setTestError('') }}>
+              {testOpen ? 'Hide test panel' : 'Try it out'}
+            </Button>
+            {!editQuery && testOpen && (
+              <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                Testing current (unsaved) definition
+              </Typography>
+            )}
+            {testOpen && (
+              <Paper variant="outlined" sx={{ p: 2, mt: 1 }}>
+                {(form.parameters ?? []).length > 0 ? (
+                  <Box display="flex" flexWrap="wrap" gap={1} mb={2}>
+                    {(form.parameters ?? []).map((p) => (
+                      <TextField key={p.name} size="small" label={`${p.name}${p.required ? ' *' : ''}`}
+                        sx={{ width: 200 }}
+                        value={testArgs[p.name] ?? ''}
+                        onChange={(e) => setTestArgs((prev) => ({ ...prev, [p.name]: e.target.value }))} />
+                    ))}
+                  </Box>
+                ) : (
+                  <Typography variant="body2" color="text.secondary" mb={1.5}>No parameters.</Typography>
+                )}
+                <Button size="small" variant="contained" startIcon={<IconPlayerPlay size={14} />}
+                  onClick={handleTest} disabled={testing}>
+                  {testing ? 'Running…' : 'Execute'}
+                </Button>
+                {testError && <Alert severity="error" sx={{ mt: 1.5, fontSize: '0.8rem' }}>{testError}</Alert>}
+                {testResult !== null && !testError && (
+                  <Box mt={1.5} sx={{
+                    maxHeight: 300, overflow: 'auto', fontFamily: 'monospace', fontSize: '0.78rem',
+                    bgcolor: '#1e1e1e', color: '#d4d4d4',
+                    p: 1.5, borderRadius: 1, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                  }}>
+                    {JSON.stringify(testResult, null, 2)}
+                  </Box>
+                )}
+              </Paper>
+            )}
+          </Box>
+
+          {saveError && <Alert severity="error">{saveError}</Alert>}
+        </Box>
+      </Box>
+      <Box display="flex" justifyContent="flex-end" gap={1} px={2.5} py={2}
+        sx={{ borderTop: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button variant="contained" onClick={handleSave}
+          disabled={saving || !form.name?.trim()}
+          startIcon={saving ? <CircularProgress size={14} /> : undefined}>
+          {saving ? 'Saving…' : 'Save'}
+        </Button>
+      </Box>
+    </Drawer>
+  )
+}
+
+function QueriesTab({ projectId, sourceType, onQueriesChange }: {
+  projectId: string
+  sourceType: string
+  onQueriesChange: (queries: DbQuery[]) => void
+}) {
+  const { can } = useAuth()
+  const [queries, setQueries] = useState<DbQuery[]>([])
+  const [loading, setLoading] = useState(true)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editQuery, setEditQuery] = useState<DbQuery | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [runPanelId, setRunPanelId] = useState<string | null>(null)
+  const [runArgs, setRunArgs] = useState<Record<string, string>>({})
+  const [runResult, setRunResult] = useState<unknown>(null)
+  const [runError, setRunError] = useState('')
+  const [running, setRunning] = useState(false)
+  const [introspectResult, setIntrospectResult] = useState<{ tables?: string[]; collections?: string[] } | null>(null)
+  const [introspecting, setIntrospecting] = useState(false)
+
+  const isSql = SQL_SOURCES_SET.has(sourceType)
+
+  useEffect(() => {
+    setLoading(true)
+    api.get<DbQuery[]>(`/swagger/servers/${projectId}/queries`)
+      .then((r) => {
+        setQueries(r.data)
+        onQueriesChange(r.data)
+      })
+      .catch(() => setQueries([]))
+      .finally(() => setLoading(false))
+  }, [projectId])
+
+  const syncQueries = (updated: DbQuery[]) => {
+    setQueries(updated)
+    onQueriesChange(updated)
+  }
+
+  const handleDelete = async (queryId: string) => {
+    setDeleting(true)
+    try {
+      await api.delete(`/swagger/servers/${projectId}/queries/${queryId}`)
+      syncQueries(queries.filter((q) => q.id !== queryId))
+    } finally {
+      setDeleting(false)
+      setDeleteConfirm(null)
+    }
+  }
+
+  const handleRun = async (query: DbQuery) => {
+    setRunning(true)
+    setRunResult(null)
+    setRunError('')
+    try {
+      const r = await api.post<{ result: unknown; error?: string }>(
+        `/swagger/servers/${projectId}/queries/${query.id}/run`,
+        { args: runArgs },
+      )
+      if (r.data.error) setRunError(r.data.error)
+      else setRunResult(r.data.result)
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } }
+      setRunError(err?.response?.data?.message ?? 'Run failed')
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  const handleIntrospect = async () => {
+    setIntrospecting(true)
+    setIntrospectResult(null)
+    try {
+      const res = await api.post<{ tables?: string[]; collections?: string[] }>(`/swagger/servers/${projectId}/introspect`)
+      setIntrospectResult(res.data)
+    } catch {
+      setIntrospectResult({})
+    } finally {
+      setIntrospecting(false)
+    }
+  }
+
+  const isMongo = sourceType === 'mongodb' || sourceType === 'firestore'
+  const label = isSql ? 'query' : 'operation'
+  const labelPlural = isSql ? 'queries' : 'operations'
+
+  return (
+    <Box>
+      <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+        <Typography variant="h6" fontWeight={700}>
+          {isSql ? 'SQL Queries' : 'Operations'}
+        </Typography>
+        <Box display="flex" gap={1}>
+          <Button size="small" variant="outlined" startIcon={<IconSearch size={16} />}
+            onClick={handleIntrospect} disabled={introspecting}>
+            {introspecting ? 'Introspecting…' : isMongo ? 'Discover collections' : 'Introspect schema'}
+          </Button>
+          {can(Permission.ToolsCreate) && (
+            <Button size="small" variant="contained" startIcon={<IconPlus size={16} />}
+              onClick={() => { setEditQuery(null); setDialogOpen(true) }}>
+              Add {label}
+            </Button>
+          )}
+        </Box>
+      </Box>
+
+      {introspectResult && (
+        <Alert severity="info" sx={{ mb: 2 }} onClose={() => setIntrospectResult(null)}>
+          {introspectResult.tables && introspectResult.tables.length > 0
+            ? <>Tables: {introspectResult.tables.join(', ')}</>
+            : introspectResult.collections && introspectResult.collections.length > 0
+              ? <>Collections: {introspectResult.collections.join(', ')}</>
+              : 'Nothing discovered. Check connection configuration.'}
+        </Alert>
+      )}
+
+      {loading ? (
+        <Box display="flex" justifyContent="center" py={4}><CircularProgress /></Box>
+      ) : queries.length === 0 ? (
+        <Alert severity="info">
+          No {labelPlural} yet. Click "Add {label}" to define your first data source, then create tools from it in the Tools tab.
+        </Alert>
+      ) : (
+        <Paper variant="outlined" sx={{ overflow: 'hidden', mb: 2 }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 700, fontSize: '0.78rem' }}>Name</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '0.78rem' }}>Description</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '0.78rem' }}>Details</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '0.78rem', width: 70 }}>Params</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '0.78rem', width: 120 }}></TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {queries.map((q) => (
+                <>
+                  <TableRow key={q.id} hover sx={{ '&:last-child td': { border: 0 } }}>
+                    <TableCell>
+                      <Typography fontWeight={600} fontSize="0.85rem">{q.name}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 220, display: 'block' }}>
+                        {q.description ?? '—'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      {isSql && (
+                        <Typography fontFamily="monospace" fontSize="0.78rem" color="text.secondary" noWrap sx={{ maxWidth: 260 }}>
+                          {(q.query ?? '').slice(0, 55)}{(q.query ?? '').length > 55 ? '…' : ''}
+                        </Typography>
+                      )}
+                      {(sourceType === 'mongodb' || sourceType === 'firestore') && (
+                        <Box display="flex" gap={0.5} alignItems="center">
+                          <Typography fontFamily="monospace" fontSize="0.8rem">{q.collection}</Typography>
+                          <Chip label={q.operationType ?? '—'} size="small" />
+                        </Box>
+                      )}
+                      {sourceType === 'redis' && (
+                        <Box display="flex" gap={0.5} alignItems="center">
+                          <Chip label={q.command ?? '—'} size="small" />
+                          <Typography fontFamily="monospace" fontSize="0.78rem" color="text.secondary">{q.keyPattern}</Typography>
+                        </Box>
+                      )}
+                      {sourceType === 'dynamodb' && (
+                        <Box display="flex" gap={0.5} alignItems="center">
+                          <Typography fontFamily="monospace" fontSize="0.8rem">{q.tableName}</Typography>
+                          <Chip label={q.dynamoOperation ?? '—'} size="small" />
+                        </Box>
+                      )}
+                      {sourceType === 'elasticsearch' && (
+                        <Box display="flex" gap={0.5} alignItems="center">
+                          <Typography fontFamily="monospace" fontSize="0.8rem">{q.esIndex}</Typography>
+                          <Chip label={q.esOperation ?? '—'} size="small" />
+                        </Box>
+                      )}
+                      {sourceType === 'graphql' && (
+                        <Box display="flex" gap={0.5} alignItems="center">
+                          <Chip label={q.gqlOperationType ?? 'query'} size="small" />
+                          <Typography fontFamily="monospace" fontSize="0.78rem" color="text.secondary" noWrap sx={{ maxWidth: 200 }}>
+                            {(q.gqlDocument ?? '').slice(0, 40)}{(q.gqlDocument ?? '').length > 40 ? '…' : ''}
+                          </Typography>
+                        </Box>
+                      )}
+                      {sourceType === 'grpc' && (
+                        <Typography fontFamily="monospace" fontSize="0.78rem" color="text.secondary">
+                          {q.grpcService}.{q.grpcMethod}
+                        </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Chip label={(q.parameters ?? []).length} size="small" />
+                    </TableCell>
+                    <TableCell>
+                      <Box display="flex" gap={0.5}>
+                        <Tooltip title={runPanelId === q.id ? 'Close run panel' : 'Run'}>
+                          <IconButton size="small" color="primary"
+                            onClick={() => {
+                              if (runPanelId === q.id) { setRunPanelId(null) }
+                              else { setRunPanelId(q.id); setRunArgs({}); setRunResult(null); setRunError('') }
+                            }}>
+                            <IconPlayerPlay size={16} />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Edit">
+                          <IconButton size="small" onClick={() => { setEditQuery(q); setDialogOpen(true) }}>
+                            <IconEdit size={16} />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete">
+                          <IconButton size="small" color="error" onClick={() => setDeleteConfirm(q.id)}>
+                            <IconTrash size={16} />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                  {runPanelId === q.id && (
+                    <TableRow key={`${q.id}-run`}>
+                      <TableCell colSpan={5} sx={{ p: 0 }}>
+                        <Box sx={{ bgcolor: 'action.hover', borderBottom: '1px solid', borderColor: 'divider', p: 2 }}>
+                          <Typography variant="subtitle2" mb={1}>Run "{q.name}"</Typography>
+                          {(q.parameters ?? []).length > 0 ? (
+                            <Box display="flex" flexWrap="wrap" gap={1} mb={1.5}>
+                              {(q.parameters ?? []).map((p) => (
+                                <TextField key={p.name} size="small" label={p.name}
+                                  value={runArgs[p.name] ?? ''}
+                                  onChange={(e) => setRunArgs((prev) => ({ ...prev, [p.name]: e.target.value }))}
+                                  sx={{ width: 180 }} />
+                              ))}
+                            </Box>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary" mb={1}>No parameters.</Typography>
+                          )}
+                          <Button size="small" variant="contained" startIcon={<IconPlayerPlay size={14} />}
+                            onClick={() => handleRun(q)} disabled={running}>
+                            {running ? 'Running…' : 'Execute'}
+                          </Button>
+                          {runError && <Alert severity="error" sx={{ mt: 1 }}>{runError}</Alert>}
+                          {runResult !== null && !runError && (
+                            <Box mt={1} sx={{ maxHeight: 260, overflow: 'auto', fontFamily: 'monospace', fontSize: '0.8rem',
+                              bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', p: 1, borderRadius: 1 }}>
+                              <pre style={{ margin: 0 }}>{JSON.stringify(runResult, null, 2)}</pre>
+                            </Box>
+                          )}
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
+              ))}
+            </TableBody>
+          </Table>
+        </Paper>
+      )}
+
+      <QueryDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        onSaved={(q) => {
+          const updated = editQuery
+            ? queries.map((x) => x.id === q.id ? q : x)
+            : [...queries, q]
+          syncQueries(updated)
+          setDialogOpen(false)
+        }}
+        projectId={projectId}
+        sourceType={sourceType}
+        editQuery={editQuery}
+      />
+
+      <ConfirmDialog
+        open={!!deleteConfirm}
+        title={`Delete ${label}`}
+        message={`Delete this ${label}? Tools referencing it will stop working. This cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={() => { if (deleteConfirm) handleDelete(deleteConfirm) }}
+        onClose={() => setDeleteConfirm(null)}
+      />
+    </Box>
+  )
+}
+
+// ─── DbToolsTab ───────────────────────────────────────────────────────────────
+
+interface DbToolForm {
+  name: string
+  description: string
+  dbQueryId: string
+  outputTemplate: string
+}
+
+function DbToolDialog({ open, onClose, onSaved, projectId, queries, editTool }: {
+  open: boolean
+  onClose: () => void
+  onSaved: (tool: GeneratedTool) => void
+  projectId: string
+  queries: DbQuery[]
+  editTool?: GeneratedTool | null
+}) {
+  const [form, setForm] = useState<DbToolForm>({ name: '', description: '', dbQueryId: '', outputTemplate: '' })
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+
+  const selectedQuery = queries.find((q) => q.id === form.dbQueryId) ?? null
+
+  useEffect(() => {
+    if (open) {
+      if (editTool) {
+        setForm({
+          name: editTool.name,
+          description: editTool.description ?? '',
+          dbQueryId: editTool.executionRef?.dbQueryId ?? '',
+          outputTemplate: editTool.outputTemplate ?? '',
+        })
+      } else {
+        setForm({ name: '', description: '', dbQueryId: '', outputTemplate: '' })
+      }
+      setSaveError('')
+    }
+  }, [open, editTool])
+
+  const handleSave = async () => {
+    if (!form.name.trim() || !form.dbQueryId) return
+    setSaving(true)
+    setSaveError('')
+    try {
+      const properties: Record<string, JsonSchema> = {}
+      const required: string[] = []
+      for (const p of selectedQuery?.parameters ?? []) {
+        properties[p.name] = { type: p.type, description: p.description }
+        if (p.required) required.push(p.name)
+      }
+      const body: Partial<GeneratedTool> = {
+        name: form.name,
+        description: form.description,
+        inputSchema: { type: 'object', properties, required },
+        executionRef: { type: 'db', dbQueryId: form.dbQueryId },
+        outputTemplate: form.outputTemplate || undefined,
+      }
+      let res: GeneratedTool
+      if (editTool) {
+        const r = await api.put<GeneratedTool>(`/swagger/servers/${projectId}/tools/${editTool.name}`, body)
+        res = r.data
+      } else {
+        const r = await api.post<GeneratedTool>(`/swagger/servers/${projectId}/tools`, body)
+        res = r.data
+      }
+      onSaved(res)
+      onClose()
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } }
+      setSaveError(err?.response?.data?.message ?? 'Save failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: 520 } }}>
+      <Box display="flex" alignItems="center" justifyContent="space-between" px={2.5} py={2}
+        sx={{ borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
+        <Typography fontWeight={700} fontSize="1rem">{editTool ? 'Edit tool' : 'New tool'}</Typography>
+        <IconButton size="small" onClick={onClose}><IconX size={18} /></IconButton>
+      </Box>
+      <Box flexGrow={1} overflow="auto" px={2.5} py={2}>
+        <Box display="flex" flexDirection="column" gap={2}>
+          {queries.length === 0 ? (
+            <Alert severity="warning">
+              No queries defined yet. Create queries in the Queries tab first.
+            </Alert>
+          ) : (
+            <>
+              <TextField label="Tool name" value={form.name} size="small" fullWidth required
+                onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
+              <TextField label="Description" value={form.description} size="small" fullWidth multiline minRows={2}
+                onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} />
+              <FormControl size="small" fullWidth required>
+                <InputLabel>Select query</InputLabel>
+                <Select value={form.dbQueryId} label="Select query"
+                  onChange={(e) => setForm((p) => ({ ...p, dbQueryId: e.target.value }))}>
+                  {queries.map((q) => (
+                    <MenuItem key={q.id} value={q.id}>
+                      <Box>
+                        <Typography fontSize="0.85rem" fontWeight={600}>{q.name}</Typography>
+                        {q.description && (
+                          <Typography fontSize="0.75rem" color="text.secondary">{q.description}</Typography>
+                        )}
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              {selectedQuery && (selectedQuery.parameters ?? []).length > 0 && (
+                <Alert severity="info" sx={{ py: 0.5 }}>
+                  Input schema will be built from {selectedQuery.parameters!.length} parameter{selectedQuery.parameters!.length !== 1 ? 's' : ''}: {selectedQuery.parameters!.map((p) => p.name).join(', ')}
+                </Alert>
+              )}
+              <TextField label="Output template (optional Handlebars)" value={form.outputTemplate} size="small" fullWidth multiline minRows={3}
+                placeholder="{{#each rows}}{{name}}: {{value}}{{/each}}"
+                inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
+                onChange={(e) => setForm((p) => ({ ...p, outputTemplate: e.target.value }))} />
+            </>
+          )}
+          {saveError && <Alert severity="error">{saveError}</Alert>}
+        </Box>
+      </Box>
+      <Box display="flex" justifyContent="flex-end" gap={1} px={2.5} py={2}
+        sx={{ borderTop: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button variant="contained" onClick={handleSave}
+          disabled={saving || !form.name.trim() || !form.dbQueryId || queries.length === 0}
+          startIcon={saving ? <CircularProgress size={14} /> : undefined}>
+          {saving ? 'Saving…' : 'Save'}
+        </Button>
+      </Box>
+    </Drawer>
+  )
+}
+
+function DbToolsTab({ tools, projectId, queries, onToolAdded, onToolChanged, onToolDeleted }: {
+  tools: GeneratedTool[]
+  projectId: string
+  queries: DbQuery[]
+  onToolAdded: (tool: GeneratedTool) => void
+  onToolChanged: (oldName: string, newTool: GeneratedTool) => void
+  onToolDeleted: (toolName: string) => void
+}) {
+  const { can } = useAuth()
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editTool, setEditTool] = useState<GeneratedTool | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [tryPanelTool, setTryPanelTool] = useState<string | null>(null)
+  const [tryArgs, setTryArgs] = useState<Record<string, string>>({})
+  const [tryResult, setTryResult] = useState<unknown>(null)
+  const [tryError, setTryError] = useState('')
+  const [trying, setTrying] = useState(false)
+
+  const handleTry = async (tool: GeneratedTool) => {
+    const dbQueryId = tool.executionRef?.dbQueryId
+    if (!dbQueryId) return
+    setTrying(true)
+    setTryResult(null)
+    setTryError('')
+    try {
+      const r = await api.post<{ result: unknown; error?: string }>(
+        `/swagger/servers/${projectId}/queries/${dbQueryId}/run`,
+        { args: tryArgs },
+      )
+      if (r.data.error) setTryError(r.data.error)
+      else setTryResult(r.data.result)
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } }
+      setTryError(err?.response?.data?.message ?? 'Execution failed')
+    } finally {
+      setTrying(false)
+    }
+  }
+
+  const dbTools = tools.filter((t) => t.executionRef?.type === 'db')
+  const queryMap = new Map(queries.map((q) => [q.id, q]))
+
+  const handleDelete = async (toolName: string) => {
+    setDeleting(true)
+    try {
+      await api.delete(`/swagger/servers/${projectId}/tools/${toolName}`)
+      onToolDeleted(toolName)
+    } finally {
+      setDeleting(false)
+      setDeleteConfirm(null)
+    }
+  }
+
+  const handleToggleEnabled = async (tool: GeneratedTool) => {
+    const updated = { ...tool, enabled: !tool.enabled }
+    await api.patch(`/swagger/servers/${projectId}/tools/${tool.name}`, { enabled: updated.enabled })
+    onToolChanged(tool.name, updated)
+  }
+
+  return (
+    <Box>
+      <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+        <Typography variant="h6" fontWeight={700}>Tools</Typography>
+        {can(Permission.ToolsCreate) && (
+          <Button size="small" variant="contained" startIcon={<IconPlus size={16} />}
+            onClick={() => { setEditTool(null); setDialogOpen(true) }}>
+            New tool
+          </Button>
+        )}
+      </Box>
+
+      {queries.length === 0 && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Create queries first in the Queries tab, then come back to create tools.
+        </Alert>
+      )}
+
+      {dbTools.length === 0 ? (
+        <Alert severity="info">
+          No tools yet. {queries.length > 0 ? 'Click "New tool" to wrap a query as an MCP tool.' : ''}
+        </Alert>
+      ) : (
+        <Paper variant="outlined" sx={{ overflow: 'hidden', mb: 2 }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 700, fontSize: '0.78rem', width: 60 }}>On</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '0.78rem' }}>Name</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '0.78rem' }}>Query</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '0.78rem', width: 80 }}>Params</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '0.78rem', width: 100 }}></TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {dbTools.map((tool) => {
+                const refQuery = tool.executionRef?.dbQueryId ? queryMap.get(tool.executionRef.dbQueryId) : undefined
+                const params = Object.entries(tool.inputSchema?.properties ?? {}) as [string, any][]
+                const isTryOpen = tryPanelTool === tool.name
+                return (
+                  <>
+                    <TableRow key={tool.name} hover sx={{ '&:last-child td': { border: 0 } }}>
+                      <TableCell>
+                        <Switch size="small" checked={tool.enabled !== false} onChange={() => handleToggleEnabled(tool)} />
+                      </TableCell>
+                      <TableCell>
+                        <Typography fontWeight={600} fontSize="0.85rem">{tool.name}</Typography>
+                        {tool.description && (
+                          <Typography variant="caption" color="text.secondary" display="block" noWrap sx={{ maxWidth: 200 }}>
+                            {tool.description}
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {refQuery ? (
+                          <Chip label={refQuery.name} size="small" color="primary" variant="outlined" />
+                        ) : (
+                          <Chip label="deleted query" size="small" color="error" variant="outlined" />
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Chip label={params.length} size="small" />
+                      </TableCell>
+                      <TableCell>
+                        <Box display="flex" gap={0.5}>
+                          <Tooltip title={isTryOpen ? 'Close' : 'Try it out'}>
+                            <IconButton size="small" color="primary"
+                              onClick={() => {
+                                if (isTryOpen) { setTryPanelTool(null) }
+                                else { setTryPanelTool(tool.name); setTryArgs({}); setTryResult(null); setTryError('') }
+                              }}>
+                              <IconPlayerPlay size={16} />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Edit">
+                            <IconButton size="small" onClick={() => { setEditTool(tool); setDialogOpen(true) }}>
+                              <IconEdit size={16} />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Delete">
+                            <IconButton size="small" color="error" onClick={() => setDeleteConfirm(tool.name)}>
+                              <IconTrash size={16} />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                    {isTryOpen && (
+                      <TableRow key={`${tool.name}-try`}>
+                        <TableCell colSpan={5} sx={{ p: 0 }}>
+                          <Box sx={{ bgcolor: 'action.hover', borderBottom: '1px solid', borderColor: 'divider', p: 2 }}>
+                            <Typography variant="subtitle2" mb={1.5}>Try "{tool.name}"</Typography>
+                            {params.length > 0 ? (
+                              <Box display="flex" flexWrap="wrap" gap={1} mb={2}>
+                                {params.map(([name, schema]) => (
+                                  <TextField key={name} size="small"
+                                    label={`${name}${(tool.inputSchema?.required ?? []).includes(name) ? ' *' : ''}`}
+                                    helperText={schema.description}
+                                    sx={{ width: 200 }}
+                                    value={tryArgs[name] ?? ''}
+                                    onChange={(e) => setTryArgs((prev) => ({ ...prev, [name]: e.target.value }))} />
+                                ))}
+                              </Box>
+                            ) : (
+                              <Typography variant="body2" color="text.secondary" mb={1.5}>No parameters.</Typography>
+                            )}
+                            <Button size="small" variant="contained"
+                              startIcon={trying ? <CircularProgress size={13} color="inherit" /> : <IconPlayerPlay size={14} />}
+                              onClick={() => handleTry(tool)} disabled={trying || !refQuery}>
+                              {trying ? 'Running…' : 'Execute'}
+                            </Button>
+                            {!refQuery && (
+                              <Typography variant="caption" color="error" sx={{ ml: 1 }}>Query was deleted — cannot execute.</Typography>
+                            )}
+                            {tryError && <Alert severity="error" sx={{ mt: 1.5, fontSize: '0.8rem' }}>{tryError}</Alert>}
+                            {tryResult !== null && !tryError && (
+                              <Box mt={1.5} sx={{
+                                maxHeight: 320, overflow: 'auto', fontFamily: 'monospace', fontSize: '0.78rem',
+                                bgcolor: '#1e1e1e', color: '#d4d4d4',
+                                p: 1.5, borderRadius: 1, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                              }}>
+                                {JSON.stringify(tryResult, null, 2)}
+                              </Box>
+                            )}
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </>
+                )
+              })}
+            </TableBody>
+          </Table>
+        </Paper>
+      )}
+
+      <DbToolDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        onSaved={(tool) => {
+          if (editTool) onToolChanged(editTool.name, tool)
+          else onToolAdded(tool)
+          setDialogOpen(false)
+        }}
+        projectId={projectId}
+        queries={queries}
+        editTool={editTool}
+      />
+
+      <ConfirmDialog
+        open={!!deleteConfirm}
+        title="Delete tool"
+        message={`Delete "${deleteConfirm}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={() => { if (deleteConfirm) handleDelete(deleteConfirm) }}
+        onClose={() => setDeleteConfirm(null)}
+      />
+    </Box>
+  )
+}
+
+
+// ─── StaticToolsTab (Blank / Static servers) ─────────────────────────────────
+
+interface StaticParam { name: string; type: string; required?: boolean; description?: string }
+interface StaticToolForm {
+  name: string
+  description: string
+  responseTemplate: string
+  mimeType: string
+  params: StaticParam[]
+}
+
+function emptyStaticForm(): StaticToolForm {
+  return { name: '', description: '', responseTemplate: '', mimeType: 'text/plain', params: [] }
+}
+
+function detectStaticParams(template: string): string[] {
+  return [...new Set([...template.matchAll(/\{\{(\w+)\}\}/g)].map(m => m[1]))]
+}
+
+function StaticToolDialog({ open, onClose, onSaved, projectId, editTool }: {
+  open: boolean
+  onClose: () => void
+  onSaved: (tool: GeneratedTool) => void
+  projectId: string
+  editTool?: GeneratedTool | null
+}) {
+  const [form, setForm] = useState<StaticToolForm>(emptyStaticForm())
+  const [saving, setSaving] = useState(false)
+  const [error, setSaveError] = useState('')
+  const [tryOpen, setTryOpen] = useState(false)
+  const [tryArgs, setTryArgs] = useState<Record<string, string>>({})
+  const [tryResult, setTryResult] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    if (editTool) {
+      const ref = editTool.executionRef as { type: 'static'; responseTemplate: string; mimeType?: string } | undefined
+      const props = editTool.inputSchema?.properties ?? {}
+      setForm({
+        name: editTool.name,
+        description: editTool.description ?? '',
+        responseTemplate: ref?.responseTemplate ?? '',
+        mimeType: ref?.mimeType ?? 'text/plain',
+        params: Object.entries(props).map(([n, s]: [string, any]) => ({
+          name: n, type: s.type ?? 'string', required: (editTool.inputSchema?.required ?? []).includes(n), description: s.description,
+        })),
+      })
+    } else {
+      setForm(emptyStaticForm())
+    }
+    setSaveError('')
+    setTryOpen(false)
+    setTryResult(null)
+  }, [open, editTool])
+
+  const syncParams = (template: string) => {
+    const detected = detectStaticParams(template)
+    setForm(prev => ({
+      ...prev,
+      responseTemplate: template,
+      params: detected.map(name => prev.params.find(p => p.name === name) ?? { name, type: 'string', required: false }),
+    }))
+  }
+
+  const handleSave = async () => {
+    if (!form.name.trim()) return
+    setSaving(true); setSaveError('')
+    try {
+      const inputSchema: any = {
+        type: 'object',
+        properties: Object.fromEntries(form.params.map(p => [p.name, { type: p.type, ...(p.description ? { description: p.description } : {}) }])),
+        required: form.params.filter(p => p.required).map(p => p.name),
+      }
+      const body: Partial<GeneratedTool> = {
+        name: form.name.trim(),
+        description: form.description.trim(),
+        inputSchema,
+        executionRef: { type: 'static', responseTemplate: form.responseTemplate, mimeType: form.mimeType } as any,
+      }
+      let saved: GeneratedTool
+      if (editTool) {
+        const r = await api.patch<GeneratedTool>(`/swagger/servers/${projectId}/tools/${encodeURIComponent(editTool.name)}`, body)
+        saved = r.data
+      } else {
+        const r = await api.post<GeneratedTool>(`/swagger/servers/${projectId}/tools`, body)
+        saved = r.data
+      }
+      onSaved(saved)
+      onClose()
+    } catch (e: any) {
+      setSaveError(e?.response?.data?.message ?? 'Save failed')
+    } finally {
+      setSaving(false) }
+  }
+
+  const previewResult = () => {
+    const rendered = (form.responseTemplate ?? '').replace(/\{\{(\w+)\}\}/g, (_, k) =>
+      tryArgs[k] !== undefined ? tryArgs[k] : `{{${k}}}`)
+    setTryResult(rendered)
+  }
+
+  return (
+    <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: 580 } }}>
+      <Box display="flex" alignItems="center" justifyContent="space-between" px={2.5} py={2}
+        sx={{ borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
+        <Typography fontWeight={700} fontSize="1rem">{editTool ? 'Edit static tool' : 'New static tool'}</Typography>
+        <IconButton size="small" onClick={onClose}><IconX size={18} /></IconButton>
+      </Box>
+      <Box flexGrow={1} overflow="auto" px={2.5} py={2}>
+        <Box display="flex" flexDirection="column" gap={2}>
+          <TextField label="Tool name" value={form.name} size="small" fullWidth required
+            onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
+          <TextField label="Description" value={form.description} size="small" fullWidth
+            multiline minRows={2} maxRows={5}
+            onChange={e => setForm(p => ({ ...p, description: e.target.value }))} />
+
+          <TextField
+            label="Response template"
+            value={form.responseTemplate}
+            size="small" fullWidth multiline minRows={6} maxRows={20}
+            placeholder={'Hello {{name}}, you have {{count}} messages.'}
+            helperText="Use {{paramName}} for dynamic values. Parameters are detected automatically."
+            inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
+            onChange={e => syncParams(e.target.value)}
+          />
+
+          <FormControl size="small" sx={{ width: 200 }}>
+            <InputLabel>MIME type</InputLabel>
+            <Select value={form.mimeType} label="MIME type"
+              onChange={e => setForm(p => ({ ...p, mimeType: e.target.value }))}>
+              <MenuItem value="text/plain">text/plain</MenuItem>
+              <MenuItem value="text/html">text/html</MenuItem>
+              <MenuItem value="application/json">application/json</MenuItem>
+              <MenuItem value="text/markdown">text/markdown</MenuItem>
+            </Select>
+          </FormControl>
+
+          {/* Auto-detected parameters */}
+          {form.params.length > 0 && (
+            <Box>
+              <Typography variant="subtitle2" mb={1}>Parameters ({form.params.length} detected)</Typography>
+              <Box display="flex" flexDirection="column" gap={1}>
+                {form.params.map((p, i) => (
+                  <Box key={p.name} display="flex" gap={1} alignItems="center">
+                    <TextField size="small" value={p.name} label="Name" sx={{ width: 160 }} inputProps={{ readOnly: true }} />
+                    <FormControl size="small" sx={{ width: 130 }}>
+                      <InputLabel>Type</InputLabel>
+                      <Select value={p.type} label="Type"
+                        onChange={e => setForm(prev => { const ps = [...prev.params]; ps[i] = { ...ps[i], type: e.target.value }; return { ...prev, params: ps } })}>
+                        <MenuItem value="string">string</MenuItem>
+                        <MenuItem value="number">number</MenuItem>
+                        <MenuItem value="boolean">boolean</MenuItem>
+                        <MenuItem value="array">array</MenuItem>
+                      </Select>
+                    </FormControl>
+                    <TextField size="small" value={p.description ?? ''} label="Description" sx={{ flexGrow: 1 }}
+                      onChange={e => setForm(prev => { const ps = [...prev.params]; ps[i] = { ...ps[i], description: e.target.value }; return { ...prev, params: ps } })} />
+                    <FormControlLabel control={
+                      <Checkbox size="small" checked={!!p.required}
+                        onChange={e => setForm(prev => { const ps = [...prev.params]; ps[i] = { ...ps[i], required: e.target.checked }; return { ...prev, params: ps } })} />
+                    } label="Required" />
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          {/* Preview panel */}
+          <Box>
+            <Button size="small" variant="outlined" startIcon={<IconPlayerPlay size={16} />}
+              onClick={() => { setTryOpen(v => !v); setTryResult(null) }}>
+              {tryOpen ? 'Hide preview' : 'Preview output'}
+            </Button>
+            {tryOpen && (
+              <Paper variant="outlined" sx={{ p: 2, mt: 1 }}>
+                {form.params.length > 0 ? (
+                  <Box display="flex" flexWrap="wrap" gap={1} mb={1.5}>
+                    {form.params.map(p => (
+                      <TextField key={p.name} size="small" label={`${p.name}${p.required ? ' *' : ''}`} sx={{ width: 180 }}
+                        value={tryArgs[p.name] ?? ''}
+                        onChange={e => setTryArgs(prev => ({ ...prev, [p.name]: e.target.value }))} />
+                    ))}
+                  </Box>
+                ) : (
+                  <Typography variant="body2" color="text.secondary" mb={1.5}>No parameters — template renders as-is.</Typography>
+                )}
+                <Button size="small" variant="contained" startIcon={<IconPlayerPlay size={14} />} onClick={previewResult}>
+                  Preview
+                </Button>
+                {tryResult !== null && (
+                  <Box mt={1.5} sx={{
+                    maxHeight: 260, overflow: 'auto', fontFamily: 'monospace', fontSize: '0.82rem',
+                    bgcolor: '#1e1e1e', color: '#d4d4d4', p: 1.5, borderRadius: 1,
+                    whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                  }}>
+                    {tryResult}
+                  </Box>
+                )}
+              </Paper>
+            )}
+          </Box>
+
+          {error && <Alert severity="error">{error}</Alert>}
+        </Box>
+      </Box>
+      <Box display="flex" justifyContent="flex-end" gap={1} px={2.5} py={2}
+        sx={{ borderTop: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button variant="contained" onClick={handleSave}
+          disabled={saving || !form.name.trim()}
+          startIcon={saving ? <CircularProgress size={14} /> : undefined}>
+          {saving ? 'Saving…' : 'Save'}
+        </Button>
+      </Box>
+    </Drawer>
+  )
+}
+
+function StaticToolsTab({ tools, projectId, onToolAdded, onToolChanged, onToolDeleted }: {
+  tools: GeneratedTool[]
+  projectId: string
+  onToolAdded: (tool: GeneratedTool) => void
+  onToolChanged: (oldName: string, newTool: GeneratedTool) => void
+  onToolDeleted: (toolName: string) => void
+}) {
+  const { can } = useAuth()
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editTool, setEditTool] = useState<GeneratedTool | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [tryPanelTool, setTryPanelTool] = useState<string | null>(null)
+  const [tryArgs, setTryArgs] = useState<Record<string, string>>({})
+  const [tryResult, setTryResult] = useState<string | null>(null)
+
+  const staticTools = tools.filter(t => t.executionRef?.type === 'static')
+
+  const handleDelete = async (toolName: string) => {
+    setDeleting(true)
+    try {
+      await api.delete(`/swagger/servers/${projectId}/tools/${toolName}`)
+      onToolDeleted(toolName)
+    } finally { setDeleting(false); setDeleteConfirm(null) }
+  }
+
+  const handleToggle = async (tool: GeneratedTool) => {
+    const updated = { ...tool, enabled: !tool.enabled }
+    await api.patch(`/swagger/servers/${projectId}/tools/${tool.name}`, { enabled: updated.enabled })
+    onToolChanged(tool.name, updated)
+  }
+
+  const preview = (tool: GeneratedTool) => {
+    const ref = tool.executionRef as { type: 'static'; responseTemplate: string } | undefined
+    const rendered = (ref?.responseTemplate ?? '').replace(/\{\{(\w+)\}\}/g, (_, k) =>
+      tryArgs[k] !== undefined ? tryArgs[k] : `{{${k}}}`)
+    setTryResult(rendered)
+  }
+
+  return (
+    <Box>
+      <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+        <Typography variant="h6" fontWeight={700}>Static Tools</Typography>
+        {can(Permission.ToolsCreate) && (
+          <Button size="small" variant="contained" startIcon={<IconPlus size={16} />}
+            onClick={() => { setEditTool(null); setDialogOpen(true) }}>
+            New tool
+          </Button>
+        )}
+      </Box>
+
+      <Alert severity="info" sx={{ mb: 2 }}>
+        Static tools return a fixed response — optionally interpolating parameter values via <code>{'{{paramName}}'}</code>. No external connection is needed.
+      </Alert>
+
+      {staticTools.length === 0 ? (
+        <Alert severity="info">No static tools yet. Click "New tool" to create one.</Alert>
+      ) : (
+        <Paper variant="outlined" sx={{ overflow: 'hidden', mb: 2 }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 700, fontSize: '0.78rem', width: 60 }}>On</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '0.78rem' }}>Name</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '0.78rem' }}>Template preview</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '0.78rem', width: 80 }}>Params</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '0.78rem', width: 100 }}></TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {staticTools.map(tool => {
+                const ref = tool.executionRef as { type: 'static'; responseTemplate: string } | undefined
+                const params = Object.entries(tool.inputSchema?.properties ?? {}) as [string, any][]
+                const isTryOpen = tryPanelTool === tool.name
+                return (
+                  <>
+                    <TableRow key={tool.name} hover sx={{ '&:last-child td': { border: 0 } }}>
+                      <TableCell>
+                        <Switch size="small" checked={tool.enabled !== false} onChange={() => handleToggle(tool)} />
+                      </TableCell>
+                      <TableCell>
+                        <Typography fontWeight={600} fontSize="0.85rem">{tool.name}</Typography>
+                        {tool.description && (
+                          <Typography variant="caption" color="text.secondary" display="block" noWrap sx={{ maxWidth: 200 }}>
+                            {tool.description}
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Typography fontFamily="monospace" fontSize="0.76rem" color="text.secondary" noWrap sx={{ maxWidth: 280 }}>
+                          {(ref?.responseTemplate ?? '').slice(0, 60)}{(ref?.responseTemplate ?? '').length > 60 ? '…' : ''}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip label={params.length} size="small" />
+                      </TableCell>
+                      <TableCell>
+                        <Box display="flex" gap={0.5}>
+                          <Tooltip title={isTryOpen ? 'Close preview' : 'Preview output'}>
+                            <IconButton size="small" color="primary"
+                              onClick={() => {
+                                if (isTryOpen) { setTryPanelTool(null) }
+                                else { setTryPanelTool(tool.name); setTryArgs({}); setTryResult(null) }
+                              }}>
+                              <IconPlayerPlay size={16} />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Edit">
+                            <IconButton size="small" onClick={() => { setEditTool(tool); setDialogOpen(true) }}>
+                              <IconEdit size={16} />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Delete">
+                            <IconButton size="small" color="error" onClick={() => setDeleteConfirm(tool.name)}>
+                              <IconTrash size={16} />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                    {isTryOpen && (
+                      <TableRow key={`${tool.name}-try`}>
+                        <TableCell colSpan={5} sx={{ p: 0 }}>
+                          <Box sx={{ bgcolor: 'action.hover', borderBottom: '1px solid', borderColor: 'divider', p: 2 }}>
+                            <Typography variant="subtitle2" mb={1.5}>Preview "{tool.name}"</Typography>
+                            {params.length > 0 ? (
+                              <Box display="flex" flexWrap="wrap" gap={1} mb={1.5}>
+                                {params.map(([name, schema]) => (
+                                  <TextField key={name} size="small"
+                                    label={`${name}${(tool.inputSchema?.required ?? []).includes(name) ? ' *' : ''}`}
+                                    helperText={schema.description}
+                                    sx={{ width: 180 }}
+                                    value={tryArgs[name] ?? ''}
+                                    onChange={e => setTryArgs(prev => ({ ...prev, [name]: e.target.value }))} />
+                                ))}
+                              </Box>
+                            ) : (
+                              <Typography variant="body2" color="text.secondary" mb={1.5}>No parameters — renders as-is.</Typography>
+                            )}
+                            <Button size="small" variant="contained" startIcon={<IconPlayerPlay size={14} />}
+                              onClick={() => preview(tool)}>
+                              Preview
+                            </Button>
+                            {tryResult !== null && (
+                              <Box mt={1.5} sx={{
+                                maxHeight: 260, overflow: 'auto', fontFamily: 'monospace', fontSize: '0.78rem',
+                                bgcolor: '#1e1e1e', color: '#d4d4d4',
+                                p: 1.5, borderRadius: 1, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                              }}>
+                                {tryResult}
+                              </Box>
+                            )}
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </>
+                )
+              })}
+            </TableBody>
+          </Table>
+        </Paper>
+      )}
+
+      <StaticToolDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        onSaved={tool => {
+          if (editTool) onToolChanged(editTool.name, tool)
+          else onToolAdded(tool)
+          setDialogOpen(false)
+        }}
+        projectId={projectId}
+        editTool={editTool}
+      />
+
+      <ConfirmDialog
+        open={!!deleteConfirm}
+        title="Delete tool"
+        message={`Delete "${deleteConfirm}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={() => { if (deleteConfirm) handleDelete(deleteConfirm) }}
+        onClose={() => setDeleteConfirm(null)}
+      />
+    </Box>
+  )
+}
+
+// ─── SchemaTab ────────────────────────────────────────────────────────────────
+
+interface SchemaColumn { name: string; type: string; nullable: boolean }
+interface SchemaTable { name: string; columns: SchemaColumn[] }
+interface SchemaResult {
+  tables?: SchemaTable[]
+  collections?: string[]
+  error?: string
+}
+
+function SchemaTab({ projectId, sourceType }: { projectId: string; sourceType: SourceType }) {
+  const [result, setResult] = useState<SchemaResult | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [expanded, setExpanded] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+
+  const isSql = SQL_SOURCES_SET.has(sourceType)
+  const isMongo = sourceType === 'mongodb' || sourceType === 'firestore'
+
+  const entityLabel = isSql ? 'table' : isMongo ? 'collection' : 'resource'
+  const entityLabelPlural = isSql ? 'Tables' : isMongo ? 'Collections' : 'Resources'
+
+  const load = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const r = await api.post<SchemaResult>(`/swagger/servers/${projectId}/introspect`)
+      setResult(r.data)
+    } catch (e: any) {
+      setError(e?.response?.data?.message ?? 'Introspection failed. Check your connection settings.')
+    } finally {
+      setLoading(false) }
+  }
+
+  useEffect(() => { load() }, [projectId])
+
+  const tables: SchemaTable[] = result?.tables ?? []
+  const collections: string[] = result?.collections ?? []
+
+  const filteredTables = tables.filter(t =>
+    !search || t.name.toLowerCase().includes(search.toLowerCase()) ||
+    t.columns.some(c => c.name.toLowerCase().includes(search.toLowerCase()))
+  )
+  const filteredCollections = collections.filter(c =>
+    !search || c.toLowerCase().includes(search.toLowerCase())
+  )
+
+  return (
+    <Box>
+      <Box display="flex" alignItems="center" justifyContent="space-between" mb={2} gap={2} flexWrap="wrap">
+        <Box display="flex" alignItems="center" gap={1}>
+          <Typography variant="h6" fontWeight={700}>{entityLabelPlural}</Typography>
+          {result && (
+            <Chip size="small" label={isSql ? `${tables.length} tables` : `${collections.length} collections`} />
+          )}
+        </Box>
+        <Box display="flex" gap={1} alignItems="center">
+          {result && (
+            <TextField size="small" placeholder={`Search ${entityLabel}s…`} value={search}
+              onChange={e => setSearch(e.target.value)} sx={{ width: 220 }}
+              InputProps={{ startAdornment: <InputAdornment position="start"><IconSearch size={16} /></InputAdornment> }} />
+          )}
+          <Button size="small" variant="outlined" startIcon={loading ? <CircularProgress size={14} /> : <IconRefresh size={16} />}
+            onClick={load} disabled={loading}>
+            {loading ? 'Loading…' : 'Refresh'}
+          </Button>
+        </Box>
+      </Box>
+
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+      {loading && !result && (
+        <Box display="flex" justifyContent="center" py={8}>
+          <CircularProgress />
+        </Box>
+      )}
+
+      {/* SQL: expandable table list with columns */}
+      {isSql && filteredTables.length > 0 && (
+        <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+          {filteredTables.map((table, i) => (
+            <Box key={table.name} sx={{ borderBottom: i < filteredTables.length - 1 ? '1px solid' : 'none', borderColor: 'divider' }}>
+              <Box
+                display="flex" alignItems="center" gap={1.5} px={2} py={1.5}
+                sx={{ cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' }, userSelect: 'none' }}
+                onClick={() => setExpanded(expanded === table.name ? null : table.name)}
+              >
+                <IconChevronRight size={16} style={{
+                  transition: 'transform 0.15s',
+                  transform: expanded === table.name ? 'rotate(90deg)' : 'none',
+                  color: 'var(--mui-palette-text-secondary)',
+                  flexShrink: 0,
+                }} />
+                <IconTable size={16} style={{ color: 'var(--mui-palette-primary-main)', flexShrink: 0 }} />
+                <Typography fontWeight={600} fontSize="0.875rem" sx={{ flexGrow: 1 }}>{table.name}</Typography>
+                <Chip size="small" label={`${table.columns.length} col${table.columns.length !== 1 ? 's' : ''}`}
+                  sx={{ fontSize: '0.7rem', height: 20 }} />
+              </Box>
+
+              {expanded === table.name && (
+                <Box sx={{ bgcolor: 'action.hover', borderTop: '1px solid', borderColor: 'divider' }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 700, fontSize: '0.72rem', pl: 6 }}>Column</TableCell>
+                        <TableCell sx={{ fontWeight: 700, fontSize: '0.72rem' }}>Type</TableCell>
+                        <TableCell sx={{ fontWeight: 700, fontSize: '0.72rem' }}>Nullable</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {table.columns.map(col => (
+                        <TableRow key={col.name} sx={{ '&:last-child td': { border: 0 } }}>
+                          <TableCell sx={{ pl: 6, fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                            <Box display="flex" alignItems="center" gap={0.75}>
+                              <IconColumns size={13} style={{ color: 'var(--mui-palette-text-secondary)', flexShrink: 0 }} />
+                              {col.name}
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Chip label={col.type} size="small"
+                              sx={{ fontFamily: 'monospace', fontSize: '0.7rem', height: 20, bgcolor: 'background.paper' }} />
+                          </TableCell>
+                          <TableCell>
+                            <Typography fontSize="0.78rem" color={col.nullable ? 'text.secondary' : 'error.main'}>
+                              {col.nullable ? 'yes' : 'no'}
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Box>
+              )}
+            </Box>
+          ))}
+        </Paper>
+      )}
+
+      {isSql && result && filteredTables.length === 0 && !error && (
+        <Alert severity="info">
+          {tables.length === 0
+            ? 'No tables found. Make sure your connection is correct and the database has tables.'
+            : 'No tables match your search.'}
+        </Alert>
+      )}
+
+      {/* Non-SQL: flat list of collections/resources */}
+      {!isSql && filteredCollections.length > 0 && (
+        <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+          {filteredCollections.map((name, i) => (
+            <Box key={name} display="flex" alignItems="center" gap={1.5} px={2} py={1.5}
+              sx={{ borderBottom: i < filteredCollections.length - 1 ? '1px solid' : 'none', borderColor: 'divider' }}>
+              <IconTable size={16} style={{ color: 'var(--mui-palette-primary-main)', flexShrink: 0 }} />
+              <Typography fontWeight={500} fontSize="0.875rem">{name}</Typography>
+            </Box>
+          ))}
+        </Paper>
+      )}
+
+      {!isSql && result && filteredCollections.length === 0 && !error && (
+        <Alert severity="info">
+          {collections.length === 0
+            ? `No ${entityLabelPlural.toLowerCase()} found. Make sure your connection is correct.`
+            : `No ${entityLabelPlural.toLowerCase()} match your search.`}
+        </Alert>
+      )}
+    </Box>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function ServerDetail() {
@@ -6044,6 +8222,47 @@ export default function ServerDetail() {
     })
   }
 
+  /* ── Sidebar context sync — hooks must be before any early return ── */
+  const { setServerDetail } = useServerNav()
+  useEffect(() => {
+    if (!project) return
+    const st = getSourceType(project)
+    const sd = SOURCE_DISPLAY[st]
+    const db = isDbSource(st)
+    const sql = isSqlSource(st)
+    const blank = isBlankSource(st)
+    const Tidx = {
+      connect: 0,
+      apiEndpoints: (!db && !blank) ? 1 : -1,
+      queries:  db ? 1 : -1,
+      tools:    db ? 2 : (blank ? 1 : 2),
+      resources:db ? 3 : (blank ? 2 : 3),
+      prompts:  db ? 4 : (blank ? 3 : 4),
+      chains:   db ? 5 : (blank ? 4 : 5),
+      settings: db ? 6 : (blank ? 5 : 6),
+      schema:   db ? 7 : -1,
+      connection: db ? 8 : -1,
+      activity: db ? 9 : (blank ? 6 : 7),
+      aiView:   db ? 10 : (blank ? 7 : 8),
+    }
+    const items: ServerNavItem[] = [
+      { label: 'Connect',      icon: <IconWorld size={16} />,         idx: Tidx.connect },
+      ...(Tidx.apiEndpoints !== -1 ? [{ label: 'API Endpoints', icon: <IconRoute size={16} />, idx: Tidx.apiEndpoints, badge: project.tools.length || undefined }] : []),
+      ...(Tidx.queries !== -1 ? [{ label: sql ? 'Queries' : 'Operations', icon: <IconDatabase size={16} />, idx: Tidx.queries, badge: (project.dbQueries ?? []).length || undefined }] : []),
+      { label: 'Tools',        icon: <IconTool size={16} />,          idx: Tidx.tools,     badge: project.tools.length || undefined },
+      { label: 'Resources',    icon: <IconFile size={16} />,          idx: Tidx.resources, badge: (project.resources ?? []).length || undefined },
+      { label: 'Prompts',      icon: <IconBulb size={16} />,          idx: Tidx.prompts,   badge: (project.prompts ?? []).length || undefined },
+      { label: 'Chains',       icon: <IconArrowsShuffle size={16} />, idx: Tidx.chains,    disabled: true },
+      { label: 'Settings',     icon: <IconAdjustments size={16} />,   idx: Tidx.settings },
+      ...(Tidx.schema !== -1 ? [{ label: 'Schema',     icon: <IconTable size={16} />, idx: Tidx.schema }] : []),
+      ...(Tidx.connection !== -1 ? [{ label: 'Connection', icon: <IconLink size={16} />, idx: Tidx.connection }] : []),
+      { label: 'Activity',     icon: <IconChartBar size={16} />,      idx: Tidx.activity },
+      { label: 'AI View',      icon: <IconBook size={16} />,          idx: Tidx.aiView },
+    ]
+    setServerDetail({ name: project.name, sourceEmoji: sd.emoji, sourceColor: sd.color, navItems: items, tab, onTabChange: setTab })
+  })
+  useEffect(() => () => setServerDetail(null), [])
+
   if (loading) {
     return <Box display="flex" justifyContent="center" alignItems="center" height="50vh"><CircularProgress /></Box>
   }
@@ -6066,44 +8285,91 @@ export default function ServerDetail() {
     return matchSearch && matchMethod
   })
 
+  const sourceType = getSourceType(project)
+  const sourceDisplay = SOURCE_DISPLAY[sourceType]
+  const dbSource = isDbSource(sourceType)
+  const sqlSource = isSqlSource(sourceType)
+  const blankSource = isBlankSource(sourceType)
+
+  const T = {
+    connect:      0,
+    apiEndpoints: (!dbSource && !blankSource) ? 1 : -1,
+    queries:      dbSource ? 1 : -1,
+    tools:        dbSource ? 2 : (blankSource ? 1 : 2),
+    resources:    dbSource ? 3 : (blankSource ? 2 : 3),
+    prompts:      dbSource ? 4 : (blankSource ? 3 : 4),
+    chains:       dbSource ? 5 : (blankSource ? 4 : 5),
+    settings:     dbSource ? 6 : (blankSource ? 5 : 6),
+    schema:       dbSource ? 7 : -1,
+    connection:   dbSource ? 8 : -1,
+    activity:     dbSource ? 9 : (blankSource ? 6 : 7),
+    aiView:       dbSource ? 10 : (blankSource ? 7 : 8),
+  }
+
   return (
     <Box py={3} px={0}>
-      {/* Nav */}
-      <Box mb={2}>
-        <Button startIcon={<IconArrowLeft size={18} />} size="small" onClick={() => navigate('/')}>Servers</Button>
-      </Box>
-
-      {/* Header — always visible */}
-      <Paper variant="outlined" sx={{ p: 2.5, mb: 2.5, borderRadius: '10px' }}>
-        <Box display="flex" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={2}>
-          <Box minWidth={0} flexGrow={1}>
-            <InlineEdit value={project.name} onSave={(v) => saveProjectInfo('name', v)}
-              readOnly={!can(Permission.ServersEditSettings)} placeholder="Server name" fontSize="1.375rem" fontWeight={700} />
-            <Box mt={0.5}>
-              <InlineEdit value={project.description ?? ''} onSave={(v) => saveProjectInfo('description', v)}
-                readOnly={!can(Permission.ServersEditSettings)} multiline placeholder="Add a short description…" emptyLabel="Add a short description…"
-                fontSize="0.875rem" color="text.secondary" />
-            </Box>
+      {/* Header */}
+      <Paper variant="outlined" sx={{ mb: 2.5, borderRadius: '10px', overflow: 'hidden' }}>
+        {/* Breadcrumb row */}
+        <Box
+          display="flex" alignItems="center" gap={0.75} px={2} py={1}
+          sx={{ borderBottom: '1px solid', borderColor: 'divider' }}
+        >
+          <Box
+            component="span"
+            onClick={() => navigate('/')}
+            sx={{
+              fontSize: '0.78rem', color: 'text.secondary', cursor: 'pointer',
+              '&:hover': { color: 'text.primary' }, transition: 'color 0.15s',
+            }}
+          >
+            Servers
           </Box>
-          <Box display="flex" gap={1} flexWrap="wrap" alignItems="flex-start">
-            {isPaused
-              ? <Chip label="Paused" icon={<IconPlayerPause size={18} />} color="warning" variant="outlined" sx={{ fontWeight: 600 }} />
-              : <Chip
-                  label={project.status === 'active' ? 'Active' : 'Error'}
-                  color={project.status === 'active' ? 'success' : 'error'}
-                  variant="outlined"
-                  sx={{ fontWeight: 600 }}
-                />
-            }
-            {project.version && <Chip label={`v${project.version}`} variant="outlined" sx={{ fontWeight: 500 }} />}
-            {can(Permission.ServersCreate) && (
-              <Tooltip title="Upload a new version of the spec to add or update tools">
-                <Button size="small" variant="outlined" startIcon={<IconRefresh size={18} />}
-                  onClick={() => { setReimportOpen(true); setReimportSuccess(null) }}>
-                  Update from spec
-                </Button>
-              </Tooltip>
-            )}
+          <Typography fontSize="0.78rem" color="divider">/</Typography>
+          <Box sx={{ fontSize: '0.78rem', color: sourceDisplay.color, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <span>{sourceDisplay.emoji}</span>
+            <span style={{ fontWeight: 500 }}>{project.name}</span>
+          </Box>
+          <Box flexGrow={1} />
+          {/* Status + source chip inline */}
+          {isPaused
+            ? <Chip label="Paused" size="small" color="warning" variant="outlined" sx={{ fontWeight: 600, height: 22, fontSize: '0.7rem' }} />
+            : <Chip
+                label={project.status === 'active' ? 'Active' : 'Error'}
+                size="small"
+                color={project.status === 'active' ? 'success' : 'error'}
+                variant="outlined"
+                sx={{ fontWeight: 600, height: 22, fontSize: '0.7rem' }}
+              />
+          }
+          <Chip
+            label={`${sourceDisplay.emoji} ${sourceDisplay.label}`}
+            size="small" variant="outlined"
+            sx={{ fontWeight: 500, height: 22, fontSize: '0.7rem', borderColor: sourceDisplay.color, color: sourceDisplay.color }}
+          />
+          {project.version && (
+            <Chip label={`v${project.version}`} size="small" variant="outlined"
+              sx={{ height: 22, fontSize: '0.7rem', fontWeight: 500 }} />
+          )}
+          {can(Permission.ServersCreate) && !dbSource && !blankSource && (
+            <Tooltip title="Upload a new version of the spec">
+              <IconButton size="small" onClick={() => { setReimportOpen(true); setReimportSuccess(null) }}>
+                <IconRefresh size={16} />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
+
+        {/* Name + description row */}
+        <Box px={2} py={1.5}>
+          <InlineEdit value={project.name} onSave={(v) => saveProjectInfo('name', v)}
+            readOnly={!can(Permission.ServersEditSettings)} placeholder="Server name"
+            fontSize="1.1rem" fontWeight={700} />
+          <Box mt={0.25}>
+            <InlineEdit value={project.description ?? ''} onSave={(v) => saveProjectInfo('description', v)}
+              readOnly={!can(Permission.ServersEditSettings)} multiline
+              placeholder="Add a short description…" emptyLabel="Add a short description…"
+              fontSize="0.82rem" color="text.secondary" />
           </Box>
         </Box>
       </Paper>
@@ -6115,261 +8381,308 @@ export default function ServerDetail() {
         </Alert>
       )}
 
-      {/* Tabs */}
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tab icon={<IconWorld size={16} />} iconPosition="start" label="Connect" />
-        <Tab icon={<IconRoute size={16} />} iconPosition="start"
-          label={`API Endpoints${project.tools.length > 0 ? ` (${project.tools.length})` : ''}`} />
-        <Tab icon={<IconTool size={16} />} iconPosition="start"
-          label={`Tools${project.tools.length > 0 ? ` (${project.tools.length})` : ''}`} />
-        <Tab icon={<IconDatabase size={16} />} iconPosition="start"
-          label={`Resources${(project.resources ?? []).length > 0 ? ` (${project.resources!.length})` : ''}`} />
-        <Tab icon={<IconBulb size={16} />} iconPosition="start"
-          label={`Prompts${(project.prompts ?? []).length > 0 ? ` (${project.prompts!.length})` : ''}`} />
-        <Tab icon={<IconArrowsShuffle size={16} />} iconPosition="start"
-          label={`Chains${(project.chains ?? []).length > 0 ? ` (${project.chains!.length})` : ''} (WIP)`} disabled />
-        <Tab icon={<IconAdjustments size={16} />} iconPosition="start" label="Settings" />
-        <Tab icon={<IconChartBar size={16} />} iconPosition="start" label="Activity" />
-        <Tab icon={<IconBook size={16} />} iconPosition="start" label="AI View" />
-      </Tabs>
-
-      {/* ── Tab 0: Connect ─────────────────────────────────────────────────────── */}
-      {tab === 0 && (
-        <>
-          <McpEndpointBar projectId={id!} hasKeys={(project.mcpApiKeys ?? []).length > 0} />
-          {can(Permission.ApiKeysView) && (
-            <ApiKeysPanel
-              projectId={id!}
-              initialKeys={project.mcpApiKeys ?? []}
-              onChange={(keys) => setProject((prev) => prev ? { ...prev, mcpApiKeys: keys } : prev)}
-            />
-          )}
-          <OAuthClientPanel
-            projectId={id!}
-            initialClientId={project.oauthClientId}
-            initialClientSecret={project.oauthClientSecret}
-            serverBase={window.location.origin}
-            onChange={(cid, csec) => setProject((prev) => prev ? { ...prev, oauthClientId: cid ?? undefined, oauthClientSecret: csec ?? undefined } : prev)}
-          />
-        </>
-      )}
-
-      {/* ── Tab 1: API Endpoints ──────────────────────────────────────────────── */}
-      {tab === 1 && (
-        <ApiEndpointsTab
-          tools={project.tools}
-          projectId={id!}
-          projectBaseUrl={project.baseUrl ?? ''}
-          anyApiKey={project.mcpApiKeys?.[0]?.key}
-          onToolAdded={(tool) => setProject((prev) => prev ? { ...prev, tools: [...prev.tools, tool] } : prev)}
-          onToolChanged={handleToolChanged}
-          onToolDeleted={handleDeleteTool}
-        />
-      )}
-
-      {/* ── Tab 2: Tools ──────────────────────────────────────────────────────── */}
-      {tab === 2 && (can(Permission.ToolsView) ? (
-        <>
-          <Grid container spacing={2} mb={3}>
-            <Grid item xs={6} sm={3}>
-              <StatCard label="Total tools" value={project.tools.length} color="#5D87FF" />
-            </Grid>
-            {Object.entries(methodCounts).map(([method, count]) => (
-              <Grid item xs={6} sm={3} key={method}>
-                <StatCard label={method} value={count} color={METHOD_COLOR[method]} />
-              </Grid>
-            ))}
-          </Grid>
-
-          <Box display="flex" alignItems="center" justifyContent="space-between" mb={1.5} flexWrap="wrap" gap={1}>
-            <Box display="flex" alignItems="center" gap={1}>
-              <Typography variant="h6" fontWeight={700}>What your AI can do</Typography>
-              <HelpButton title="Tools">
-                <Typography variant="body2" gutterBottom>
-                  Each tool is one specific action your AI can take — like "search for a contact", "create a ticket", or "get project status". The AI reads all the descriptions here and decides which tool to use based on what you ask it.
-                </Typography>
-                <Typography variant="body2" gutterBottom>
-                  <strong>Better descriptions = better AI.</strong> Instead of "Get user", write "Fetch a user account by ID — returns name, email, role, and status." The more specific, the more reliably the AI will use it correctly.
-                </Typography>
-                <Typography variant="body2">
-                  Use <strong>Disable</strong> to hide a tool from the AI without deleting it. Useful when an endpoint is temporarily unavailable.
-                </Typography>
-              </HelpButton>
-            </Box>
-            {can(Permission.ToolsCreate) && (
-              <Button variant="contained" startIcon={<IconPlus size={18} />} onClick={() => setPickerOpen(true)} size="small">
-                New tool
-              </Button>
-            )}
-          </Box>
-
-          <Box display="flex" alignItems="center" gap={1} mb={2} flexWrap="wrap">
-            <TextField
-              size="small" placeholder="Search by name or description…" value={toolSearch}
-              onChange={(e) => setToolSearch(e.target.value)} sx={{ width: 260 }}
-              InputProps={{ startAdornment: <InputAdornment position="start"><IconSearch size={16} /></InputAdornment> }}
-            />
-            {availableMethods.length > 1 && (
-              <Box display="flex" gap={0.5} flexWrap="wrap" alignItems="center">
-                <Chip label="All" size="small" clickable onClick={() => setToolMethodFilter(null)}
-                  color={toolMethodFilter === null ? 'primary' : 'default'}
-                  variant={toolMethodFilter === null ? 'filled' : 'outlined'} />
-                {availableMethods.map((m) => (
-                  <Chip key={m} label={m} size="small" clickable
-                    onClick={() => setToolMethodFilter(toolMethodFilter === m ? null : m)}
-                    sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.7rem',
-                      bgcolor: toolMethodFilter === m ? METHOD_COLOR[m] : 'transparent',
-                      color: toolMethodFilter === m ? '#fff' : METHOD_COLOR[m],
-                      borderColor: METHOD_COLOR[m] }}
-                    variant="outlined" />
-                ))}
-              </Box>
-            )}
-            {(toolSearch || toolMethodFilter) && (
-              <Typography variant="body2" color="text.secondary" ml="auto">
-                {visibleTools.length} of {project.tools.length}
-              </Typography>
-            )}
-          </Box>
-
-          {project.tools.length === 0
-            ? <Alert severity="info">No tools yet. Click "Add tool" to create one, or use "Update tools from spec" to import from an OpenAPI file.</Alert>
-            : visibleTools.length === 0
-              ? <Alert severity="info">No tools match your search.</Alert>
-              : visibleTools.map((tool) => (
-                  <ToolAccordion
-                    key={tool.name}
-                    tool={tool}
+      {/* ── Tab content ─────────────────────────────────────────────────────── */}
+      <Box>
+            {/* ── Connect ─────────────────────────────────────────────────────── */}
+            {tab === T.connect && (
+              <>
+                <McpEndpointBar projectId={id!} hasKeys={(project.mcpApiKeys ?? []).length > 0} />
+                {can(Permission.ApiKeysView) && (
+                  <ApiKeysPanel
                     projectId={id!}
-                    anyApiKey={project.mcpApiKeys?.[0]?.key}
-                    onToolChanged={handleToolChanged}
-                    onEditEndpoint={handleOpenEdit}
+                    initialKeys={project.mcpApiKeys ?? []}
+                    onChange={(keys) => setProject((prev) => prev ? { ...prev, mcpApiKeys: keys } : prev)}
                   />
-                ))}
-        </>
-      ) : (
-        <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={12}>
-          <Typography color="text.secondary" variant="h6">Access restricted</Typography>
-          <Typography color="text.secondary" variant="body2">You don't have permission to view tools.</Typography>
-        </Box>
-      ))}
+                )}
+                <OAuthClientPanel
+                  projectId={id!}
+                  initialClientId={project.oauthClientId}
+                  initialClientSecret={project.oauthClientSecret}
+                  serverBase={window.location.origin}
+                  onChange={(cid, csec) => setProject((prev) => prev ? { ...prev, oauthClientId: cid ?? undefined, oauthClientSecret: csec ?? undefined } : prev)}
+                />
+              </>
+            )}
 
-      {/* ── Tab 3: Resources ──────────────────────────────────────────────────── */}
-      {tab === 3 && (can(Permission.ResourcesView) ? (
-        <ResourcesTab
-          projectId={id!}
-          initialResources={project.resources ?? []}
-          tools={project.tools ?? []}
-          onChange={(resources) => setProject((prev) => prev ? { ...prev, resources } : prev)}
-          anyApiKey={project.mcpApiKeys?.[0]?.key}
-        />
-      ) : (
-        <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={12}>
-          <Typography color="text.secondary" variant="h6">Access restricted</Typography>
-          <Typography color="text.secondary" variant="body2">You don't have permission to view resources.</Typography>
-        </Box>
-      ))}
+            {/* ── Tab: API Endpoints (non-DB only) ────────────────────────────── */}
+            {T.apiEndpoints !== -1 && tab === T.apiEndpoints && (
+              <ApiEndpointsTab
+                tools={project.tools}
+                projectId={id!}
+                projectBaseUrl={project.baseUrl ?? ''}
+                anyApiKey={project.mcpApiKeys?.[0]?.key}
+                onToolAdded={(tool) => setProject((prev) => prev ? { ...prev, tools: [...prev.tools, tool] } : prev)}
+                onToolChanged={handleToolChanged}
+                onToolDeleted={handleDeleteTool}
+              />
+            )}
 
-      {/* ── Tab 4: Prompts ────────────────────────────────────────────────────── */}
-      {tab === 4 && (
-        <PromptsTab
-          projectId={id!}
-          initialPrompts={project.prompts ?? []}
-          onChange={(prompts) => setProject((prev) => prev ? { ...prev, prompts } : prev)}
-          anyApiKey={project.mcpApiKeys?.[0]?.key}
-        />
-      )}
+            {/* ── Tab: Queries / Operations (DB only) ─────────────────────────── */}
+            {T.queries !== -1 && tab === T.queries && (
+              <QueriesTab
+                projectId={id!}
+                sourceType={sourceType}
+                onQueriesChange={(queries) => setProject((prev) => prev ? { ...prev, dbQueries: queries } : prev)}
+              />
+            )}
 
-      {/* ── Tab 5: Chains ─────────────────────────────────────────────────────── */}
-      {tab === 5 && (
-        <ChainsTab
-          projectId={id!}
-          initialChains={project.chains ?? []}
-          tools={project.tools ?? []}
-          onChange={(chains) => setProject((prev) => prev ? { ...prev, chains } : prev)}
-        />
-      )}
+            {/* ── Tab: Tools ──────────────────────────────────────────────────── */}
+            {tab === T.tools && (
+              blankSource ? (
+                <StaticToolsTab
+                  tools={project.tools}
+                  projectId={id!}
+                  onToolAdded={(tool) => setProject((prev) => prev ? { ...prev, tools: [...prev.tools, tool] } : prev)}
+                  onToolChanged={handleToolChanged}
+                  onToolDeleted={handleDeleteTool}
+                />
+              ) : dbSource ? (
+                <DbToolsTab
+                  tools={project.tools}
+                  projectId={id!}
+                  queries={project.dbQueries ?? []}
+                  onToolAdded={(tool) => setProject((prev) => prev ? { ...prev, tools: [...prev.tools, tool] } : prev)}
+                  onToolChanged={handleToolChanged}
+                  onToolDeleted={handleDeleteTool}
+                />
+              ) : (
+                sourceType === 'graphql' || sourceType === 'grpc' ? (
+                  <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', borderRadius: '10px' }}>
+                    <Typography variant="h6" mb={1}>{SOURCE_DISPLAY[sourceType].label} Tools</Typography>
+                    <Typography color="text.secondary" variant="body2">
+                      Tool editor for {SOURCE_DISPLAY[sourceType].label} is coming soon.
+                    </Typography>
+                  </Paper>
+                ) : (
+                  can(Permission.ToolsView) ? (
+                    <>
+                      <Grid container spacing={2} mb={3}>
+                        <Grid item xs={6} sm={3}>
+                          <StatCard label="Total tools" value={project.tools.length} color="#5D87FF" />
+                        </Grid>
+                        {!dbSource && Object.entries(methodCounts).map(([method, count]) => (
+                          <Grid item xs={6} sm={3} key={method}>
+                            <StatCard label={method} value={count} color={METHOD_COLOR[method]} />
+                          </Grid>
+                        ))}
+                      </Grid>
 
-      {/* ── Tab 6: Settings ───────────────────────────────────────────────────── */}
-      {tab === 6 && (
-        can(Permission.ServersEditSettings) ? <>
-          <BaseUrlPanel projectId={id!} initialValue={baseUrl} onChange={setBaseUrl} />
-          <AuthConfigPanel
-            projectId={id!}
-            initialAuth={project.auth}
-            onChange={(auth) => setProject((prev) => prev ? { ...prev, auth } : prev)}
-          />
-          <RateLimitPanel
-            projectId={id!}
-            initialRateLimit={project.rateLimit}
-            onChange={(rl) => setProject((prev) => prev ? { ...prev, rateLimit: rl } : prev)}
-          />
-          <ProjectControlsPanel
-            projectId={id!}
-            initialPaused={project.isPaused}
-            initialMaintenance={project.maintenanceMode}
-            initialAvailability={project.availabilityWindow}
-            onPausedChange={setIsPaused}
-          />
-          <AlertConfigPanel projectId={id!} initialConfig={project.alertConfig} />
-          <TenantConfigPanel
-            projectId={id!}
-            initialConfig={(project as any).tenantConfig}
-            toolParamSuggestions={(() => {
-              const seen = new Set<string>()
-              for (const tool of project.tools ?? []) {
-                for (const mapping of tool.endpointRef?.parameterMap ?? []) {
-                  seen.add(mapping.originalName)
-                }
-              }
-              return Array.from(seen).sort()
-            })()}
-          />
-        </> : (
-          <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={12}>
-            <Typography color="text.secondary" variant="h6">Access restricted</Typography>
-            <Typography color="text.secondary" variant="body2">You don't have permission to manage server settings.</Typography>
-          </Box>
-        )
-      )}
+                      <Box display="flex" alignItems="center" justifyContent="space-between" mb={1.5} flexWrap="wrap" gap={1}>
+                        <Box display="flex" alignItems="center" gap={1}>
+                          <Typography variant="h6" fontWeight={700}>What your AI can do</Typography>
+                          <HelpButton title="Tools">
+                            <Typography variant="body2" gutterBottom>
+                              Each tool is one specific action your AI can take — like "search for a contact", "create a ticket", or "get project status". The AI reads all the descriptions here and decides which tool to use based on what you ask it.
+                            </Typography>
+                            <Typography variant="body2" gutterBottom>
+                              <strong>Better descriptions = better AI.</strong> Instead of "Get user", write "Fetch a user account by ID — returns name, email, role, and status." The more specific, the more reliably the AI will use it correctly.
+                            </Typography>
+                            <Typography variant="body2">
+                              Use <strong>Disable</strong> to hide a tool from the AI without deleting it. Useful when an endpoint is temporarily unavailable.
+                            </Typography>
+                          </HelpButton>
+                        </Box>
+                        {can(Permission.ToolsCreate) && (
+                          <Button variant="contained" startIcon={<IconPlus size={18} />} onClick={() => setPickerOpen(true)} size="small">
+                            New tool
+                          </Button>
+                        )}
+                      </Box>
 
-      {/* ── Tab 7: Activity ───────────────────────────────────────────────────── */}
-      {tab === 7 && (
-        <>
-          <Box display="flex" alignItems="center" gap={1} mb={2}>
-            <Typography variant="h6" fontWeight={700}>Activity Log</Typography>
-            <HelpButton title="Activity Log">
-              <Typography variant="body2" gutterBottom>
-                Every request your AI made through this project, in order. Each row is one action — the tool used, whether it succeeded, and how long it took.
-              </Typography>
-              <Box component="ul" sx={{ mt: 0.5, mb: 1, pl: 2.5 }}>
-                <Box component="li"><Typography variant="body2"><strong>Green status</strong> — request succeeded.</Typography></Box>
-                <Box component="li"><Typography variant="body2"><strong>Red status</strong> — something went wrong. Check the error column for details.</Typography></Box>
-                <Box component="li"><Typography variant="body2"><strong>Response time</strong> — how long the external API took to reply. Over 3s turns orange.</Typography></Box>
+                      <Box display="flex" alignItems="center" gap={1} mb={2} flexWrap="wrap">
+                        <TextField
+                          size="small" placeholder="Search by name or description…" value={toolSearch}
+                          onChange={(e) => setToolSearch(e.target.value)} sx={{ width: 260 }}
+                          InputProps={{ startAdornment: <InputAdornment position="start"><IconSearch size={16} /></InputAdornment> }}
+                        />
+                        {!dbSource && availableMethods.length > 1 && (
+                          <Box display="flex" gap={0.5} flexWrap="wrap" alignItems="center">
+                            <Chip label="All" size="small" clickable onClick={() => setToolMethodFilter(null)}
+                              color={toolMethodFilter === null ? 'primary' : 'default'}
+                              variant={toolMethodFilter === null ? 'filled' : 'outlined'} />
+                            {availableMethods.map((m) => (
+                              <Chip key={m} label={m} size="small" clickable
+                                onClick={() => setToolMethodFilter(toolMethodFilter === m ? null : m)}
+                                sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.7rem',
+                                  bgcolor: toolMethodFilter === m ? METHOD_COLOR[m] : 'transparent',
+                                  color: toolMethodFilter === m ? '#fff' : METHOD_COLOR[m],
+                                  borderColor: METHOD_COLOR[m] }}
+                                variant="outlined" />
+                            ))}
+                          </Box>
+                        )}
+                        {(toolSearch || toolMethodFilter) && (
+                          <Typography variant="body2" color="text.secondary" ml="auto">
+                            {visibleTools.length} of {project.tools.length}
+                          </Typography>
+                        )}
+                      </Box>
+
+                      {project.tools.length === 0
+                        ? <Alert severity="info">No tools yet. Click "Add tool" to create one, or use "Update tools from spec" to import from an OpenAPI file.</Alert>
+                        : visibleTools.length === 0
+                          ? <Alert severity="info">No tools match your search.</Alert>
+                          : visibleTools.map((tool) => (
+                              <ToolAccordion
+                                key={tool.name}
+                                tool={tool}
+                                projectId={id!}
+                                anyApiKey={project.mcpApiKeys?.[0]?.key}
+                                onToolChanged={handleToolChanged}
+                                onEditEndpoint={handleOpenEdit}
+                              />
+                            ))}
+                    </>
+                  ) : (
+                    <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={12}>
+                      <Typography color="text.secondary" variant="h6">Access restricted</Typography>
+                      <Typography color="text.secondary" variant="body2">You don't have permission to view tools.</Typography>
+                    </Box>
+                  )
+                )
+              )
+            )}
+
+            {/* ── Tab: Resources ──────────────────────────────────────────────── */}
+            {tab === T.resources && (can(Permission.ResourcesView) ? (
+              <ResourcesTab
+                projectId={id!}
+                initialResources={project.resources ?? []}
+                tools={project.tools ?? []}
+                onChange={(resources) => setProject((prev) => prev ? { ...prev, resources } : prev)}
+                anyApiKey={project.mcpApiKeys?.[0]?.key}
+              />
+            ) : (
+              <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={12}>
+                <Typography color="text.secondary" variant="h6">Access restricted</Typography>
+                <Typography color="text.secondary" variant="body2">You don't have permission to view resources.</Typography>
               </Box>
-              <Typography variant="body2">
-                Logs are kept for 7 days. They reset when the server restarts.
-              </Typography>
-            </HelpButton>
-          </Box>
-          <ProjectLogs projectId={id!} />
-        </>
-      )}
+            ))}
 
-      {/* ── Tab 8: AI View ────────────────────────────────────────────────────── */}
-      {tab === 8 && (
-        <>
-          <Box display="flex" alignItems="center" gap={1} mb={2}>
-            <Typography variant="h6" fontWeight={700}>What your AI sees</Typography>
-            <HelpButton title="What your AI sees">
-              <Typography variant="body2">
-                This is the exact list of tools and descriptions your AI receives when it connects. If the AI is not using a tool correctly, check its description here — clearer descriptions lead to better results.
-              </Typography>
-            </HelpButton>
-          </Box>
-          <McpDocsContent project={project} projectId={id!} />
-        </>
-      )}
+            {/* ── Tab: Prompts ────────────────────────────────────────────────── */}
+            {tab === T.prompts && (
+              <PromptsTab
+                projectId={id!}
+                initialPrompts={project.prompts ?? []}
+                onChange={(prompts) => setProject((prev) => prev ? { ...prev, prompts } : prev)}
+                anyApiKey={project.mcpApiKeys?.[0]?.key}
+              />
+            )}
+
+            {/* ── Tab: Chains ─────────────────────────────────────────────────── */}
+            {tab === T.chains && (
+              <ChainsTab
+                projectId={id!}
+                initialChains={project.chains ?? []}
+                tools={project.tools ?? []}
+                onChange={(chains) => setProject((prev) => prev ? { ...prev, chains } : prev)}
+              />
+            )}
+
+            {/* ── Tab: Settings ───────────────────────────────────────────────── */}
+            {tab === T.settings && (
+              can(Permission.ServersEditSettings) ? <>
+                {!dbSource && <BaseUrlPanel projectId={id!} initialValue={baseUrl} onChange={setBaseUrl} />}
+                {!dbSource && (
+                  <AuthConfigPanel
+                    projectId={id!}
+                    initialAuth={project.auth}
+                    onChange={(auth) => setProject((prev) => prev ? { ...prev, auth } : prev)}
+                  />
+                )}
+                <RateLimitPanel
+                  projectId={id!}
+                  initialRateLimit={project.rateLimit}
+                  onChange={(rl) => setProject((prev) => prev ? { ...prev, rateLimit: rl } : prev)}
+                />
+                <ProjectControlsPanel
+                  projectId={id!}
+                  initialPaused={project.isPaused}
+                  initialMaintenance={project.maintenanceMode}
+                  initialAvailability={project.availabilityWindow}
+                  onPausedChange={setIsPaused}
+                />
+                <AlertConfigPanel projectId={id!} initialConfig={project.alertConfig} />
+                {!dbSource && (
+                  <TenantConfigPanel
+                    projectId={id!}
+                    initialConfig={(project as any).tenantConfig}
+                    toolParamSuggestions={(() => {
+                      const seen = new Set<string>()
+                      for (const tool of project.tools ?? []) {
+                        for (const mapping of tool.endpointRef?.parameterMap ?? []) {
+                          seen.add(mapping.originalName)
+                        }
+                      }
+                      return Array.from(seen).sort()
+                    })()}
+                  />
+                )}
+              </> : (
+                <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={12}>
+                  <Typography color="text.secondary" variant="h6">Access restricted</Typography>
+                  <Typography color="text.secondary" variant="body2">You don't have permission to manage server settings.</Typography>
+                </Box>
+              )
+            )}
+
+            {/* ── Tab: Schema (DB sources only) ───────────────────────────────── */}
+            {T.schema !== -1 && tab === T.schema && (
+              <SchemaTab projectId={id!} sourceType={sourceType} />
+            )}
+
+            {/* ── Tab: Connection (DB sources only) ───────────────────────────── */}
+            {T.connection !== -1 && tab === T.connection && (
+              <ConnectionTab
+                projectId={id!}
+                connectionConfig={project.connectionConfig}
+                sourceType={sourceType}
+                onUpdated={() => {
+                  api.get<Project>(`/swagger/servers/${id}`).then((r) => {
+                    setProject(r.data)
+                  })
+                }}
+              />
+            )}
+
+            {/* ── Tab: Activity ───────────────────────────────────────────────── */}
+            {tab === T.activity && (
+              <>
+                <Box display="flex" alignItems="center" gap={1} mb={2}>
+                  <Typography variant="h6" fontWeight={700}>Activity Log</Typography>
+                  <HelpButton title="Activity Log">
+                    <Typography variant="body2" gutterBottom>
+                      Every request your AI made through this project, in order. Each row is one action — the tool used, whether it succeeded, and how long it took.
+                    </Typography>
+                    <Box component="ul" sx={{ mt: 0.5, mb: 1, pl: 2.5 }}>
+                      <Box component="li"><Typography variant="body2"><strong>Green status</strong> — request succeeded.</Typography></Box>
+                      <Box component="li"><Typography variant="body2"><strong>Red status</strong> — something went wrong. Check the error column for details.</Typography></Box>
+                      <Box component="li"><Typography variant="body2"><strong>Response time</strong> — how long the external API took to reply. Over 3s turns orange.</Typography></Box>
+                    </Box>
+                    <Typography variant="body2">
+                      Logs are kept for 7 days. They reset when the server restarts.
+                    </Typography>
+                  </HelpButton>
+                </Box>
+                <ProjectLogs projectId={id!} />
+              </>
+            )}
+
+            {/* ── Tab: AI View ────────────────────────────────────────────────── */}
+            {tab === T.aiView && (
+              <>
+                <Box display="flex" alignItems="center" gap={1} mb={2}>
+                  <Typography variant="h6" fontWeight={700}>What your AI sees</Typography>
+                  <HelpButton title="What your AI sees">
+                    <Typography variant="body2">
+                      This is the exact list of tools and descriptions your AI receives when it connects. If the AI is not using a tool correctly, check its description here — clearer descriptions lead to better results.
+                    </Typography>
+                  </HelpButton>
+                </Box>
+                <McpDocsContent project={project as any} projectId={id!} />
+              </>
+            )}
+      </Box>
 
       <ToolDialog
         open={dialogOpen}

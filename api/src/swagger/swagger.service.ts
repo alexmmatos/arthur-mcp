@@ -6,7 +6,8 @@ import * as jwt from 'jsonwebtoken';
 import { parseSpec } from '../dynamic-mcp/openapi-parser';
 import { generateTools } from '../dynamic-mcp/tool-generator';
 import { DynamicMcpService } from '../dynamic-mcp/dynamic-mcp.service';
-import type { AuthConfig, EndpointRef, McpResource, ToolChain, ToolComment } from '../dynamic-mcp/types';
+import type { AuthConfig, DbConnectionConfig, DbQuery, EndpointRef, ExecutionRef, McpResource, ToolChain, ToolComment } from '../dynamic-mcp/types';
+import { testConnection, introspectSchema, executeWithRef } from '../dynamic-mcp/adapters/index';
 import { buildRequest } from '../dynamic-mcp/request-builder';
 import { applyAuth } from '../dynamic-mcp/auth-provider';
 import { executeRequest } from '../dynamic-mcp/http-client';
@@ -809,5 +810,132 @@ export class SwaggerService {
     httpReq = await applyAuth(httpReq, server.auth);
     const res = await executeRequest(httpReq);
     return { status: res.status, body: res.body, contentType: res.contentType };
+  }
+
+  async updateConnectionConfig(id: string, cfg: DbConnectionConfig): Promise<void> {
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Server not found.');
+    await this.projectRepo.update(id, { connectionConfig: cfg } as any);
+    this.dynamicMcp.invalidate(id);
+  }
+
+  async testDbConnection(id: string): Promise<{ ok: boolean; latencyMs?: number; error?: string }> {
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Server not found.');
+    const cfg = (server as any).connectionConfig as DbConnectionConfig | undefined;
+    if (!cfg) return { ok: false, error: 'No connection config found. Save connection details first.' };
+    const sourceType = (server.tags ?? []).find((t) => t.startsWith('source:'))?.slice(7) ?? 'rest';
+    try {
+      const result = await testConnection(sourceType, cfg);
+      return result;
+    } catch (err: any) {
+      return { ok: false, error: err?.message ?? 'Connection failed' };
+    }
+  }
+
+  async introspectDbSchema(id: string): Promise<{
+    tables?: Array<{ name: string; columns: Array<{ name: string; type: string; nullable: boolean }> }>;
+    collections?: string[];
+  }> {
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Server not found.');
+    const cfg = (server as any).connectionConfig as DbConnectionConfig | undefined;
+    if (!cfg) throw new BadRequestException('No connection config found. Save connection details first.');
+    const sourceType = (server.tags ?? []).find((t) => t.startsWith('source:'))?.slice(7) ?? 'rest';
+    return introspectSchema(sourceType, cfg);
+  }
+
+  async testDbQuery(
+    id: string,
+    executionRef: ExecutionRef,
+    args: Record<string, unknown>,
+  ): Promise<{ result: unknown; error?: string }> {
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Server not found.');
+    const cfg = (server as any).connectionConfig as DbConnectionConfig | undefined;
+    if (!cfg) throw new BadRequestException('No connection config found.');
+    try {
+      const result = await executeWithRef(executionRef, args, cfg);
+      return { result };
+    } catch (err: any) {
+      return { result: null, error: err?.message ?? 'Query failed' };
+    }
+  }
+
+  // ── DbQuery CRUD ────────────────────────────────────────────────────────────
+
+  async listDbQueries(id: string): Promise<DbQuery[]> {
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Server not found.');
+    return server.dbQueries ?? [];
+  }
+
+  async addDbQuery(id: string, dto: Omit<DbQuery, 'id'>): Promise<DbQuery> {
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Server not found.');
+    const query: DbQuery = { ...dto, id: crypto.randomUUID() };
+    const updated = await this.projectRepo.update(id, { dbQueries: [...(server.dbQueries ?? []), query] });
+    if (!updated) throw new NotFoundException('Server not found.');
+    this.dynamicMcp.invalidate(id);
+    return query;
+  }
+
+  async updateDbQuery(id: string, queryId: string, dto: Partial<Omit<DbQuery, 'id'>>): Promise<DbQuery> {
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Server not found.');
+    const queries = server.dbQueries ?? [];
+    const idx = queries.findIndex((q) => q.id === queryId);
+    if (idx === -1) throw new NotFoundException('Query not found.');
+    queries[idx] = { ...queries[idx], ...dto };
+    await this.projectRepo.update(id, { dbQueries: queries });
+    this.dynamicMcp.invalidate(id);
+    return queries[idx];
+  }
+
+  async deleteDbQuery(id: string, queryId: string): Promise<void> {
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Server not found.');
+    const queries = (server.dbQueries ?? []).filter((q) => q.id !== queryId);
+    await this.projectRepo.update(id, { dbQueries: queries });
+    this.dynamicMcp.invalidate(id);
+  }
+
+  async runDbQuery(
+    id: string,
+    queryId: string,
+    args: Record<string, unknown>,
+  ): Promise<{ result: unknown; error?: string }> {
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Server not found.');
+    const query = (server.dbQueries ?? []).find((q) => q.id === queryId);
+    if (!query) throw new NotFoundException('Query not found.');
+    const cfg = server.connectionConfig;
+    if (!cfg) throw new BadRequestException('No connection config found.');
+    try {
+      const { executeDbQuery } = await import('../dynamic-mcp/adapters/index');
+      const result = await executeDbQuery(query, args, cfg);
+      return { result };
+    } catch (err: any) {
+      return { result: null, error: err?.message ?? 'Query failed' };
+    }
+  }
+
+  /** Run an inline (unsaved) DbQuery definition — used to test while creating. */
+  async runQueryInline(
+    id: string,
+    query: DbQuery,
+    args: Record<string, unknown>,
+  ): Promise<{ result: unknown; error?: string }> {
+    const server = await this.projectRepo.findById(id);
+    if (!server) throw new NotFoundException('Server not found.');
+    const cfg = server.connectionConfig;
+    if (!cfg) throw new BadRequestException('No connection config found. Save connection details in the Connection tab first.');
+    try {
+      const { executeDbQuery } = await import('../dynamic-mcp/adapters/index');
+      const result = await executeDbQuery(query, args, cfg);
+      return { result };
+    } catch (err: any) {
+      return { result: null, error: err?.message ?? 'Query failed' };
+    }
   }
 }

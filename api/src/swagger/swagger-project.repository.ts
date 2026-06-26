@@ -1,4 +1,4 @@
-import type { AuthConfig, GeneratedTool, McpPrompt, McpResource, ToolChain } from '../dynamic-mcp/types';
+import type { AuthConfig, DbConnectionConfig, DbQuery, GeneratedTool, McpPrompt, McpResource, ToolChain } from '../dynamic-mcp/types';
 
 export interface McpApiKeyEntry {
   id: string;
@@ -32,6 +32,8 @@ export interface SwaggerProjectRecord {
   availabilityWindow: { enabled: boolean; timezone: string; schedule: Array<{ day: number; startHour: number; endHour: number }> };
   alertConfig: { enabled: boolean; errorThresholdPct: number; notifyEmail: string };
   tenantConfig?: { enabled: boolean; params: Array<{ name: string; type: 'string' | 'integer' | 'number' | 'boolean' | 'uuid' | 'hash'; description?: string }> };
+  connectionConfig?: DbConnectionConfig;
+  dbQueries?: DbQuery[];
   createdAt?: Date;
   updatedAt?: Date;
 }

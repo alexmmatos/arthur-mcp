@@ -42,6 +42,8 @@ export class SqliteSwaggerProjectRepository implements ISwaggerProjectRepository
       tenantConfig: (e as any).tenantConfig
         ? JSON.parse((e as any).tenantConfig)
         : { enabled: false, params: [] },
+      connectionConfig: e.connectionConfig ? JSON.parse(e.connectionConfig) : undefined,
+      dbQueries: e.dbQueries ? JSON.parse(e.dbQueries) : [],
       createdAt: e.createdAt,
       updatedAt: e.updatedAt,
     };
@@ -72,6 +74,8 @@ export class SqliteSwaggerProjectRepository implements ISwaggerProjectRepository
     if (data.availabilityWindow !== undefined) e.availabilityWindow = JSON.stringify(data.availabilityWindow);
     if (data.alertConfig !== undefined) e.alertConfig = JSON.stringify(data.alertConfig);
     if ((data as any).tenantConfig !== undefined) (e as any).tenantConfig = JSON.stringify((data as any).tenantConfig);
+    if (data.connectionConfig !== undefined) e.connectionConfig = data.connectionConfig ? JSON.stringify(data.connectionConfig) : undefined;
+    if (data.dbQueries !== undefined) e.dbQueries = JSON.stringify(data.dbQueries);
     return e;
   }
 

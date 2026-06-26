@@ -7,7 +7,6 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Drawer,
   FormControl,
   FormControlLabel,
   Grid,
@@ -46,18 +45,107 @@ import {
 } from '@tabler/icons-react'
 import api from '../api'
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Source types ─────────────────────────────────────────────────────────────
 
-const STEPS = ['Server details', 'Import API spec', 'Tools overview', 'API Authentication']
+type SourceType =
+  | 'blank'
+  | 'rest' | 'graphql' | 'grpc'
+  | 'postgresql' | 'mysql' | 'mariadb' | 'mssql' | 'oracle' | 'cockroachdb'
+  | 'mongodb' | 'redis' | 'cassandra' | 'dynamodb' | 'elasticsearch' | 'snowflake' | 'clickhouse' | 'firestore'
 
-const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const
+const SOURCE_TYPES: Array<{
+  id: SourceType
+  name: string
+  description: string
+  emoji: string
+  color: string
+  available: boolean
+  group: string
+}> = [
+  // ── Blank ─────────────────────────────────────────────────────────────────
+  { id: 'blank',   name: 'Blank / Static', description: 'No external connection. Define tools that return hardcoded or parameter-based responses.', emoji: '📄', color: '#9E9E9E', available: true, group: 'Other' },
+  // ── APIs ──────────────────────────────────────────────────────────────────
+  { id: 'rest',    name: 'REST API',  description: 'HTTP APIs described with OpenAPI, Swagger, or Postman collections.', emoji: '🌐', color: '#5D87FF', available: true,  group: 'API' },
+  { id: 'graphql', name: 'GraphQL',   description: 'Expose queries and mutations from a GraphQL endpoint as MCP tools.', emoji: '🔮', color: '#E535AB', available: false, group: 'API' },
+  { id: 'grpc',    name: 'gRPC',      description: 'High-performance RPC services using Protocol Buffer definitions.',    emoji: '⚡', color: '#fca130', available: false, group: 'API' },
+  // ── Relational databases ──────────────────────────────────────────────────
+  { id: 'postgresql',  name: 'PostgreSQL',   description: 'Open-source object-relational database system.',                        emoji: '🐘', color: '#336791', available: false, group: 'SQL' },
+  { id: 'mysql',       name: 'MySQL',        description: 'The world\'s most popular open-source relational database.',             emoji: '🐬', color: '#4479A1', available: false, group: 'SQL' },
+  { id: 'mariadb',     name: 'MariaDB',      description: 'MySQL-compatible community-driven relational database.',                 emoji: '🦭', color: '#003545', available: false, group: 'SQL' },
+  { id: 'mssql',       name: 'SQL Server',   description: 'Microsoft\'s enterprise relational database management system.',        emoji: '🏢', color: '#CC2927', available: false, group: 'SQL' },
+  { id: 'oracle',      name: 'Oracle DB',    description: 'Oracle\'s enterprise-grade relational database.',                       emoji: '🏛️', color: '#F80000', available: false, group: 'SQL' },
+  { id: 'cockroachdb', name: 'CockroachDB',  description: 'Distributed SQL database with PostgreSQL compatibility.',               emoji: '🪳', color: '#6933FF', available: false, group: 'SQL' },
+  { id: 'clickhouse',  name: 'ClickHouse',   description: 'Column-oriented database for real-time analytics at scale.',            emoji: '🖱️', color: '#FAFF00', available: false, group: 'SQL' },
+  // ── NoSQL / Document / Key-value ─────────────────────────────────────────
+  { id: 'mongodb',       name: 'MongoDB',       description: 'Document-oriented NoSQL database with flexible schema.',              emoji: '🍃', color: '#47A248', available: false, group: 'NoSQL' },
+  { id: 'redis',         name: 'Redis',          description: 'In-memory key-value store for caching, queues, and pub/sub.',        emoji: '🔴', color: '#DC382D', available: false, group: 'NoSQL' },
+  { id: 'cassandra',     name: 'Cassandra',      description: 'Wide-column store for high availability and massive datasets.',       emoji: '👁️', color: '#1287B1', available: false, group: 'NoSQL' },
+  { id: 'firestore',     name: 'Firestore',      description: 'Google\'s serverless document database for web and mobile apps.',    emoji: '🔥', color: '#FFCA28', available: false, group: 'NoSQL' },
+  // ── Cloud / Warehouse ────────────────────────────────────────────────────
+  { id: 'dynamodb',      name: 'DynamoDB',       description: 'AWS fully managed key-value and document database service.',         emoji: '🔷', color: '#232F3E', available: false, group: 'Cloud' },
+  { id: 'elasticsearch', name: 'Elasticsearch',  description: 'Distributed search and analytics engine built on Apache Lucene.',    emoji: '🔍', color: '#FEC514', available: false, group: 'Cloud' },
+  { id: 'snowflake',     name: 'Snowflake',      description: 'Cloud data warehouse with multi-cluster shared data architecture.',  emoji: '❄️', color: '#29B5E8', available: false, group: 'Cloud' },
+]
+
+// ─── Step definitions (dynamic per source type) ───────────────────────────────
+
+const STEPS: Record<SourceType, string[]> = {
+  blank:         ['Source', 'Details'],
+  rest:          ['Source', 'Details', 'Import spec', 'Tools overview', 'Authentication'],
+  graphql:       ['Source', 'Details', 'Schema',      'Authentication'],
+  grpc:          ['Source', 'Details', 'Service',     'Authentication'],
+  postgresql:    ['Source', 'Details', 'Connection'],
+  mysql:         ['Source', 'Details', 'Connection'],
+  mariadb:       ['Source', 'Details', 'Connection'],
+  mssql:         ['Source', 'Details', 'Connection'],
+  oracle:        ['Source', 'Details', 'Connection'],
+  cockroachdb:   ['Source', 'Details', 'Connection'],
+  clickhouse:    ['Source', 'Details', 'Connection'],
+  mongodb:       ['Source', 'Details', 'Connection'],
+  redis:         ['Source', 'Details', 'Connection'],
+  cassandra:     ['Source', 'Details', 'Connection'],
+  firestore:     ['Source', 'Details', 'Connection'],
+  dynamodb:      ['Source', 'Details', 'Connection'],
+  elasticsearch: ['Source', 'Details', 'Connection'],
+  snowflake:     ['Source', 'Details', 'Connection'],
+}
+
+const DB_PORT_DEFAULTS: Partial<Record<SourceType, string>> = {
+  postgresql:    '5432',
+  mysql:         '3306',
+  mariadb:       '3306',
+  mssql:         '1433',
+  oracle:        '1521',
+  cockroachdb:   '26257',
+  clickhouse:    '8443',
+  cassandra:     '9042',
+  redis:         '6379',
+  elasticsearch: '9200',
+}
+
+// Databases that use the standard host/port/database/user/password/SSL form
+const SQL_HOSTS: SourceType[] = ['postgresql', 'mysql', 'mariadb', 'mssql', 'oracle', 'cockroachdb', 'clickhouse', 'cassandra']
+
+const DB_DATABASE_LABEL: Partial<Record<SourceType, string>> = {
+  cassandra:  'Keyspace',
+  clickhouse: 'Database',
+}
+
+const DB_DATABASE_PLACEHOLDER: Partial<Record<SourceType, string>> = {
+  cassandra:  'my_keyspace',
+  clickhouse: 'default',
+  oracle:     'ORCL',
+}
+
+const DEFAULT_STEPS = ['Source', 'Details']
+
+// ─── Other constants ──────────────────────────────────────────────────────────
 
 const METHOD_COLOR: Record<string, string> = {
   GET: '#61affe', POST: '#49cc90', PUT: '#fca130', PATCH: '#50e3c2', DELETE: '#f93e3e',
 }
 
 type AuthType = 'none' | 'bearer' | 'api-key' | 'basic' | 'oauth2-client' | 'custom'
-
 const AUTH_TYPE_LABELS: Record<AuthType, string> = {
   none: 'None (public API)',
   bearer: 'Bearer Token',
@@ -67,31 +155,14 @@ const AUTH_TYPE_LABELS: Record<AuthType, string> = {
   custom: 'Custom headers',
 }
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 interface LocalTool {
-  id: string
-  name: string
-  description?: string
-  method: string
-  path: string
-  enabled: boolean
-  fromSpec: boolean
+  id: string; name: string; description?: string; method: string; path: string; enabled: boolean; fromSpec: boolean
 }
-
 interface SpecMeta {
-  name: string
-  version?: string
-  description?: string
-  resolvedBaseUrl: string
+  name: string; version?: string; description?: string; resolvedBaseUrl: string
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function isValidUrl(u: string) {
-  try { new URL(u); return true } catch { return false }
-}
-
+function isValidUrl(u: string) { try { new URL(u); return true } catch { return false } }
 function uid() { return Math.random().toString(36).slice(2) }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -99,32 +170,85 @@ function uid() { return Math.random().toString(36).slice(2) }
 export default function NewServer() {
   const navigate = useNavigate()
   const { can, loading: authLoading } = useAuth()
-  const [activeStep, setActiveStep] = useState(0)
 
-  // Step 0 — Server details
+  // ── Global
+  const [sourceType, setSourceType] = useState<SourceType | null>(null)
+  const [activeStep, setActiveStep] = useState(0)
+  const [creating, setCreating] = useState(false)
+  const [error, setError] = useState('')
+
+  // ── Step: Details (all sources)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
 
-  // Step 1 — Import
-  const [importTab, setImportTab] = useState(0) // 0 = OpenAPI, 1 = Postman
+  // ── REST: Import spec (step 2)
+  const [importTab, setImportTab] = useState(0)
   const [file, setFile] = useState<File | null>(null)
   const [postmanFile, setPostmanFile] = useState<File | null>(null)
   const [fetchedForFile, setFetchedForFile] = useState<File | null>(null)
   const [baseUrl, setBaseUrl] = useState('')
   const [dragging, setDragging] = useState(false)
   const [discovering, setDiscovering] = useState(false)
+  const [previewing, setPreviewing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const postmanInputRef = useRef<HTMLInputElement>(null)
 
-  // Step 2 — Tools overview
+  // ── REST: Tools overview (step 3)
   const [specMeta, setSpecMeta] = useState<SpecMeta | null>(null)
   const [localTools, setLocalTools] = useState<LocalTool[]>([])
-  const [deletedSpecTools, setDeletedSpecTools] = useState<string[]>([])
-  const [previewing, setPreviewing] = useState(false)
 
-  // Step 3 — API Authentication
+  // ── GraphQL (step 2)
+  const [gqlEndpoint, setGqlEndpoint] = useState('')
+  const [gqlFile, setGqlFile] = useState<File | null>(null)
+  const [gqlIntrospect, setGqlIntrospect] = useState(true)
+  const gqlFileRef = useRef<HTMLInputElement>(null)
+
+  // ── gRPC (step 2)
+  const [grpcHost, setGrpcHost] = useState('')
+  const [grpcPort, setGrpcPort] = useState('50051')
+  const [grpcTls, setGrpcTls] = useState(false)
+  const [protoFile, setProtoFile] = useState<File | null>(null)
+  const protoFileRef = useRef<HTMLInputElement>(null)
+
+  // ── SQL databases (step 2) — shared for postgresql/mysql/mssql/sqlite
+  const [dbHost, setDbHost] = useState('')
+  const [dbPort, setDbPort] = useState('')
+  const [dbDatabase, setDbDatabase] = useState('')
+  const [dbUser, setDbUser] = useState('')
+  const [dbPassword, setDbPassword] = useState('')
+  const [dbSsl, setDbSsl] = useState(false)
+
+  // ── MongoDB (step 2)
+  const [mongoUri, setMongoUri] = useState('')
+
+  // ── Redis (step 2)
+  const [redisHost, setRedisHost] = useState('')
+  const [redisPort, setRedisPort] = useState('6379')
+  const [redisPassword, setRedisPassword] = useState('')
+  const [redisTls, setRedisTls] = useState(false)
+
+  // ── DynamoDB (step 2)
+  const [dynamoRegion, setDynamoRegion] = useState('us-east-1')
+  const [dynamoAccessKey, setDynamoAccessKey] = useState('')
+  const [dynamoSecretKey, setDynamoSecretKey] = useState('')
+  const [dynamoEndpoint, setDynamoEndpoint] = useState('')
+
+  // ── Elasticsearch (step 2)
+  const [esUrl, setEsUrl] = useState('')
+  const [esApiKey, setEsApiKey] = useState('')
+
+  // ── Snowflake (step 2)
+  const [snowflakeAccount, setSnowflakeAccount] = useState('')
+  const [snowflakeWarehouse, setSnowflakeWarehouse] = useState('')
+  const [snowflakeSchema, setSnowflakeSchema] = useState('PUBLIC')
+
+  // ── Firestore (step 2)
+  const [firestoreProject, setFirestoreProject] = useState('')
+  const [firestoreCredentials, setFirestoreCredentials] = useState('')
+
+  // ── Authentication (last step for REST/GraphQL/gRPC)
   const [authType, setAuthType] = useState<AuthType>('none')
   const [showSecrets, setShowSecrets] = useState(false)
   const [token, setToken] = useState('')
@@ -139,61 +263,78 @@ export default function NewServer() {
   const [oauthScope, setOauthScope] = useState('')
   const [customHeaders, setCustomHeaders] = useState<{ name: string; value: string }[]>([{ name: '', value: '' }])
 
-  // Submit
-  const [creating, setCreating] = useState(false)
-  const [error, setError] = useState('')
+  // ── Computed ───────────────────────────────────────────────────────────────
 
-  // ── Validation ────────────────────────────────────────────────────────────
-
-  const step0Valid = name.trim().length > 0
+  const steps = sourceType ? STEPS[sourceType] : DEFAULT_STEPS
+  const isLastStep = activeStep === steps.length - 1
 
   const activeFile = importTab === 0 ? file : postmanFile
-  const step1Valid = importTab === 0
+  const restStep2Valid = importTab === 0
     ? (file ? (baseUrl.trim() === '' || isValidUrl(baseUrl.trim())) : (baseUrl.trim().length > 0 && isValidUrl(baseUrl.trim())))
     : !!postmanFile
 
-  const canNext = () => {
-    if (activeStep === 0) return step0Valid
-    if (activeStep === 1) return step1Valid
+  const canNext = (): boolean => {
+    if (activeStep === 0) return sourceType !== null
+    if (activeStep === 1) return name.trim().length > 0
+    if (sourceType === 'rest') {
+      if (activeStep === 2) return restStep2Valid
+      return true
+    }
+    if (sourceType === 'graphql' && activeStep === 2) {
+      return gqlIntrospect ? (gqlEndpoint.trim().length > 0 && isValidUrl(gqlEndpoint.trim())) : gqlFile !== null
+    }
+    if (sourceType === 'grpc' && activeStep === 2) return grpcHost.trim().length > 0
+    if (SQL_HOSTS.includes(sourceType!) && activeStep === 2) {
+      return dbHost.trim().length > 0 && dbDatabase.trim().length > 0 && dbUser.trim().length > 0
+    }
+    if (sourceType === 'mongodb' && activeStep === 2) return mongoUri.trim().length > 0
+    if (sourceType === 'redis' && activeStep === 2) return redisHost.trim().length > 0
+    if (sourceType === 'dynamodb' && activeStep === 2) return dynamoRegion.trim().length > 0 && dynamoAccessKey.trim().length > 0
+    if (sourceType === 'elasticsearch' && activeStep === 2) return esUrl.trim().length > 0
+    if (sourceType === 'snowflake' && activeStep === 2) return snowflakeAccount.trim().length > 0 && dbDatabase.trim().length > 0 && dbUser.trim().length > 0
+    if (sourceType === 'firestore' && activeStep === 2) return firestoreProject.trim().length > 0
     return true
   }
 
-  const isLastStep = activeStep === STEPS.length - 1
-
-  // ── Tags ─────────────────────────────────────────────────────────────────
+  // ── Helpers ────────────────────────────────────────────────────────────────
 
   const addTag = (raw: string) => {
-    const trimmed = raw.trim().toLowerCase().replace(/\s+/g, '-')
-    if (trimmed && !tags.includes(trimmed)) setTags((t) => [...t, trimmed])
+    const t = raw.trim().toLowerCase().replace(/\s+/g, '-')
+    if (t && !tags.includes(t)) setTags((prev) => [...prev, t])
     setTagInput('')
   }
-
   const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(tagInput) }
     if (e.key === 'Backspace' && !tagInput && tags.length > 0) setTags((t) => t.slice(0, -1))
   }
 
-  // ── File handling ─────────────────────────────────────────────────────────
-
-  const clearSpecState = () => {
-    setSpecMeta(null); setLocalTools([]); setDeletedSpecTools([]); setFetchedForFile(null)
-  }
+  const clearSpecState = () => { setSpecMeta(null); setLocalTools([]); setFetchedForFile(null) }
 
   const acceptOpenApiFile = (f: File) => {
     const n = f.name.toLowerCase()
-    if (!n.endsWith('.yaml') && !n.endsWith('.yml') && !n.endsWith('.json')) {
-      setError('Unsupported format. Use .yaml, .yml or .json'); return
-    }
+    if (!n.endsWith('.yaml') && !n.endsWith('.yml') && !n.endsWith('.json')) { setError('Use .yaml, .yml or .json'); return }
     if (f !== fetchedForFile) clearSpecState()
     setFile(f); setError('')
   }
-
   const acceptPostmanFile = (f: File) => {
     if (!f.name.toLowerCase().endsWith('.json')) { setError('Postman collections must be .json'); return }
     setPostmanFile(f); clearSpecState(); setError('')
   }
 
-  // ── Auto-discover ─────────────────────────────────────────────────────────
+  const secretInput = (value: string, onChange: (v: string) => void, label: string) => (
+    <TextField size="small" fullWidth label={label} type={showSecrets ? 'text' : 'password'} value={value}
+      onChange={(e) => onChange(e.target.value)}
+      InputProps={{ endAdornment: (
+        <InputAdornment position="end">
+          <IconButton size="small" onClick={() => setShowSecrets((s) => !s)} edge="end">
+            {showSecrets ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+          </IconButton>
+        </InputAdornment>
+      ) }}
+    />
+  )
+
+  // ── Auto-discover ──────────────────────────────────────────────────────────
 
   const handleDiscover = async () => {
     if (!isValidUrl(baseUrl.trim())) return
@@ -211,112 +352,112 @@ export default function NewServer() {
       }
     } catch (err: any) {
       setError(err?.response?.data?.message ?? 'Could not discover spec from this URL.')
-    } finally {
-      setDiscovering(false)
-    }
+    } finally { setDiscovering(false) }
   }
 
-  // ── Navigation ────────────────────────────────────────────────────────────
+  // ── Navigation ─────────────────────────────────────────────────────────────
 
   const handleNext = async () => {
-    if (activeStep === 1) {
+    if (sourceType === 'rest' && activeStep === 2) {
       if (importTab === 0 && file && file !== fetchedForFile) {
         setPreviewing(true); setError('')
         try {
-          const form = new FormData()
-          form.append('file', file)
+          const form = new FormData(); form.append('file', file)
           const params = baseUrl.trim() ? { baseUrl: baseUrl.trim() } : {}
-          const { data } = await api.post<SpecMeta & { totalTools: number; tools: Array<{ name: string; description?: string; method: string; path: string }> }>(
+          const { data } = await api.post<SpecMeta & { tools: Array<{ name: string; description?: string; method: string; path: string }> }>(
             '/swagger/preview', form, { params, headers: { 'Content-Type': 'multipart/form-data' } }
           )
           setSpecMeta({ name: data.name, version: data.version, description: data.description, resolvedBaseUrl: data.resolvedBaseUrl })
           setLocalTools(data.tools.map((t) => ({ id: uid(), name: t.name, description: t.description, method: t.method, path: t.path, enabled: true, fromSpec: true })))
-          setDeletedSpecTools([])
           setFetchedForFile(file)
         } catch (err: any) {
           const msg = err?.response?.data?.message ?? 'Error parsing spec.'
           setError(Array.isArray(msg) ? msg.join(', ') : msg); return
-        } finally {
-          setPreviewing(false)
-        }
-      } else if (importTab === 0 && !file && fetchedForFile !== null) {
-        setLocalTools((prev) => prev.filter((t) => !t.fromSpec))
-        setSpecMeta(null); setDeletedSpecTools([]); setFetchedForFile(null)
+        } finally { setPreviewing(false) }
       } else if (importTab === 1 && postmanFile && postmanFile !== fetchedForFile) {
         setPreviewing(true); setError('')
         try {
-          const form = new FormData()
-          form.append('file', postmanFile)
+          const form = new FormData(); form.append('file', postmanFile)
           const params = baseUrl.trim() ? { baseUrl: baseUrl.trim() } : {}
           const { data } = await api.post<SpecMeta & { tools?: Array<{ name: string; description?: string; method: string; path: string }> }>(
             '/swagger/parse-postman', form, { params, headers: { 'Content-Type': 'multipart/form-data' } }
           )
           setSpecMeta({ name: data.name ?? 'Postman Collection', version: data.version, description: data.description, resolvedBaseUrl: data.resolvedBaseUrl ?? baseUrl.trim() })
           setLocalTools((data.tools ?? []).map((t) => ({ id: uid(), name: t.name, description: t.description, method: t.method, path: t.path, enabled: true, fromSpec: true })))
-          setDeletedSpecTools([])
           setFetchedForFile(postmanFile)
         } catch (err: any) {
           const msg = err?.response?.data?.message ?? 'Error parsing Postman collection.'
           setError(Array.isArray(msg) ? msg.join(', ') : msg); return
-        } finally {
-          setPreviewing(false)
-        }
+        } finally { setPreviewing(false) }
       }
     }
     setActiveStep((s) => s + 1)
   }
 
-  // ── Create project ────────────────────────────────────────────────────────
+  // ── Build auth payload ─────────────────────────────────────────────────────
 
   const buildAuth = () => {
     switch (authType) {
-      case 'bearer': return { type: 'bearer', token }
-      case 'api-key': return { type: 'api-key', name: keyName, value: keyValue, in: keyIn }
-      case 'basic': return { type: 'basic', username: basicUser, password: basicPass }
+      case 'bearer':        return { type: 'bearer', token }
+      case 'api-key':       return { type: 'api-key', name: keyName, value: keyValue, in: keyIn }
+      case 'basic':         return { type: 'basic', username: basicUser, password: basicPass }
       case 'oauth2-client': return { type: 'oauth2-client', tokenUrl: oauthTokenUrl, clientId: oauthClientId, clientSecret: oauthClientSecret, scope: oauthScope || undefined }
-      case 'custom': return { type: 'custom', headers: customHeaders.filter((h) => h.name.trim()) }
-      default: return { type: 'none' }
+      case 'custom':        return { type: 'custom', headers: customHeaders.filter((h) => h.name.trim()) }
+      default:              return { type: 'none' }
     }
   }
+
+  // ── Create ─────────────────────────────────────────────────────────────────
 
   const handleCreate = async () => {
     setError(''); setCreating(true)
     try {
       let projectId: string
 
-      if (importTab === 1 && postmanFile) {
-        // Postman import — backend creates server + tools
-        const form = new FormData()
-        form.append('file', postmanFile)
-        const params = baseUrl.trim() ? { baseUrl: baseUrl.trim() } : {}
-        const { data } = await api.post<{ _id: string }>('/swagger/import-postman', form, { params, headers: { 'Content-Type': 'multipart/form-data' } })
-        projectId = data._id
-      } else if (importTab === 0 && file) {
-        // OpenAPI spec upload
-        const form = new FormData()
-        form.append('file', file)
-        const params = baseUrl.trim() ? { baseUrl: baseUrl.trim() } : {}
-        const { data } = await api.post<{ _id: string; baseUrl: string }>('/swagger/upload', form, { params, headers: { 'Content-Type': 'multipart/form-data' } })
-        projectId = data._id
+      if (sourceType === 'rest') {
+        if (importTab === 1 && postmanFile) {
+          const form = new FormData(); form.append('file', postmanFile)
+          const params = baseUrl.trim() ? { baseUrl: baseUrl.trim() } : {}
+          const { data } = await api.post<{ _id: string }>('/swagger/import-postman', form, { params, headers: { 'Content-Type': 'multipart/form-data' } })
+          projectId = data._id
+        } else if (importTab === 0 && file) {
+          const form = new FormData(); form.append('file', file)
+          const params = baseUrl.trim() ? { baseUrl: baseUrl.trim() } : {}
+          const { data } = await api.post<{ _id: string }>('/swagger/upload', form, { params, headers: { 'Content-Type': 'multipart/form-data' } })
+          projectId = data._id
+        } else {
+          const { data } = await api.post<{ _id: string }>('/swagger/servers', { name: name.trim(), baseUrl: baseUrl.trim(), description: description.trim() || undefined })
+          projectId = data._id
+        }
+        if (authType !== 'none') await api.patch(`/swagger/servers/${projectId}/auth`, buildAuth())
       } else {
-        // Empty server
-        const { data } = await api.post<{ _id: string; baseUrl: string }>('/swagger/servers', {
+        // Non-REST: create empty server with source-type tag
+        const serverBaseUrl =
+          sourceType === 'graphql'       ? gqlEndpoint.trim() :
+          sourceType === 'grpc'          ? `${grpcHost.trim()}:${grpcPort.trim()}` :
+          sourceType === 'mongodb'       ? mongoUri.trim() :
+          sourceType === 'redis'         ? `${redisHost.trim()}:${redisPort.trim()}` :
+          sourceType === 'dynamodb'      ? `https://dynamodb.${dynamoRegion}.amazonaws.com` :
+          sourceType === 'elasticsearch' ? esUrl.trim() :
+          sourceType === 'snowflake'     ? `${snowflakeAccount.trim()}.snowflakecomputing.com` :
+          sourceType === 'firestore'     ? `https://firestore.googleapis.com/v1/projects/${firestoreProject.trim()}` :
+          SQL_HOSTS.includes(sourceType as SourceType) ? `${dbHost.trim()}:${dbPort.trim()}` :
+          ''
+        const { data } = await api.post<{ _id: string }>('/swagger/servers', {
           name: name.trim(),
-          baseUrl: baseUrl.trim(),
+          baseUrl: serverBaseUrl,
           description: description.trim() || undefined,
         })
         projectId = data._id
+        // Auth (GraphQL / gRPC)
+        if ((sourceType === 'graphql' || sourceType === 'grpc') && authType !== 'none') {
+          await api.patch(`/swagger/servers/${projectId}/auth`, buildAuth())
+        }
       }
 
-      // Apply auth
-      if (authType !== 'none') {
-        await api.patch(`/swagger/servers/${projectId}/auth`, buildAuth())
-      }
-
-      // Apply tags
-      if (tags.length > 0) {
-        await api.patch(`/swagger/servers/${projectId}/tags`, { tags })
-      }
+      // Tags (always)
+      const allTags = [...tags, `source:${sourceType}`]
+      await api.patch(`/swagger/servers/${projectId}/tags`, { tags: allTags })
 
       navigate(`/servers/${projectId}`)
     } catch (err: any) {
@@ -326,25 +467,7 @@ export default function NewServer() {
     }
   }
 
-  // ── Secret input helper ───────────────────────────────────────────────────
-
-  const secretInput = (value: string, onChange: (v: string) => void, label: string) => (
-    <TextField size="small" fullWidth label={label}
-      type={showSecrets ? 'text' : 'password'} value={value}
-      onChange={(e) => onChange(e.target.value)}
-      InputProps={{
-        endAdornment: (
-          <InputAdornment position="end">
-            <IconButton size="small" onClick={() => setShowSecrets((s) => !s)} edge="end">
-              {showSecrets ? <IconEyeOff size={16} /> : <IconEye size={16} />}
-            </IconButton>
-          </InputAdornment>
-        ),
-      }}
-    />
-  )
-
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Guard ──────────────────────────────────────────────────────────────────
 
   if (!authLoading && !can(Permission.ServersCreate)) {
     return (
@@ -355,8 +478,10 @@ export default function NewServer() {
     )
   }
 
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
-    <Box py={3} maxWidth={700} mx="auto">
+    <Box py={3} maxWidth={activeStep === 0 ? 860 : 700} mx="auto">
       {/* Header */}
       <Box display="flex" alignItems="center" gap={1.5} mb={4}>
         <Button size="small" startIcon={<IconArrowLeft size={16} />} onClick={() => navigate('/')} sx={{ mr: 0.5 }}>
@@ -367,7 +492,7 @@ export default function NewServer() {
 
       {/* Stepper */}
       <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-        {STEPS.map((label, i) => (
+        {steps.map((label, i) => (
           <Step key={label} completed={activeStep > i}>
             <StepLabel>{label}</StepLabel>
           </Step>
@@ -376,66 +501,131 @@ export default function NewServer() {
 
       {error && <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>{error}</Alert>}
 
-      {/* ── Step 0: Server details ─────────────────────────────────────── */}
+      {/* ── Step 0: Source type ───────────────────────────────────────────── */}
       {activeStep === 0 && (
+        <Box>
+          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Choose your data source</Typography>
+          <Typography variant="body2" color="text.secondary" mb={3}>
+            Select the type of API or database this server will connect to.
+          </Typography>
+          {(['Other', 'API', 'SQL', 'NoSQL', 'Cloud'] as const).map((group) => {
+            const items = SOURCE_TYPES.filter((s) => s.group === group)
+            const groupLabel: Record<string, string> = {
+              Other: 'General',
+              API: 'APIs & Protocols',
+              SQL: 'Relational Databases',
+              NoSQL: 'NoSQL & Document Stores',
+              Cloud: 'Cloud & Analytics',
+            }
+            return (
+              <Box key={group} mb={3}>
+                <Typography variant="caption" fontWeight={700} color="text.secondary"
+                  sx={{ textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', mb: 1.5 }}>
+                  {groupLabel[group]}
+                </Typography>
+                <Grid container spacing={1.5}>
+                  {items.map((s) => {
+                    const selected = sourceType === s.id
+                    return (
+                      <Grid item xs={12} sm={6} md={4} key={s.id}>
+                        <Paper
+                          variant="outlined"
+                          onClick={() => {
+                            setSourceType(s.id)
+                            if (DB_PORT_DEFAULTS[s.id]) setDbPort(DB_PORT_DEFAULTS[s.id]!)
+                          }}
+                          sx={{
+                            p: 2, cursor: 'pointer', height: '100%',
+                            borderColor: selected ? s.color : undefined,
+                            borderWidth: selected ? 2 : 1,
+                            bgcolor: selected ? `${s.color}0d` : undefined,
+                            transition: 'border-color 0.15s, background-color 0.15s',
+                            '&:hover': { borderColor: s.color, bgcolor: `${s.color}08` },
+                          }}
+                        >
+                          <Box display="flex" alignItems="center" gap={1.5}>
+                            <Box sx={{
+                              width: 38, height: 38, borderRadius: 1.5, flexShrink: 0,
+                              bgcolor: `${s.color}18`, border: `1.5px solid ${s.color}35`,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: '1.2rem', lineHeight: 1,
+                            }}>
+                              {s.emoji}
+                            </Box>
+                            <Box flexGrow={1} minWidth={0}>
+                              <Box display="flex" alignItems="center" gap={0.75} flexWrap="wrap">
+                                <Typography fontWeight={700} fontSize="0.875rem" noWrap>{s.name}</Typography>
+                                {s.available
+                                  ? <Chip label="Available" size="small" color="success" sx={{ fontSize: '0.6rem', height: 16, fontWeight: 600 }} />
+                                  : <Chip label="Soon" size="small" sx={{ fontSize: '0.6rem', height: 16 }} />
+                                }
+                              </Box>
+                              <Typography variant="caption" color="text.secondary"
+                                sx={{ lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                {s.description}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </Paper>
+                      </Grid>
+                    )
+                  })}
+                </Grid>
+              </Box>
+            )
+          })}
+        </Box>
+      )}
+
+      {/* ── Step 1: Server details (all sources) ─────────────────────────── */}
+      {activeStep === 1 && (
         <Paper variant="outlined" sx={{ p: 3 }}>
           <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Server details</Typography>
           <Typography variant="body2" color="text.secondary" mb={3}>
-            Give your server a name so you can identify it later. Everything else can be configured after creation.
+            A name to identify this server. Everything else can be changed after creation.
           </Typography>
           <Box display="flex" flexDirection="column" gap={2.5}>
             <TextField label="Server name" required fullWidth autoFocus
               placeholder="e.g. Stripe Payments, Internal CRM"
-              value={name}
-              onChange={(e) => { setName(e.target.value); setError('') }}
-              onKeyDown={(e) => e.key === 'Enter' && step0Valid && handleNext()}
-              helperText="A short name that identifies this API integration"
+              value={name} onChange={(e) => { setName(e.target.value); setError('') }}
+              onKeyDown={(e) => e.key === 'Enter' && name.trim() && handleNext()}
+              helperText="A short name that identifies this integration"
             />
             <TextField label="Description" fullWidth multiline minRows={3} maxRows={8}
-              placeholder="What does this server do? What API does it connect to?"
+              placeholder="What does this server do? What does it connect to?"
               value={description} onChange={(e) => setDescription(e.target.value)}
-              helperText="Optional — helps team members understand the purpose of this server"
+              helperText="Optional — helps team members understand this server's purpose"
             />
-            {/* Tags */}
-            <Box>
-              <TextField
-                size="small" fullWidth label="Tags" placeholder="Press Enter or comma to add…"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={handleTagKeyDown}
-                onBlur={() => tagInput.trim() && addTag(tagInput)}
-                helperText="Optional — used to filter and organize servers"
-                InputProps={{
-                  startAdornment: tags.length > 0 ? (
-                    <InputAdornment position="start" sx={{ flexWrap: 'wrap', gap: 0.5, py: 0.5, maxWidth: '60%' }}>
-                      {tags.map((tag) => (
-                        <Chip key={tag} label={tag} size="small" icon={<IconTag size={12} />}
-                          onDelete={() => setTags((t) => t.filter((x) => x !== tag))}
-                          sx={{ height: 20, fontSize: '0.7rem' }}
-                        />
-                      ))}
-                    </InputAdornment>
-                  ) : undefined,
-                }}
-              />
-            </Box>
+            <TextField size="small" fullWidth label="Tags" placeholder="Press Enter or comma to add…"
+              value={tagInput} onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={handleTagKeyDown} onBlur={() => tagInput.trim() && addTag(tagInput)}
+              helperText="Optional — used to filter and organize servers"
+              InputProps={{
+                startAdornment: tags.length > 0 ? (
+                  <InputAdornment position="start" sx={{ flexWrap: 'wrap', gap: 0.5, py: 0.5, maxWidth: '60%' }}>
+                    {tags.map((tag) => (
+                      <Chip key={tag} label={tag} size="small" icon={<IconTag size={12} />}
+                        onDelete={() => setTags((t) => t.filter((x) => x !== tag))}
+                        sx={{ height: 20, fontSize: '0.7rem' }} />
+                    ))}
+                  </InputAdornment>
+                ) : undefined,
+              }}
+            />
           </Box>
         </Paper>
       )}
 
-      {/* ── Step 1: Import API spec ─────────────────────────────────────── */}
-      {activeStep === 1 && (
+      {/* ── REST Step 2: Import API spec ──────────────────────────────────── */}
+      {sourceType === 'rest' && activeStep === 2 && (
         <Box display="flex" flexDirection="column" gap={2.5}>
           <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
             <Tabs value={importTab} onChange={(_, v) => { setImportTab(v); setError('') }}
               sx={{ borderBottom: 1, borderColor: 'divider', px: 1 }}>
-              <Tab label="OpenAPI / Swagger" icon={<IconCloudUpload size={15} />} iconPosition="start"
-                sx={{ minHeight: 44, fontSize: '0.82rem', gap: 0.5 }} />
-              <Tab label="Postman collection" icon={<IconPackage size={15} />} iconPosition="start"
-                sx={{ minHeight: 44, fontSize: '0.82rem', gap: 0.5 }} />
+              <Tab label="OpenAPI / Swagger" icon={<IconCloudUpload size={15} />} iconPosition="start" sx={{ minHeight: 44, fontSize: '0.82rem', gap: 0.5 }} />
+              <Tab label="Postman collection" icon={<IconPackage size={15} />} iconPosition="start" sx={{ minHeight: 44, fontSize: '0.82rem', gap: 0.5 }} />
             </Tabs>
 
-            {/* OpenAPI tab */}
             {importTab === 0 && (
               <Box p={2.5}>
                 <Box
@@ -447,8 +637,7 @@ export default function NewServer() {
                     p: 4, textAlign: 'center', cursor: file ? 'default' : 'pointer', borderRadius: 1,
                     border: '2px dashed', borderColor: dragging ? 'primary.main' : file ? 'success.main' : 'divider',
                     bgcolor: dragging ? 'primary.light' : file ? 'rgba(73,204,144,0.08)' : 'action.hover',
-                    transition: 'all 0.18s',
-                    '&:hover': file ? {} : { borderColor: 'primary.light' },
+                    transition: 'all 0.18s', '&:hover': file ? {} : { borderColor: 'primary.light' },
                   }}
                 >
                   <input ref={fileInputRef} type="file" accept=".yaml,.yml,.json" hidden
@@ -469,7 +658,7 @@ export default function NewServer() {
                       <Typography fontWeight={500} mt={0.5}>Drag your OpenAPI / Swagger spec here</Typography>
                       <Typography variant="body2" color="text.secondary">or click to browse · .yaml · .yml · .json</Typography>
                       <Typography variant="caption" color="text.disabled" mt={1} display="block">
-                        Optional — skip to start with an empty server and add tools manually
+                        Optional — skip to start with an empty server
                       </Typography>
                     </Box>
                   )}
@@ -477,7 +666,6 @@ export default function NewServer() {
               </Box>
             )}
 
-            {/* Postman tab */}
             {importTab === 1 && (
               <Box p={2.5}>
                 <Box
@@ -486,8 +674,7 @@ export default function NewServer() {
                     p: 4, textAlign: 'center', cursor: postmanFile ? 'default' : 'pointer', borderRadius: 1,
                     border: '2px dashed', borderColor: postmanFile ? 'success.main' : 'divider',
                     bgcolor: postmanFile ? 'rgba(73,204,144,0.08)' : 'action.hover',
-                    transition: 'all 0.18s',
-                    '&:hover': postmanFile ? {} : { borderColor: 'primary.light' },
+                    transition: 'all 0.18s', '&:hover': postmanFile ? {} : { borderColor: 'primary.light' },
                   }}
                 >
                   <input ref={postmanInputRef} type="file" accept=".json" hidden
@@ -514,7 +701,6 @@ export default function NewServer() {
             )}
           </Paper>
 
-          {/* Base URL */}
           <Paper variant="outlined" sx={{ p: 3 }}>
             <Typography variant="subtitle2" fontWeight={700} mb={0.5}>
               {importTab === 0 && file ? 'Base URL override' : 'API Base URL'}
@@ -522,25 +708,23 @@ export default function NewServer() {
             </Typography>
             <Typography variant="body2" color="text.secondary" mb={1.5}>
               {importTab === 0 && file
-                ? 'Leave blank to use the server URL declared inside the spec. Fill in to point to a different environment.'
+                ? 'Leave blank to use the URL declared in the spec.'
                 : importTab === 1
-                  ? 'Override the base URL from the Postman collection. Leave blank to use the URL defined in the collection.'
-                  : 'The root address of the external API. All tool endpoints will be appended to this URL.'}
+                  ? 'Override the base URL from the collection. Leave blank to use the collection URL.'
+                  : 'The root address of the external API.'}
             </Typography>
             <Box display="flex" gap={1}>
               <TextField fullWidth size="small" required={importTab === 0 && !file} placeholder="https://api.example.com"
-                value={baseUrl}
-                onChange={(e) => { setBaseUrl(e.target.value); setError('') }}
+                value={baseUrl} onChange={(e) => { setBaseUrl(e.target.value); setError('') }}
                 error={baseUrl.trim().length > 0 && !isValidUrl(baseUrl.trim())}
-                helperText={baseUrl.trim().length > 0 && !isValidUrl(baseUrl.trim())
-                  ? 'Invalid URL — include the protocol (e.g. https://api.example.com)' : ''}
+                helperText={baseUrl.trim().length > 0 && !isValidUrl(baseUrl.trim()) ? 'Invalid URL — include the protocol (e.g. https://api.example.com)' : ''}
               />
               {importTab === 0 && !file && (
                 <Tooltip title="Try to auto-discover the OpenAPI spec from this URL">
                   <span>
-                    <Button variant="outlined" size="small" startIcon={discovering ? <CircularProgress size={13} color="inherit" /> : <IconSparkles size={15} />}
-                      onClick={handleDiscover}
-                      disabled={!isValidUrl(baseUrl.trim()) || discovering}
+                    <Button variant="outlined" size="small"
+                      startIcon={discovering ? <CircularProgress size={13} color="inherit" /> : <IconSparkles size={15} />}
+                      onClick={handleDiscover} disabled={!isValidUrl(baseUrl.trim()) || discovering}
                       sx={{ whiteSpace: 'nowrap', flexShrink: 0, height: 40 }}>
                       {discovering ? 'Discovering…' : 'Auto-discover'}
                     </Button>
@@ -557,14 +741,14 @@ export default function NewServer() {
 
           {importTab === 0 && file && (
             <Alert severity="info" sx={{ fontSize: '0.82rem' }}>
-              When importing a spec, the <strong>server name</strong> is taken from the spec's <code>info.title</code> field. You can rename it from the server detail page.
+              The server name will be taken from the spec's <code>info.title</code>. You can rename it after creation.
             </Alert>
           )}
         </Box>
       )}
 
-      {/* ── Step 2: Tools overview ──────────────────────────────────────── */}
-      {activeStep === 2 && (
+      {/* ── REST Step 3: Tools overview ───────────────────────────────────── */}
+      {sourceType === 'rest' && activeStep === 3 && (
         <Box display="flex" flexDirection="column" gap={2}>
           {specMeta ? (
             <>
@@ -574,28 +758,19 @@ export default function NewServer() {
                   <Box flexGrow={1} minWidth={0}>
                     <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
                       <Typography variant="subtitle2" fontWeight={700}>{specMeta.name}</Typography>
-                      {specMeta.version && (
-                        <Chip label={`v${specMeta.version}`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 20 }} />
-                      )}
+                      {specMeta.version && <Chip label={`v${specMeta.version}`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 20 }} />}
                       <Chip label={`${localTools.length} tool${localTools.length !== 1 ? 's' : ''}`} size="small" color="primary" sx={{ fontSize: '0.7rem', height: 20 }} />
                     </Box>
-                    {specMeta.description && (
-                      <Typography variant="caption" color="text.secondary" display="block" mt={0.25}>{specMeta.description}</Typography>
-                    )}
+                    {specMeta.description && <Typography variant="caption" color="text.secondary" display="block" mt={0.25}>{specMeta.description}</Typography>}
                   </Box>
                 </Box>
               </Paper>
-
               {localTools.length > 0 && (
                 <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
                   {localTools.slice(0, 8).map((t, i) => (
                     <Box key={t.id} display="flex" alignItems="center" gap={1.5} px={2} py={1}
                       sx={{ borderBottom: i < Math.min(localTools.length, 8) - 1 ? '1px solid' : 'none', borderColor: 'divider' }}>
-                      <Box sx={{
-                        px: 0.75, py: 0.2, borderRadius: '4px', fontFamily: 'monospace', fontWeight: 700,
-                        fontSize: '0.65rem', color: METHOD_COLOR[t.method] ?? '#888',
-                        bgcolor: 'action.selected', minWidth: 44, textAlign: 'center', flexShrink: 0,
-                      }}>
+                      <Box sx={{ px: 0.75, py: 0.2, borderRadius: '4px', fontFamily: 'monospace', fontWeight: 700, fontSize: '0.65rem', color: METHOD_COLOR[t.method] ?? '#888', bgcolor: 'action.selected', minWidth: 44, textAlign: 'center', flexShrink: 0 }}>
                         {t.method}
                       </Box>
                       <Typography fontSize="0.82rem" fontWeight={600} noWrap flexGrow={1}>{t.name}</Typography>
@@ -605,7 +780,7 @@ export default function NewServer() {
                   {localTools.length > 8 && (
                     <Box px={2} py={1} sx={{ borderTop: '1px solid', borderColor: 'divider', bgcolor: 'action.hover' }}>
                       <Typography variant="caption" color="text.secondary">
-                        +{localTools.length - 8} more tools — all will be created and available to configure after creation
+                        +{localTools.length - 8} more tools — all available to configure after creation
                       </Typography>
                     </Box>
                   )}
@@ -617,27 +792,332 @@ export default function NewServer() {
               <IconTool size={40} style={{ opacity: 0.25, marginBottom: 8 }} />
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>No spec imported</Typography>
               <Typography variant="body2" color="text.disabled">
-                The server will be created empty. You can add tools manually from the server detail page.
+                The server will be created empty. Add tools manually from the server detail page.
               </Typography>
             </Paper>
           )}
-
           <Alert severity="info" sx={{ fontSize: '0.82rem' }}>
-            Tool parameters, descriptions, output schemas, and test configurations are all editable from the server detail page after creation.
+            Tool parameters, descriptions, and output schemas are editable from the server detail page after creation.
           </Alert>
         </Box>
       )}
 
-      {/* ── Step 3: API Authentication ──────────────────────────────────── */}
-      {activeStep === 3 && (
+      {/* ── GraphQL Step 2: Schema & endpoint ────────────────────────────── */}
+      {sourceType === 'graphql' && activeStep === 2 && (
+        <Box display="flex" flexDirection="column" gap={2.5}>
+          <Paper variant="outlined" sx={{ p: 3 }}>
+            <Typography variant="subtitle2" fontWeight={700} mb={0.5}>GraphQL endpoint</Typography>
+            <Typography variant="body2" color="text.secondary" mb={2}>
+              The URL of your GraphQL API. Schema discovery will be performed via introspection.
+            </Typography>
+            <TextField fullWidth size="small" required autoFocus placeholder="https://api.example.com/graphql"
+              label="Endpoint URL" value={gqlEndpoint}
+              onChange={(e) => { setGqlEndpoint(e.target.value); setError('') }}
+              error={gqlEndpoint.trim().length > 0 && !isValidUrl(gqlEndpoint.trim())}
+              helperText={gqlEndpoint.trim().length > 0 && !isValidUrl(gqlEndpoint.trim()) ? 'Invalid URL' : ''}
+            />
+          </Paper>
+
+          <Paper variant="outlined" sx={{ p: 3 }}>
+            <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Schema source</Typography>
+            <Typography variant="body2" color="text.secondary" mb={2}>
+              Choose how to load the GraphQL schema.
+            </Typography>
+            <Box display="flex" gap={1.5} flexWrap="wrap">
+              <Paper variant="outlined" onClick={() => setGqlIntrospect(true)}
+                sx={{ p: 2, flex: 1, minWidth: 180, cursor: 'pointer', borderColor: gqlIntrospect ? 'primary.main' : undefined, borderWidth: gqlIntrospect ? 2 : 1, bgcolor: gqlIntrospect ? 'primary.50' : undefined, transition: 'all 0.15s' }}>
+                <Typography variant="subtitle2" fontWeight={700} fontSize="0.85rem">🔍 Auto-introspect</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Query the endpoint's introspection API to discover all operations automatically.
+                </Typography>
+              </Paper>
+              <Paper variant="outlined" onClick={() => setGqlIntrospect(false)}
+                sx={{ p: 2, flex: 1, minWidth: 180, cursor: 'pointer', borderColor: !gqlIntrospect ? 'primary.main' : undefined, borderWidth: !gqlIntrospect ? 2 : 1, bgcolor: !gqlIntrospect ? 'primary.50' : undefined, transition: 'all 0.15s' }}>
+                <Typography variant="subtitle2" fontWeight={700} fontSize="0.85rem">📄 Upload SDL file</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Provide a <code>.graphql</code> or <code>.gql</code> SDL schema file manually.
+                </Typography>
+              </Paper>
+            </Box>
+
+            {!gqlIntrospect && (
+              <Box mt={2}>
+                <input ref={gqlFileRef} type="file" accept=".graphql,.gql,.sdl" hidden
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) { setGqlFile(f); setError('') }; e.target.value = '' }} />
+                <Box onClick={() => !gqlFile && gqlFileRef.current?.click()}
+                  sx={{ p: 3, textAlign: 'center', cursor: gqlFile ? 'default' : 'pointer', borderRadius: 1, border: '2px dashed', borderColor: gqlFile ? 'success.main' : 'divider', bgcolor: gqlFile ? 'rgba(73,204,144,0.08)' : 'action.hover', '&:hover': gqlFile ? {} : { borderColor: 'primary.light' } }}>
+                  {gqlFile ? (
+                    <Box display="flex" flexDirection="column" alignItems="center" gap={1}>
+                      <IconFile size={32} color="var(--mui-palette-success-main)" />
+                      <Typography fontWeight={700} color="success.main" fontSize="0.875rem">{gqlFile.name}</Typography>
+                      <Button size="small" startIcon={<IconX size={14} />} onClick={(e) => { e.stopPropagation(); setGqlFile(null) }}>Remove</Button>
+                    </Box>
+                  ) : (
+                    <Box display="flex" flexDirection="column" alignItems="center" gap={0.5}>
+                      <IconCloudUpload size={32} style={{ opacity: 0.4 }} />
+                      <Typography fontSize="0.875rem" fontWeight={500}>Upload SDL schema</Typography>
+                      <Typography variant="caption" color="text.secondary">.graphql · .gql · .sdl</Typography>
+                    </Box>
+                  )}
+                </Box>
+              </Box>
+            )}
+          </Paper>
+
+          <Alert severity="info" sx={{ fontSize: '0.82rem' }}>
+            Operations discovered from the schema will each become an MCP tool with typed inputs.
+          </Alert>
+        </Box>
+      )}
+
+      {/* ── gRPC Step 2: Service config ───────────────────────────────────── */}
+      {sourceType === 'grpc' && activeStep === 2 && (
+        <Box display="flex" flexDirection="column" gap={2.5}>
+          <Paper variant="outlined" sx={{ p: 3 }}>
+            <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Service address</Typography>
+            <Typography variant="body2" color="text.secondary" mb={2}>
+              The host and port of the gRPC server.
+            </Typography>
+            <Grid container spacing={1.5}>
+              <Grid item xs={9}>
+                <TextField fullWidth size="small" required autoFocus label="Host" placeholder="grpc.example.com"
+                  value={grpcHost} onChange={(e) => setGrpcHost(e.target.value)} />
+              </Grid>
+              <Grid item xs={3}>
+                <TextField fullWidth size="small" label="Port" value={grpcPort} onChange={(e) => setGrpcPort(e.target.value)} />
+              </Grid>
+            </Grid>
+            <FormControlLabel sx={{ mt: 1.5 }}
+              control={<Switch size="small" checked={grpcTls} onChange={(e) => setGrpcTls(e.target.checked)} />}
+              label={<Typography variant="body2">Use TLS (secure connection)</Typography>}
+            />
+          </Paper>
+
+          <Paper variant="outlined" sx={{ p: 3 }}>
+            <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Protocol Buffer definition</Typography>
+            <Typography variant="body2" color="text.secondary" mb={2}>
+              Upload your <code>.proto</code> file. Each RPC method will become an MCP tool.
+            </Typography>
+            <input ref={protoFileRef} type="file" accept=".proto" hidden
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) { setProtoFile(f); setError('') }; e.target.value = '' }} />
+            <Box onClick={() => !protoFile && protoFileRef.current?.click()}
+              sx={{ p: 3, textAlign: 'center', cursor: protoFile ? 'default' : 'pointer', borderRadius: 1, border: '2px dashed', borderColor: protoFile ? 'success.main' : 'divider', bgcolor: protoFile ? 'rgba(73,204,144,0.08)' : 'action.hover', '&:hover': protoFile ? {} : { borderColor: 'primary.light' } }}>
+              {protoFile ? (
+                <Box display="flex" flexDirection="column" alignItems="center" gap={1}>
+                  <IconFile size={32} color="var(--mui-palette-success-main)" />
+                  <Typography fontWeight={700} color="success.main" fontSize="0.875rem">{protoFile.name}</Typography>
+                  <Button size="small" startIcon={<IconX size={14} />} onClick={(e) => { e.stopPropagation(); setProtoFile(null) }}>Remove</Button>
+                </Box>
+              ) : (
+                <Box display="flex" flexDirection="column" alignItems="center" gap={0.5}>
+                  <IconCloudUpload size={32} style={{ opacity: 0.4 }} />
+                  <Typography fontSize="0.875rem" fontWeight={500}>Upload .proto file</Typography>
+                  <Typography variant="caption" color="text.secondary">Optional — can be added later</Typography>
+                </Box>
+              )}
+            </Box>
+          </Paper>
+        </Box>
+      )}
+
+      {/* ── Standard SQL connection (postgresql/mysql/mariadb/mssql/oracle/cockroachdb/clickhouse/cassandra) */}
+      {SQL_HOSTS.includes(sourceType as SourceType) && activeStep === 2 && (
+        <Paper variant="outlined" sx={{ p: 3 }}>
+          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Database connection</Typography>
+          <Typography variant="body2" color="text.secondary" mb={3}>
+            Connection details for your {SOURCE_TYPES.find((s) => s.id === sourceType)?.name} database.
+          </Typography>
+          <Box display="flex" flexDirection="column" gap={2}>
+            <Grid container spacing={1.5}>
+              <Grid item xs={9}>
+                <TextField fullWidth size="small" required autoFocus label="Host" placeholder="db.example.com"
+                  value={dbHost} onChange={(e) => setDbHost(e.target.value)} />
+              </Grid>
+              <Grid item xs={3}>
+                <TextField fullWidth size="small" label="Port" value={dbPort} onChange={(e) => setDbPort(e.target.value)} />
+              </Grid>
+            </Grid>
+            <TextField fullWidth size="small" required
+              label={DB_DATABASE_LABEL[sourceType as SourceType] ?? 'Database name'}
+              placeholder={DB_DATABASE_PLACEHOLDER[sourceType as SourceType] ?? 'myapp_production'}
+              value={dbDatabase} onChange={(e) => setDbDatabase(e.target.value)} />
+            <TextField fullWidth size="small" required label="Username"
+              value={dbUser} onChange={(e) => setDbUser(e.target.value)} />
+            {secretInput(dbPassword, setDbPassword, 'Password')}
+            <FormControlLabel
+              control={<Switch size="small" checked={dbSsl} onChange={(e) => setDbSsl(e.target.checked)} />}
+              label={<Typography variant="body2">Enable SSL / TLS</Typography>}
+            />
+          </Box>
+          <Alert severity="warning" sx={{ mt: 2.5, fontSize: '0.78rem' }}>
+            Use a <strong>read-only user</strong> with access limited to only the tables the AI needs.
+          </Alert>
+        </Paper>
+      )}
+
+      {/* ── MongoDB ───────────────────────────────────────────────────────── */}
+      {sourceType === 'mongodb' && activeStep === 2 && (
+        <Paper variant="outlined" sx={{ p: 3 }}>
+          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>MongoDB connection</Typography>
+          <Typography variant="body2" color="text.secondary" mb={3}>
+            Connection URI including credentials and database name.
+          </Typography>
+          <TextField fullWidth size="small" required autoFocus label="Connection URI"
+            placeholder="mongodb+srv://user:password@cluster.mongodb.net/mydb"
+            value={mongoUri} onChange={(e) => setMongoUri(e.target.value)}
+            helperText="mongodb:// or mongodb+srv:// format"
+          />
+          <Alert severity="warning" sx={{ mt: 2.5, fontSize: '0.78rem' }}>
+            Use an account scoped to only the collections the AI needs.
+          </Alert>
+        </Paper>
+      )}
+
+      {/* ── Redis ─────────────────────────────────────────────────────────── */}
+      {sourceType === 'redis' && activeStep === 2 && (
+        <Paper variant="outlined" sx={{ p: 3 }}>
+          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Redis connection</Typography>
+          <Typography variant="body2" color="text.secondary" mb={3}>
+            Connection details for your Redis instance.
+          </Typography>
+          <Box display="flex" flexDirection="column" gap={2}>
+            <Grid container spacing={1.5}>
+              <Grid item xs={9}>
+                <TextField fullWidth size="small" required autoFocus label="Host" placeholder="redis.example.com"
+                  value={redisHost} onChange={(e) => setRedisHost(e.target.value)} />
+              </Grid>
+              <Grid item xs={3}>
+                <TextField fullWidth size="small" label="Port" value={redisPort} onChange={(e) => setRedisPort(e.target.value)} />
+              </Grid>
+            </Grid>
+            {secretInput(redisPassword, setRedisPassword, 'Password (optional)')}
+            <FormControlLabel
+              control={<Switch size="small" checked={redisTls} onChange={(e) => setRedisTls(e.target.checked)} />}
+              label={<Typography variant="body2">Enable TLS</Typography>}
+            />
+          </Box>
+        </Paper>
+      )}
+
+      {/* ── DynamoDB ──────────────────────────────────────────────────────── */}
+      {sourceType === 'dynamodb' && activeStep === 2 && (
+        <Paper variant="outlined" sx={{ p: 3 }}>
+          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>DynamoDB connection</Typography>
+          <Typography variant="body2" color="text.secondary" mb={3}>
+            AWS credentials to access your DynamoDB tables.
+          </Typography>
+          <Box display="flex" flexDirection="column" gap={2}>
+            <FormControl size="small" fullWidth>
+              <InputLabel>AWS Region</InputLabel>
+              <Select value={dynamoRegion} label="AWS Region" onChange={(e) => setDynamoRegion(e.target.value)}>
+                {['us-east-1','us-east-2','us-west-1','us-west-2','eu-west-1','eu-west-2','eu-central-1','ap-southeast-1','ap-southeast-2','ap-northeast-1','sa-east-1'].map((r) => (
+                  <MenuItem key={r} value={r}>{r}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            {secretInput(dynamoAccessKey, setDynamoAccessKey, 'Access Key ID')}
+            {secretInput(dynamoSecretKey, setDynamoSecretKey, 'Secret Access Key')}
+            <TextField fullWidth size="small" label="Custom endpoint (optional)" placeholder="http://localhost:8000"
+              value={dynamoEndpoint} onChange={(e) => setDynamoEndpoint(e.target.value)}
+              helperText="Leave blank to use the standard AWS endpoint. Use for DynamoDB Local."
+            />
+          </Box>
+          <Alert severity="info" sx={{ mt: 2.5, fontSize: '0.78rem' }}>
+            Prefer an IAM user with <strong>least-privilege permissions</strong> — read-only access to specific tables.
+          </Alert>
+        </Paper>
+      )}
+
+      {/* ── Elasticsearch ─────────────────────────────────────────────────── */}
+      {sourceType === 'elasticsearch' && activeStep === 2 && (
+        <Paper variant="outlined" sx={{ p: 3 }}>
+          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Elasticsearch connection</Typography>
+          <Typography variant="body2" color="text.secondary" mb={3}>
+            URL and credentials for your Elasticsearch cluster.
+          </Typography>
+          <Box display="flex" flexDirection="column" gap={2}>
+            <TextField fullWidth size="small" required autoFocus label="Cluster URL"
+              placeholder="https://my-cluster.es.io:9200"
+              value={esUrl} onChange={(e) => setEsUrl(e.target.value)}
+              helperText="Full URL including protocol and port"
+            />
+            {secretInput(esApiKey, setEsApiKey, 'API Key (recommended)')}
+            <Typography variant="caption" color="text.secondary" sx={{ mt: -1 }}>
+              Or use Basic Auth — fill username and password below.
+            </Typography>
+            <TextField fullWidth size="small" label="Username (optional)" value={dbUser} onChange={(e) => setDbUser(e.target.value)} />
+            {secretInput(dbPassword, setDbPassword, 'Password (optional)')}
+          </Box>
+        </Paper>
+      )}
+
+      {/* ── Snowflake ─────────────────────────────────────────────────────── */}
+      {sourceType === 'snowflake' && activeStep === 2 && (
+        <Paper variant="outlined" sx={{ p: 3 }}>
+          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Snowflake connection</Typography>
+          <Typography variant="body2" color="text.secondary" mb={3}>
+            Account and credentials for your Snowflake data warehouse.
+          </Typography>
+          <Box display="flex" flexDirection="column" gap={2}>
+            <TextField fullWidth size="small" required autoFocus label="Account identifier"
+              placeholder="myorg-myaccount"
+              value={snowflakeAccount} onChange={(e) => setSnowflakeAccount(e.target.value)}
+              helperText="Found in your Snowflake URL: <account>.snowflakecomputing.com"
+            />
+            <TextField fullWidth size="small" label="Warehouse" placeholder="COMPUTE_WH"
+              value={snowflakeWarehouse} onChange={(e) => setSnowflakeWarehouse(e.target.value)} />
+            <TextField fullWidth size="small" required label="Database" placeholder="MY_DATABASE"
+              value={dbDatabase} onChange={(e) => setDbDatabase(e.target.value)} />
+            <TextField fullWidth size="small" label="Schema" placeholder="PUBLIC"
+              value={snowflakeSchema} onChange={(e) => setSnowflakeSchema(e.target.value)} />
+            <TextField fullWidth size="small" required label="Username"
+              value={dbUser} onChange={(e) => setDbUser(e.target.value)} />
+            {secretInput(dbPassword, setDbPassword, 'Password')}
+          </Box>
+        </Paper>
+      )}
+
+      {/* ── Firestore ─────────────────────────────────────────────────────── */}
+      {sourceType === 'firestore' && activeStep === 2 && (
+        <Paper variant="outlined" sx={{ p: 3 }}>
+          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Firestore connection</Typography>
+          <Typography variant="body2" color="text.secondary" mb={3}>
+            Google Cloud project and service account credentials.
+          </Typography>
+          <Box display="flex" flexDirection="column" gap={2}>
+            <TextField fullWidth size="small" required autoFocus label="GCP Project ID"
+              placeholder="my-firebase-project"
+              value={firestoreProject} onChange={(e) => setFirestoreProject(e.target.value)}
+            />
+            <TextField fullWidth size="small" multiline minRows={4} maxRows={8}
+              label="Service Account JSON"
+              placeholder='{"type": "service_account", "project_id": "...", ...}'
+              value={firestoreCredentials} onChange={(e) => setFirestoreCredentials(e.target.value)}
+              helperText="Paste the content of your service account key file"
+            />
+          </Box>
+          <Alert severity="info" sx={{ mt: 2.5, fontSize: '0.78rem' }}>
+            Create a service account with <strong>Cloud Datastore User</strong> role (read-only) for minimal permissions.
+          </Alert>
+        </Paper>
+      )}
+
+      {/* ── Authentication step (REST step 4, GraphQL/gRPC step 3) ───────── */}
+      {((sourceType === 'rest' && activeStep === 4) ||
+        (sourceType === 'graphql' && activeStep === 3) ||
+        (sourceType === 'grpc' && activeStep === 3)) && (
         <Box display="flex" flexDirection="column" gap={2.5}>
           <Paper variant="outlined" sx={{ p: 3 }}>
             <Box display="flex" alignItems="center" gap={1} mb={0.5}>
               <IconKey size={16} style={{ opacity: authType !== 'none' ? 1 : 0.4 }} />
-              <Typography variant="subtitle2" fontWeight={700}>API Authentication</Typography>
+              <Typography variant="subtitle2" fontWeight={700}>
+                {sourceType === 'grpc' ? 'gRPC Authentication' : 'API Authentication'}
+              </Typography>
             </Box>
             <Typography variant="body2" color="text.secondary" mb={3}>
-              Credentials attached to every outgoing HTTP request when calling your API. The AI never sees these — they are injected automatically.
+              {sourceType === 'grpc'
+                ? 'Credentials sent as metadata headers with every gRPC call. Never exposed to the AI.'
+                : 'Credentials attached to every outgoing request. Never exposed to the AI.'}
             </Typography>
 
             <FormControl size="small" fullWidth sx={{ mb: 3 }}>
@@ -649,9 +1129,7 @@ export default function NewServer() {
               </Select>
             </FormControl>
 
-            {authType === 'none' && (
-              <Typography variant="body2" color="text.secondary">No credentials will be attached. Use for public APIs.</Typography>
-            )}
+            {authType === 'none' && <Typography variant="body2" color="text.secondary">No credentials attached. Use for public APIs.</Typography>}
 
             {authType === 'bearer' && (
               <Box display="flex" flexDirection="column" gap={1.5}>
@@ -663,9 +1141,7 @@ export default function NewServer() {
             {authType === 'api-key' && (
               <Box display="flex" flexDirection="column" gap={1.5}>
                 <Grid container spacing={1.5}>
-                  <Grid item xs={12} sm={5}>
-                    <TextField size="small" fullWidth label="Parameter name" placeholder="X-Api-Key" value={keyName} onChange={(e) => setKeyName(e.target.value)} />
-                  </Grid>
+                  <Grid item xs={12} sm={5}><TextField size="small" fullWidth label="Header name" placeholder="X-Api-Key" value={keyName} onChange={(e) => setKeyName(e.target.value)} /></Grid>
                   <Grid item xs={12} sm={7}>{secretInput(keyValue, setKeyValue, 'Value')}</Grid>
                 </Grid>
                 <FormControl size="small" fullWidth>
@@ -675,9 +1151,6 @@ export default function NewServer() {
                     <MenuItem value="query">Query param (?{keyName || 'key'}=…)</MenuItem>
                   </Select>
                 </FormControl>
-                <Typography variant="caption" color="text.secondary">
-                  {keyIn === 'header' ? `Sent as: ${keyName || '<name>'}: <value>` : `Added to URL: ?${keyName || '<name>'}=<value>`}
-                </Typography>
               </Box>
             )}
 
@@ -685,46 +1158,42 @@ export default function NewServer() {
               <Box display="flex" flexDirection="column" gap={1.5}>
                 <TextField size="small" fullWidth label="Username" value={basicUser} onChange={(e) => setBasicUser(e.target.value)} />
                 {secretInput(basicPass, setBasicPass, 'Password')}
-                <Typography variant="caption" color="text.secondary">Sent as: <code>Authorization: Basic &lt;base64(username:password)&gt;</code></Typography>
+                <Typography variant="caption" color="text.secondary">Sent as: <code>Authorization: Basic &lt;base64(user:pass)&gt;</code></Typography>
               </Box>
             )}
 
             {authType === 'oauth2-client' && (
               <Box display="flex" flexDirection="column" gap={1.5}>
-                <TextField size="small" fullWidth label="Token URL" placeholder="https://auth.example.com/oauth/token"
-                  value={oauthTokenUrl} onChange={(e) => setOauthTokenUrl(e.target.value)} />
+                <TextField size="small" fullWidth label="Token URL" placeholder="https://auth.example.com/oauth/token" value={oauthTokenUrl} onChange={(e) => setOauthTokenUrl(e.target.value)} />
                 <Grid container spacing={1.5}>
                   <Grid item xs={12} sm={6}><TextField size="small" fullWidth label="Client ID" value={oauthClientId} onChange={(e) => setOauthClientId(e.target.value)} /></Grid>
                   <Grid item xs={12} sm={6}>{secretInput(oauthClientSecret, setOauthClientSecret, 'Client Secret')}</Grid>
                 </Grid>
                 <TextField size="small" fullWidth label="Scope (optional)" placeholder="read write" value={oauthScope} onChange={(e) => setOauthScope(e.target.value)} />
-                <Typography variant="caption" color="text.secondary">Uses <strong>client_credentials</strong> flow. Token fetched and renewed automatically.</Typography>
+                <Typography variant="caption" color="text.secondary">Uses <strong>client_credentials</strong> flow. Token renewed automatically.</Typography>
               </Box>
             )}
 
             {authType === 'custom' && (
               <Box display="flex" flexDirection="column" gap={1}>
                 <Typography variant="caption" color="text.secondary" mb={0.5}>
-                  Add any HTTP headers to every request (e.g. <code>X-Tenant-Id</code>, <code>X-Auth-Token</code>).
+                  Add HTTP headers to every request (e.g. <code>X-Tenant-Id</code>).
                 </Typography>
                 {customHeaders.map((h, i) => (
                   <Box key={i} display="flex" gap={1} alignItems="center">
                     <TextField size="small" label="Header" placeholder="X-Custom-Header" sx={{ flex: 1 }}
                       value={h.name} onChange={(e) => setCustomHeaders(customHeaders.map((x, idx) => idx === i ? { ...x, name: e.target.value } : x))} />
-                    <TextField size="small" label="Value" sx={{ flex: 2 }}
-                      type={showSecrets ? 'text' : 'password'}
+                    <TextField size="small" label="Value" sx={{ flex: 2 }} type={showSecrets ? 'text' : 'password'}
                       value={h.value} onChange={(e) => setCustomHeaders(customHeaders.map((x, idx) => idx === i ? { ...x, value: e.target.value } : x))}
-                      InputProps={{
-                        endAdornment: i === 0 ? (
-                          <InputAdornment position="end">
-                            <IconButton size="small" onClick={() => setShowSecrets((s) => !s)} edge="end">
-                              {showSecrets ? <IconEyeOff size={16} /> : <IconEye size={16} />}
-                            </IconButton>
-                          </InputAdornment>
-                        ) : undefined,
-                      }}
+                      InputProps={{ endAdornment: i === 0 ? (
+                        <InputAdornment position="end">
+                          <IconButton size="small" onClick={() => setShowSecrets((s) => !s)} edge="end">
+                            {showSecrets ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+                          </IconButton>
+                        </InputAdornment>
+                      ) : undefined }}
                     />
-                    <Tooltip title="Remove header">
+                    <Tooltip title="Remove">
                       <span>
                         <IconButton size="small" color="error" onClick={() => setCustomHeaders(customHeaders.filter((_, idx) => idx !== i))} disabled={customHeaders.length === 1}>
                           <IconTrash size={16} />
@@ -734,8 +1203,7 @@ export default function NewServer() {
                   </Box>
                 ))}
                 <Button size="small" variant="outlined" startIcon={<IconPlus size={14} />}
-                  onClick={() => setCustomHeaders((prev) => [...prev, { name: '', value: '' }])}
-                  sx={{ alignSelf: 'flex-start', mt: 0.5 }}>
+                  onClick={() => setCustomHeaders((prev) => [...prev, { name: '', value: '' }])} sx={{ alignSelf: 'flex-start', mt: 0.5 }}>
                   Add header
                 </Button>
               </Box>
@@ -748,17 +1216,28 @@ export default function NewServer() {
             )}
           </Paper>
 
-          <Alert severity="info" sx={{ fontSize: '0.82rem' }}>
-            <strong>MCP API keys</strong> and <strong>rate limiting</strong> are available in the server settings after creation.
-          </Alert>
+          {(sourceType === 'graphql' || sourceType === 'grpc') && (
+            <Alert severity="info" sx={{ fontSize: '0.82rem' }}>
+              Full {sourceType === 'graphql' ? 'GraphQL' : 'gRPC'} execution support is coming soon. The server configuration will be saved and activated when the adapter is released.
+            </Alert>
+          )}
+
+          {sourceType === 'rest' && (
+            <Alert severity="info" sx={{ fontSize: '0.82rem' }}>
+              <strong>MCP API keys</strong> and <strong>rate limiting</strong> are available in the server settings after creation.
+            </Alert>
+          )}
         </Box>
       )}
 
-      {/* ── Navigation ─────────────────────────────────────────────────── */}
+      {/* ── Navigation ─────────────────────────────────────────────────────── */}
       <Box display="flex" justifyContent="space-between" mt={4}>
-        <Button size="small"
-          startIcon={<IconArrowLeft size={16} />}
-          onClick={() => activeStep === 0 ? navigate('/') : setActiveStep((s) => s - 1)}
+        <Button size="small" startIcon={<IconArrowLeft size={16} />}
+          onClick={() => {
+            if (activeStep === 0) navigate('/')
+            else if (activeStep === 1 && sourceType) { setActiveStep(0) }
+            else setActiveStep((s) => s - 1)
+          }}
           disabled={creating || previewing}
         >
           {activeStep === 0 ? 'Cancel' : 'Back'}

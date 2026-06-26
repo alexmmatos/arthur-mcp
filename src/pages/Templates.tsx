@@ -316,7 +316,7 @@ export default function Templates() {
       <Box display="flex" alignItems="flex-start" justifyContent="space-between" mb={3} flexWrap="wrap" gap={2}>
         <Box>
           <Typography variant="h5" fontWeight={700} gutterBottom letterSpacing="-0.2px">
-            API Templates
+            REST API Templates
           </Typography>
           <Typography color="text.secondary" maxWidth={560}>
             Start with a pre-built integration. Pick a template, name your server, and your AI will have working tools in under a minute.

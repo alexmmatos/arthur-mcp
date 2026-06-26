@@ -35,11 +35,14 @@ import {
   IconLock,
   IconSun,
   IconMoon,
+  IconArrowLeft,
+  IconChevronRight,
 } from '@tabler/icons-react'
 import api from '../api'
 import { avatarLetter, avatarColor } from '../pages/Profile'
 import { useColorMode, ColorMode } from '../theme/ColorModeContext'
 import { useAuth, type UserPermissions } from '../context/AuthContext'
+import { useServerNav } from '../context/ServerNavContext'
 
 const SIDEBAR_WIDTH = 248
 
@@ -96,8 +99,9 @@ function SidebarContent() {
   const theme = useTheme()
   const [logoError, setLogoError] = useState(false)
   const { can, isAdmin } = useAuth()
-
   const { mode } = useColorMode()
+  const { serverDetail } = useServerNav()
+
   const scrollbarStyles = {
     '&::-webkit-scrollbar': { width: '7px' },
     '&::-webkit-scrollbar-thumb': {
@@ -106,48 +110,134 @@ function SidebarContent() {
     },
   }
 
-  return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        overflowY: 'auto',
-        ...scrollbarStyles,
-      }}
-    >
-      {/* Logo */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          px: 2.5,
-          height: '56px',
-          borderBottom: `1px solid ${theme.palette.divider}`,
-          flexShrink: 0,
-        }}
-      >
-        {logoError ? (
-          <Typography
-            variant="h6"
-            fontWeight={700}
-            color="primary.main"
-            sx={{ letterSpacing: '-0.4px', fontSize: '0.9375rem' }}
-          >
-            Arthur MCP
-          </Typography>
-        ) : (
-          <Box
-            component="img"
-            src={mode === ColorMode.Dark ? '/images/logos/arthur_mcp_logo_dark_mode.svg' : '/images/logos/arthur_mcp_logo_light_mode.svg'}
-            alt="Arthur MCP Adapter"
-            sx={{ height: '100%', maxWidth: '100%' }}
-            onError={() => setLogoError(true)}
-          />
-        )}
-      </Box>
+  const logoArea = (
+    <Box sx={{
+      display: 'flex', alignItems: 'center',
+      px: 2.5, height: '56px',
+      borderBottom: `1px solid ${theme.palette.divider}`,
+      flexShrink: 0,
+    }}>
+      {logoError ? (
+        <Typography variant="h6" fontWeight={700} color="primary.main"
+          sx={{ letterSpacing: '-0.4px', fontSize: '0.9375rem' }}>
+          Arthur MCP
+        </Typography>
+      ) : (
+        <Box component="img"
+          src={mode === ColorMode.Dark ? '/images/logos/arthur_mcp_logo_dark_mode.svg' : '/images/logos/arthur_mcp_logo_light_mode.svg'}
+          alt="Arthur MCP Adapter"
+          sx={{ height: '100%', maxWidth: '100%' }}
+          onError={() => setLogoError(true)}
+        />
+      )}
+    </Box>
+  )
 
-      {/* Menu */}
+  const promoBox = (
+    <Box sx={{ p: 1.5, pb: 2, flexShrink: 0 }}>
+      <Box sx={{
+        p: 1.5, bgcolor: 'primary.light', borderRadius: '10px',
+        border: '1px solid', borderColor: 'rgba(93,135,255,0.15)',
+      }}>
+        <Typography fontWeight={700} fontSize="0.8rem" color="primary.dark" mb={0.25}>
+          Arthur MCP Adapter
+        </Typography>
+        <Typography fontSize="0.72rem" color="text.secondary" lineHeight={1.4}>
+          Connect your AI to your APIs
+        </Typography>
+      </Box>
+    </Box>
+  )
+
+  /* ── Contextual nav — server detail ── */
+  if (serverDetail) {
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto', ...scrollbarStyles }}>
+        {logoArea}
+
+        {/* Back to Servers */}
+        <Box
+          display="flex" alignItems="center" gap={0.75} px={2} py={1.25}
+          onClick={() => navigate('/')}
+          sx={{
+            cursor: 'pointer', borderBottom: `1px solid ${theme.palette.divider}`,
+            color: 'text.secondary', flexShrink: 0,
+            '&:hover': { color: 'text.primary' }, transition: 'color 0.15s',
+          }}
+        >
+          <IconArrowLeft size={14} />
+          <Typography fontSize="0.75rem">Servers</Typography>
+        </Box>
+
+        {/* Server identity */}
+        <Box px={2} py={1.25} sx={{ borderBottom: `1px solid ${theme.palette.divider}`, flexShrink: 0 }}>
+          <Box display="flex" alignItems="center" gap={0.75}>
+            <Box component="span" fontSize="0.85rem">{serverDetail.sourceEmoji}</Box>
+            <Typography fontSize="0.8rem" fontWeight={700} noWrap color="text.primary"
+              title={serverDetail.name}>
+              {serverDetail.name}
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Server nav items */}
+        <Box sx={{ flexGrow: 1, py: 0.5, overflowY: 'auto' }}>
+          {serverDetail.navItems.map((item) => {
+            const active = serverDetail.tab === item.idx
+            return (
+              <Box
+                key={item.label}
+                display="flex" alignItems="center" gap={1.25} px={1.75} py={1}
+                onClick={() => !item.disabled && serverDetail.onTabChange(item.idx)}
+                sx={{
+                  cursor: item.disabled ? 'default' : 'pointer',
+                  opacity: item.disabled ? 0.38 : 1,
+                  color: active ? 'primary.main' : 'text.secondary',
+                  borderLeft: '2px solid',
+                  borderColor: active ? 'primary.main' : 'transparent',
+                  bgcolor: active ? 'rgba(26,115,232,0.08)' : 'transparent',
+                  transition: 'background 0.12s, color 0.12s',
+                  '&:hover': !item.disabled ? {
+                    bgcolor: active ? 'rgba(26,115,232,0.12)' : 'action.hover',
+                    color: active ? 'primary.main' : 'text.primary',
+                  } : {},
+                  userSelect: 'none',
+                  mx: 0.75, borderRadius: '0 6px 6px 0',
+                }}
+              >
+                <Box sx={{ flexShrink: 0, display: 'flex', color: 'inherit', '& svg': { strokeWidth: active ? 2 : 1.5 } }}>
+                  {item.icon}
+                </Box>
+                <Typography fontSize="0.8375rem" fontWeight={active ? 600 : 400} noWrap
+                  sx={{ flexGrow: 1, color: 'inherit' }}>
+                  {item.label}
+                </Typography>
+                {item.badge !== undefined && item.badge > 0 && (
+                  <Box sx={{
+                    minWidth: 18, height: 18, borderRadius: '9px', px: 0.6,
+                    bgcolor: active ? 'primary.main' : 'action.selected',
+                    color: active ? '#fff' : 'text.secondary',
+                    fontSize: '0.65rem', fontWeight: 700,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0,
+                  }}>
+                    {item.badge}
+                  </Box>
+                )}
+              </Box>
+            )
+          })}
+        </Box>
+
+        {promoBox}
+      </Box>
+    )
+  }
+
+  /* ── Default app nav ── */
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto', ...scrollbarStyles }}>
+      {logoArea}
       <Box sx={{ flexGrow: 1, py: 1 }}>
         {NAV_SECTIONS.map((section) => {
           const visibleItems = section.items.filter((item) => {
@@ -157,89 +247,57 @@ function SidebarContent() {
           })
           if (visibleItems.length === 0) return null
           return (
-          <List
-            key={section.subheader}
-            subheader={
-              <ListSubheader
-                sx={{
-                  fontSize: '0.6875rem',
-                  fontWeight: 700,
-                  color: 'text.disabled',
-                  letterSpacing: '0.08em',
-                  lineHeight: 1,
-                  bgcolor: 'transparent',
-                  px: 2.5,
-                  pt: 2,
-                  pb: 0.75,
-                  textTransform: 'uppercase',
-                }}
-              >
-                {section.subheader}
-              </ListSubheader>
-            }
-            dense
-            disablePadding
-          >
-            {visibleItems.map((item) => {
-              const Icon = item.icon
-              const selected = location.pathname === item.path
-              return (
-                <ListItem key={item.path} disablePadding sx={{ px: 1.5, py: '1px' }}>
-                  <ListItemButton
-                    selected={selected}
-                    onClick={() => navigate(item.path)}
-                    sx={{
-                      borderRadius: '8px',
-                      minHeight: 38,
-                      px: 1.5,
-                      '&.Mui-selected': {
-                        bgcolor: 'rgba(26,115,232,0.08)',
-                        color: 'primary.main',
-                        '& .MuiListItemIcon-root': { color: 'primary.main' },
-                        '&:hover': { bgcolor: 'rgba(26,115,232,0.12)' },
-                      },
-                      '&:hover': { bgcolor: 'rgba(0,0,0,0.04)' },
-                    }}
-                  >
-                    <ListItemIcon sx={{ minWidth: 32, color: selected ? 'primary.main' : 'text.secondary' }}>
-                      <Icon stroke={selected ? 2 : 1.5} size="1.1rem" />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={item.title}
-                      primaryTypographyProps={{
-                        fontSize: '0.8375rem',
-                        fontWeight: selected ? 600 : 400,
-                        color: selected ? 'primary.main' : 'text.primary',
+            <List
+              key={section.subheader}
+              subheader={
+                <ListSubheader sx={{
+                  fontSize: '0.6875rem', fontWeight: 700, color: 'text.disabled',
+                  letterSpacing: '0.08em', lineHeight: 1, bgcolor: 'transparent',
+                  px: 2.5, pt: 2, pb: 0.75, textTransform: 'uppercase',
+                }}>
+                  {section.subheader}
+                </ListSubheader>
+              }
+              dense disablePadding
+            >
+              {visibleItems.map((item) => {
+                const Icon = item.icon
+                const selected = location.pathname === item.path
+                return (
+                  <ListItem key={item.path} disablePadding sx={{ px: 1.5, py: '1px' }}>
+                    <ListItemButton
+                      selected={selected}
+                      onClick={() => navigate(item.path)}
+                      sx={{
+                        borderRadius: '8px', minHeight: 38, px: 1.5,
+                        '&.Mui-selected': {
+                          bgcolor: 'rgba(26,115,232,0.08)', color: 'primary.main',
+                          '& .MuiListItemIcon-root': { color: 'primary.main' },
+                          '&:hover': { bgcolor: 'rgba(26,115,232,0.12)' },
+                        },
+                        '&:hover': { bgcolor: 'rgba(0,0,0,0.04)' },
                       }}
-                    />
-                  </ListItemButton>
-                </ListItem>
-              )
-            })}
-          </List>
+                    >
+                      <ListItemIcon sx={{ minWidth: 32, color: selected ? 'primary.main' : 'text.secondary' }}>
+                        <Icon stroke={selected ? 2 : 1.5} size="1.1rem" />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={item.title}
+                        primaryTypographyProps={{
+                          fontSize: '0.8375rem',
+                          fontWeight: selected ? 600 : 400,
+                          color: selected ? 'primary.main' : 'text.primary',
+                        }}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                )
+              })}
+            </List>
           )
         })}
       </Box>
-
-      {/* Bottom promo box */}
-      <Box sx={{ p: 1.5, pb: 2 }}>
-        <Box
-          sx={{
-            p: 1.5,
-            bgcolor: 'primary.light',
-            borderRadius: '10px',
-            border: '1px solid',
-            borderColor: 'rgba(93,135,255,0.15)',
-          }}
-        >
-          <Typography fontWeight={700} fontSize="0.8rem" color="primary.dark" mb={0.25}>
-            Arthur MCP Adapter
-          </Typography>
-          <Typography fontSize="0.72rem" color="text.secondary" lineHeight={1.4}>
-            Connect your AI to your APIs
-          </Typography>
-        </Box>
-      </Box>
+      {promoBox}
     </Box>
   )
 }

@@ -74,6 +74,12 @@ export class SwaggerProjectEntity {
   @Column('text', { default: '{"enabled":false,"params":[]}' })
   tenantConfig: string;
 
+  @Column('text', { nullable: true })
+  connectionConfig?: string;
+
+  @Column('text', { default: '[]' })
+  dbQueries: string;
+
   @CreateDateColumn()
   createdAt: Date;
 
