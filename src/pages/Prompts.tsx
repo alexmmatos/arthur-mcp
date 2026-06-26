@@ -26,8 +26,10 @@ import {
   IconX,
   IconArrowsMaximize,
   IconArrowsMinimize,
+  IconSparkles,
 } from '@tabler/icons-react'
 import MonacoEditor from '@monaco-editor/react'
+import { useNavigate } from 'react-router-dom'
 import api from '../api'
 import { useAuth, Permission } from '../context/AuthContext'
 import { useColorMode } from '../theme/ColorModeContext'
@@ -255,6 +257,7 @@ function PromptDialog({
         : empty()
       )
       setError('')
+      setExpandedOpen(false)
     }
   }, [open, editTarget])
 
@@ -424,6 +427,7 @@ function PromptDialog({
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function Prompts() {
+  const navigate = useNavigate()
   const { can, loading: authLoading } = useAuth()
   const [prompts, setPrompts] = useState<Prompt[]>([])
   const [loading, setLoading] = useState(true)
@@ -495,9 +499,14 @@ export default function Prompts() {
           </Typography>
         </Box>
         {can(Permission.PromptsCreate) && (
-          <Button size="small" variant="contained" startIcon={<IconPlus size={18} />} onClick={openCreate}>
-            New prompt
-          </Button>
+          <Box display="flex" gap={1}>
+            <Button size="small" variant="outlined" startIcon={<IconSparkles size={16} />} onClick={() => navigate('/prompt-templates')}>
+              Templates
+            </Button>
+            <Button size="small" variant="contained" startIcon={<IconPlus size={16} />} onClick={openCreate}>
+              New prompt
+            </Button>
+          </Box>
         )}
       </Box>
 

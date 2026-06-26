@@ -16,6 +16,7 @@ import SetupWizard from './pages/SetupWizard'
 import SharePage from './pages/SharePage'
 import Templates from './pages/Templates'
 import Prompts from './pages/Prompts'
+import PromptTemplates from './pages/PromptTemplates'
 import Secrets from './pages/Secrets'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -60,6 +61,7 @@ export default function App() {
                   <Route path="/audit-logs" element={<AuditLogs />} />
                   <Route path="/templates" element={<Templates />} />
                   <Route path="/prompts" element={<Prompts />} />
+                  <Route path="/prompt-templates" element={<PromptTemplates />} />
                   <Route path="/secrets" element={<Secrets />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
