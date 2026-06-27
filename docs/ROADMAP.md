@@ -13,7 +13,7 @@ This file should be updated when task state changes. It does not replace issues 
 
 - [ ] Apply frontend code duplication optimization plan (`docs/FRONTEND_OPTIMIZATION_PLAN.md`):
   - [x] **Phase 1:** Create `BaseListCard` generic component and refactor `PromptCard`, `SecretCard`, `ProjectCard` (4–6 hours, ~60 lines saved per card).
-  - [ ] **Phase 2:** Extract `useListPageLogic` hook and refactor list pages (Prompts, Secrets, Servers).
+  - [x] **Phase 2:** Extract `useListPageLogic` hook and refactor list pages (Prompts, Secrets, Servers).
   - [ ] **Phase 3:** Extract `useCopyToClipboard` utility hook.
   - [ ] **Phase 4:** Create `BaseDialogLayout` for dialog/drawer wrappers.
   - [ ] **Phase 5:** Extract `useDetailPageNav` hook for detail page contextual navigation.
@@ -64,6 +64,8 @@ This file should be updated when task state changes. It does not replace issues 
 - [x] Extracted the `Servers` list card into `src/features/server/ProjectCard.tsx` and moved server health-summary types into shared feature types.
 - [x] Switched `ServerDetail` to the shared contextual sidebar navigation pattern so the back action and section tabs are driven by `ServerNavContext` instead of duplicated inline UI.
 - [x] Switched `Profile` to the shared contextual sidebar navigation pattern so profile sections are selected from the sidebar instead of inline tabs.
+- [x] **Phase 1 Complete:** Implemented `BaseListCard` generic card component and migrated `PromptCard`, `SecretCard`, `ProjectCard` to use it (~390 lines eliminated).
+- [x] **Phase 2 Complete:** Extracted `useListPageLogic` hook and refactored `Prompts`, `Secrets`, `Servers` list pages (~240 lines eliminated).
 
 ## Decisions
 
