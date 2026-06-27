@@ -111,6 +111,7 @@ export interface Project {
   name: string
   baseUrl: string
   description?: string
+  tags?: string[]
   version?: string
   status: string
   isPaused?: boolean
@@ -228,4 +229,18 @@ export interface ExecLog {
   isError: boolean
   errorMessage?: string
   createdAt: string
+}
+
+export interface HealthEntry {
+  projectId: string
+  errorRatePct: number
+  totalCalls: number
+  isPaused: boolean
+}
+
+export interface HealthSummaryEntry {
+  projectId: string
+  isPaused: boolean
+  errorRatePct: number
+  totalCalls: number
 }
