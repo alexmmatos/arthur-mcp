@@ -7,6 +7,7 @@ import {
   IconButton,
   InputAdornment,
   Paper,
+  TextField,
   Tooltip,
   Typography,
 } from '@mui/material'
@@ -15,10 +16,6 @@ import {
   IconMail,
   IconWorld,
   IconClock,
-  IconPlus,
-  IconTrash,
-  IconHttpConnect,
-  IconLetterCase,
 } from '@tabler/icons-react'
 import { useTranslation } from 'react-i18next'
 import api from '../api'
@@ -26,12 +23,8 @@ import { useAuth, Permission } from '../context/AuthContext'
 import { useTerminology } from '../context/TerminologyContext'
 import HelpButton from '../components/HelpButton'
 import AppSnackbar from '../components/AppSnackbar'
-
-interface HeaderEntry {
-  id: string
-  name: string
-  value: string
-}
+import { GlobalRequestHeadersPanel, type HeaderEntry } from '../features/settings/GlobalRequestHeadersPanel'
+import { TerminologyPanel } from '../features/settings/TerminologyPanel'
 
 interface SettingsData {
   serverBaseUrl: string
@@ -49,8 +42,6 @@ interface SettingsData {
   termChain?: string
   termSecret?: string
 }
-
-import { TextField } from '@mui/material'
 
 function emailValid(v: string) {
   return !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
@@ -291,51 +282,12 @@ export default function Settings() {
         </Grid>
       </Paper>
 
-      {/* Global Request Headers */}
-      <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
-        <Box display="flex" alignItems="center" gap={1} mb={2}>
-          <Box sx={{ color: 'primary.main', display: 'flex' }}><IconHttpConnect size={18} /></Box>
-          <Typography variant="subtitle1" fontWeight={700}>{t('headers.title')}</Typography>
-          <HelpButton title={t('headers.helpTitle')}>
-            <Typography variant="body2">{t('headers.helpBody')}</Typography>
-          </HelpButton>
-        </Box>
-
-        {globalHeaders.length === 0 ? (
-          <Box sx={{ border: '1px dashed', borderColor: 'divider', borderRadius: 1, py: 2.5, textAlign: 'center', mb: 1.5 }}>
-            <Typography variant="body2" color="text.disabled">
-              {t('headers.empty')}
-            </Typography>
-          </Box>
-        ) : (
-          <Box display="flex" flexDirection="column" gap={1} mb={1.5}>
-            {globalHeaders.map((h) => (
-              <Box key={h.id} display="flex" alignItems="center" gap={1}>
-                <TextField
-                  size="small" placeholder={t('headers.placeholderName')} value={h.name}
-                  onChange={(e) => setGlobalHeader(h.id, 'name', e.target.value)}
-                  InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.82rem' } }}
-                  sx={{ width: 220, flexShrink: 0 }}
-                />
-                <TextField
-                  size="small" fullWidth placeholder={t('headers.placeholderValue')} value={h.value}
-                  onChange={(e) => setGlobalHeader(h.id, 'value', e.target.value)}
-                  InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.82rem' } }}
-                />
-                <Tooltip title={t('headers.removeTooltip')}>
-                  <IconButton size="small" color="error" onClick={() => removeGlobalHeader(h.id)}>
-                    <IconTrash size={16} />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-            ))}
-          </Box>
-        )}
-
-        <Button size="small" variant="outlined" startIcon={<IconPlus size={14} />} onClick={addGlobalHeader}>
-          {t('headers.addHeader')}
-        </Button>
-      </Paper>
+      <GlobalRequestHeadersPanel
+        globalHeaders={globalHeaders}
+        onAdd={addGlobalHeader}
+        onRemove={removeGlobalHeader}
+        onChange={setGlobalHeader}
+      />
 
       {/* SMTP */}
       <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
@@ -416,77 +368,22 @@ export default function Settings() {
         </Button>
       </Box>
 
-      {/* Terminology */}
-      <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
-        <Box display="flex" alignItems="center" gap={1} mb={2}>
-          <Box sx={{ color: 'primary.main', display: 'flex' }}><IconLetterCase size={18} /></Box>
-          <Typography variant="subtitle1" fontWeight={700}>{t('terminology.title')}</Typography>
-          <HelpButton title={t('terminology.helpTitle')}>
-            <Typography variant="body2">{t('terminology.helpBody')}</Typography>
-          </HelpButton>
-        </Box>
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={6} md={4}>
-            <TextField size="small" fullWidth
-              label={t('terminology.serverLabel')}
-              placeholder="Server"
-              value={termServer}
-              onChange={(e) => setTermServer(e.target.value)}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}>
-            <TextField size="small" fullWidth
-              label={t('terminology.toolLabel')}
-              placeholder="Tool"
-              value={termTool}
-              onChange={(e) => setTermTool(e.target.value)}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}>
-            <TextField size="small" fullWidth
-              label={t('terminology.resourceLabel')}
-              placeholder="Resource"
-              value={termResource}
-              onChange={(e) => setTermResource(e.target.value)}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}>
-            <TextField size="small" fullWidth
-              label={t('terminology.promptLabel')}
-              placeholder="Prompt"
-              value={termPrompt}
-              onChange={(e) => setTermPrompt(e.target.value)}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}>
-            <TextField size="small" fullWidth
-              label={t('terminology.chainLabel')}
-              placeholder="Chain"
-              value={termChain}
-              onChange={(e) => setTermChain(e.target.value)}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}>
-            <TextField size="small" fullWidth
-              label={t('terminology.secretLabel')}
-              placeholder="Secret"
-              value={termSecret}
-              onChange={(e) => setTermSecret(e.target.value)}
-            />
-          </Grid>
-        </Grid>
-        <Box display="flex" justifyContent="flex-end" mt={2}>
-          <Button
-            variant="contained"
-            size="small"
-            onClick={handleSaveTerminology}
-            disabled={savingTerms}
-            startIcon={savingTerms ? <CircularProgress size={14} color="inherit" /> : <IconDeviceFloppy size={18} />}
-          >
-            {savingTerms ? t('saving') : t('terminology.save')}
-          </Button>
-        </Box>
-      </Paper>
+      <TerminologyPanel
+        termServer={termServer}
+        termTool={termTool}
+        termResource={termResource}
+        termPrompt={termPrompt}
+        termChain={termChain}
+        termSecret={termSecret}
+        savingTerms={savingTerms}
+        onTermServerChange={setTermServer}
+        onTermToolChange={setTermTool}
+        onTermResourceChange={setTermResource}
+        onTermPromptChange={setTermPrompt}
+        onTermChainChange={setTermChain}
+        onTermSecretChange={setTermSecret}
+        onSave={handleSaveTerminology}
+      />
 
       <AppSnackbar
         open={snackOpen}

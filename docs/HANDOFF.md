@@ -12,6 +12,7 @@ The shared context protocol now includes Claude Code specialist agents, backend 
 
 ## Latest Changes
 
+- Added `docs/FRONTEND_MODULARIZATION_PLAN.md` with a phased execution plan for modularizing the frontend by domain, using `src/features/server/` as the first reference slice.
 - Added `AGENTS.md` with project context, commands, and the agent protocol.
 - Added `docs/ROADMAP.md` with macro status, decisions, and open questions.
 - Added `docs/HANDOFF.md` as the handoff file between sessions.
@@ -60,8 +61,11 @@ The shared context protocol now includes Claude Code specialist agents, backend 
 - Extracted `buildCurl`, `buildMcpCurl`, and `inferSchema` from `ServerDetail.tsx` into `src/features/server/api-endpoints/curl-utils.ts`.
 - Extracted `EndpointAccordion` from `ServerDetail.tsx` into `src/features/server/api-endpoints/EndpointAccordion.tsx`, preserving the main tree's i18n copy instead of using the older hardcoded worktree text.
 - Extracted shared schema field rendering into `src/features/server/api-endpoints/FieldInput.tsx`; `ServerDetail` still imports it for the remaining `ToolAccordion` path.
-- Imported pending uncommitted changes from Claude worktree `.claude/worktrees/agent-ab0722d25387f1c7f` into `develop`.
-- Added modular files from the worktree split, including API endpoint tabs/tool dialogs, chains tab/dialog, prompts tab, resources tab, and shared UI helpers such as `CodePreviewTabs` and `InlineEdit`.
+- Extracted the remaining settings-only inline panels from `ServerDetail.tsx` into `src/features/server/settings/AlertConfigPanel.tsx` and `src/features/server/settings/TenantConfigPanel.tsx`.
+- Rewired `ServerDetail.tsx` to consume settings, activity, API endpoint, resources, prompts, and chains modules through imports; the page no longer defines inline subcomponents and now acts primarily as route orchestration.
+- Extracted `PromptCard`, `TagInput`, and prompt types into `src/features/prompts/`, then removed the unused inline prompt drawer implementation from `src/pages/Prompts.tsx` and reused the shared tag input in `src/pages/NewPrompt.tsx`.
+- Extracted `SecretCard` and secret types into `src/features/secrets/`, then removed the unused inline secret drawer implementation from `src/pages/Secrets.tsx`.
+- Extracted `GlobalRequestHeadersPanel` and `TerminologyPanel` into `src/features/settings/`, keeping save logic in `src/pages/Settings.tsx` while reducing page-owned JSX.
 
 ## Files Changed In This Session
 
@@ -175,7 +179,8 @@ The shared context protocol now includes Claude Code specialist agents, backend 
 - `npm run type-check` passed after extracting `ToolCommentsSection`.
 - `npm run type-check` passed after extracting API endpoint curl/schema helpers.
 - `npm run type-check` passed after extracting `EndpointAccordion` and `FieldInput`.
-- `npm run type-check` passed after importing pending worktree files into `develop`.
+- `npm run type-check` passed after extracting the remaining settings panels and repairing the final `ServerDetail` imports.
+- `npm run type-check` passed after modularizing `Prompts`, `Secrets`, and the first `Settings` panels.
 - `npm test --prefix api -- secrets.service.spec.ts swagger.service.spec.ts permissions.guard.spec.ts` passed.
 - `npm run test:cov --prefix api -- --runInBand` passed with 83.85% statements, 71.72% branches, 87.34% functions, and 85.35% lines.
 - `npm run build --prefix api` could not complete because the local system hit the file watcher limit (`ENOSPC`), so backend validation used direct `tsc --noEmit` instead.
