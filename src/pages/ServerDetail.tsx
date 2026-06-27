@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   getSourceType, isDbSource, isSqlSource, isNoSqlSource, isBlankSource,
   SOURCE_DISPLAY, SourceType, SQL_SOURCES, NOSQL_SOURCES,
@@ -40,12 +41,13 @@ import {
   TableRow,
   Tabs,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   Typography,
 } from '@mui/material'
 import {
   IconPlus,
-  IconArrowLeft,
   IconRefresh,
   IconCheck,
   IconX,
@@ -61,7 +63,6 @@ import {
   IconWorld,
   IconBook,
   IconChartBar,
-  IconGauge,
   IconKey,
   IconPlayerPlay,
   IconPlayerPause,
@@ -98,6 +99,10 @@ import HelpButton from '../components/HelpButton'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { McpDocsContent } from './McpDocs'
 import SecretAutocomplete, { SecretEntry, useSecrets } from '../components/SecretAutocomplete'
+import { SaveIndicator } from '../components/SaveIndicator'
+import { AuthConfigPanel } from '../features/server/settings/AuthConfigPanel'
+import { RateLimitPanel } from '../features/server/settings/RateLimitPanel'
+import type { AuthConfig, SaveStatus } from '../features/server/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -178,6 +183,14 @@ interface DbQuery {
   command?: string
   keyPattern?: string
   valueTemplate?: string
+  redisTemplate?: 'exact_key' | 'key_prefix' | 'key_range' | 'search_by_value' | 'secondary_index' | 'full_text' | 'composite'
+  valuePattern?: string
+  keyPrefixFilter?: string
+  redisMinScore?: string
+  redisMaxScore?: string
+  redisLimit?: number
+  redisFtIndex?: string
+  redisFetchValues?: boolean
   tableName?: string
   dynamoOperation?: string
   esIndex?: string
@@ -189,6 +202,8 @@ interface DbQuery {
   grpcMethod?: string
   grpcRequestTemplate?: string
   parameters?: DbQueryParameter[]
+  inputSchema?: JsonSchema
+  outputSchema?: JsonSchema
   iteratorPath?: string
 }
 
@@ -297,16 +312,6 @@ interface Project {
   updatedAt: string
 }
 
-type AuthType = 'none' | 'bearer' | 'api-key' | 'basic' | 'oauth2-client' | 'custom'
-
-type AuthConfig =
-  | { type: 'none' }
-  | { type: 'bearer'; token: string }
-  | { type: 'api-key'; name: string; value: string; in: 'header' | 'query' }
-  | { type: 'basic'; username: string; password: string }
-  | { type: 'oauth2-client'; tokenUrl: string; clientId: string; clientSecret: string; scope?: string }
-  | { type: 'custom'; headers: { name: string; value: string }[] }
-
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const METHOD_COLOR: Record<string, string> = {
@@ -380,6 +385,7 @@ function InlineEdit({
   fontFamily,
   maxWidth,
 }: InlineEditProps) {
+  const { t } = useTranslation('serverDetail')
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
   const [saving, setSaving] = useState(false)
@@ -460,14 +466,14 @@ function InlineEdit({
         disabled={saving}
       />
       <Box display="flex" gap={0.5} mt={0.5} justifyContent="flex-end">
-        <Tooltip title={multiline ? 'Save (Ctrl+Enter)' : 'Save (Enter)'}>
+        <Tooltip title={multiline ? t('tooltip.saveCtrlEnter') : t('tooltip.saveEnter')}>
           <span>
             <IconButton size="small" color="primary" onClick={commit} disabled={saving}>
               {saving ? <CircularProgress size={13} /> : <IconCheck size={18} />}
             </IconButton>
           </span>
         </Tooltip>
-        <Tooltip title="Cancel (Esc)">
+        <Tooltip title={t('tooltip.cancelEsc')}>
           <IconButton size="small" onClick={cancel} disabled={saving}><IconX size={18} /></IconButton>
         </Tooltip>
       </Box>
@@ -480,6 +486,7 @@ function InlineEdit({
 function BaseUrlPanel({ projectId, initialValue, onChange }: {
   projectId: string; initialValue: string; onChange: (url: string) => void
 }) {
+  const { t } = useTranslation('serverDetail')
   const { can } = useAuth()
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(initialValue)
@@ -490,13 +497,13 @@ function BaseUrlPanel({ projectId, initialValue, onChange }: {
 
   const handleSave = async () => {
     const trimmed = value.trim()
-    if (!trimmed) { setError('The URL cannot be empty.'); return }
-    try { new URL(trimmed) } catch { setError('Invalid URL. Include protocol (e.g. https://api.example.com)'); return }
+    if (!trimmed) { setError(t('error.baseUrlEmpty')); return }
+    try { new URL(trimmed) } catch { setError(t('error.baseUrlInvalid')); return }
     setSaving(true); setError('')
     try {
       await api.patch(`/swagger/servers/${projectId}/base-url`, { baseUrl: trimmed })
       onChange(trimmed); setEditing(false)
-    } catch { setError('Failed to save. Please try again.') } finally { setSaving(false) }
+    } catch { setError(t('error.baseUrlSaveFailed')) } finally { setSaving(false) }
   }
 
   const handleCancel = () => { setValue(initialValue); setEditing(false); setError('') }
@@ -509,8 +516,8 @@ function BaseUrlPanel({ projectId, initialValue, onChange }: {
 
       <Box flex={1} minWidth={0}>
         <Box display="flex" alignItems="center" gap={0.5} mb={0.5}>
-          <Typography variant="subtitle2" fontWeight={700}>API Base URL</Typography>
-          <HelpButton title="API Base URL">
+          <Typography variant="subtitle2" fontWeight={700}>{t('heading.apiBaseUrl')}</Typography>
+          <HelpButton title={t('heading.apiBaseUrl')}>
             <Typography variant="body2" gutterBottom>
               The root address of the external API this server connects to. Every tool call is prefixed with this URL — for example, base <code>https://api.example.com</code> + tool path <code>/users/42</code> makes a full request to <code>https://api.example.com/users/42</code>.
             </Typography>
@@ -536,18 +543,18 @@ function BaseUrlPanel({ projectId, initialValue, onChange }: {
             size="small" fullWidth autoFocus
             label="ExternalAPI Base URL" value={value}
             onChange={(e) => { setValue(e.target.value); setError('') }}
-            error={!!error} helperText={error || 'Base URL used for all HTTP calls in this server'}
+            error={!!error} helperText={error || t('hint.baseUrl')}
             placeholder="https://api.example.com"
             onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') handleCancel() }}
             InputProps={{
               endAdornment: (
                 <InputAdornment position="end">
-                  <Tooltip title="Save"><span>
+                  <Tooltip title={t('tooltip.saveEnter')}><span>
                     <IconButton size="small" color="primary" onClick={handleSave} disabled={saving}>
                       {saving ? <CircularProgress size={14} /> : <IconCheck size={18} />}
                     </IconButton>
                   </span></Tooltip>
-                  <Tooltip title="Cancel">
+                  <Tooltip title={t('tooltip.cancelEsc')}>
                     <IconButton size="small" onClick={handleCancel} disabled={saving}><IconX size={18} /></IconButton>
                   </Tooltip>
                 </InputAdornment>
@@ -560,10 +567,10 @@ function BaseUrlPanel({ projectId, initialValue, onChange }: {
               fontFamily="monospace" fontSize="0.85rem" color="text.secondary"
               sx={{ wordBreak: 'break-all', flexGrow: 1 }}
             >
-              {initialValue || <span style={{ fontStyle: 'italic', opacity: 0.5 }}>No base URL set</span>}
+              {initialValue || <span style={{ fontStyle: 'italic', opacity: 0.5 }}>{t('label.noBaseUrl')}</span>}
             </Typography>
             {can(Permission.ServersEditSettings) && (
-              <Tooltip title="Edit Base URL">
+              <Tooltip title={t('action.editBaseUrl')}>
                 <IconButton size="small" onClick={() => setEditing(true)}><IconEdit size={15} /></IconButton>
               </Tooltip>
             )}
@@ -577,6 +584,7 @@ function BaseUrlPanel({ projectId, initialValue, onChange }: {
 // ─── MCP Endpoint bar ─────────────────────────────────────────────────────────
 
 function McpEndpointBar({ projectId, hasKeys }: { projectId: string; hasKeys: boolean }) {
+  const { t } = useTranslation('serverDetail')
   const [copied, setCopied] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [shareLink, setShareLink] = useState('')
@@ -601,10 +609,10 @@ function McpEndpointBar({ projectId, hasKeys }: { projectId: string; hasKeys: bo
     <Paper variant="outlined" sx={{ p: 2.5, mb: 2 }}>
       <Box display="flex" alignItems="center" gap={1} mb={1.5}>
         <IconWorld size={18} style={{ color: '#5D87FF' }} />
-        <Typography variant="subtitle1" fontWeight={700} flexGrow={1}>Connection URL</Typography>
-        {can(Permission.ServersShare) && <Tooltip title="Share setup instructions with a client">
+        <Typography variant="subtitle1" fontWeight={700} flexGrow={1}>{t('heading.connectionUrl')}</Typography>
+        {can(Permission.ServersShare) && <Tooltip title={t('hint.shareDesc')}>
           <Button size="small" variant="outlined" startIcon={<IconShare size={18} />} onClick={handleShareOpen}>
-            Share with client
+            {t('action.shareWithClient')}
           </Button>
         </Tooltip>}
         <HelpButton title="MCP Endpoint">
@@ -628,7 +636,7 @@ function McpEndpointBar({ projectId, hasKeys }: { projectId: string; hasKeys: bo
         }}>
           {url}
         </Box>
-        <Tooltip title={copied ? 'Copied!' : 'Copy URL'}>
+        <Tooltip title={copied ? t('tooltip.copiedBang') : t('action.copyUrl')}>
           <IconButton size="small" color={copied ? 'primary' : 'default'}
             onClick={() => { navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000) }}>
             <IconCopy size={18} />
@@ -638,8 +646,8 @@ function McpEndpointBar({ projectId, hasKeys }: { projectId: string; hasKeys: bo
 
       <Typography variant="caption" color="text.secondary" mt={0.75} display="block">
         {hasKeys
-          ? <>Configure this URL in your MCP client and include the header <Box component="code" sx={{ bgcolor: 'action.hover', px: 0.8, py: 0.2, borderRadius: 0.5, fontSize: '0.78rem' }}>auth: &lt;key&gt;</Box></>
-          : 'Configure this URL in Claude Desktop, Cursor, or any compatible MCP client.'}
+          ? <>{t('label.authEndpoint')} <Box component="code" sx={{ bgcolor: 'action.hover', px: 0.8, py: 0.2, borderRadius: 0.5, fontSize: '0.78rem' }}>auth: &lt;key&gt;</Box></>
+          : t('label.publicEndpoint')}
       </Typography>
 
       {/* Share dialog */}
@@ -647,12 +655,12 @@ function McpEndpointBar({ projectId, hasKeys }: { projectId: string; hasKeys: bo
         PaperProps={{ sx: { width: { xs: '100vw', sm: 480 }, display: 'flex', flexDirection: 'column' } }}>
         <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0 }}>
           <IconShare size={18} style={{ color: '#5D87FF' }} />
-          <Typography variant="h6" fontWeight={700} flexGrow={1}>Share with client</Typography>
+          <Typography variant="h6" fontWeight={700} flexGrow={1}>{t('connect.shareDrawerTitle')}</Typography>
           <IconButton size="small" onClick={() => setShareOpen(false)}><IconX size={18} /></IconButton>
         </Box>
         <Box sx={{ flex: 1, overflowY: 'auto', px: 3, py: 2.5 }}>
           <Typography variant="body2" color="text.secondary" mb={2}>
-            Send this link to anyone who needs to connect their AI client to this server. The page includes step-by-step instructions for Claude Desktop, Cursor, and a QR code for mobile.
+            {t('hint.shareDesc')}
           </Typography>
           {shareLoading ? (
             <Box display="flex" justifyContent="center" py={3}><CircularProgress /></Box>
@@ -662,7 +670,7 @@ function McpEndpointBar({ projectId, hasKeys }: { projectId: string; hasKeys: bo
                 <Box sx={{ flexGrow: 1, fontFamily: 'monospace', fontSize: '0.8rem', bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider', borderRadius: 1, px: 1.5, py: 1, wordBreak: 'break-all' }}>
                   {fullShareLink}
                 </Box>
-                <Tooltip title={shareLinkCopied ? 'Copied!' : 'Copy link'}>
+                <Tooltip title={shareLinkCopied ? t('tooltip.copiedBang') : t('action.copyLink')}>
                   <IconButton size="small" color={shareLinkCopied ? 'primary' : 'default'}
                     onClick={() => { navigator.clipboard.writeText(fullShareLink); setShareLinkCopied(true); setTimeout(() => setShareLinkCopied(false), 2500) }}>
                     <IconCopy size={18} />
@@ -671,22 +679,22 @@ function McpEndpointBar({ projectId, hasKeys }: { projectId: string; hasKeys: bo
               </Box>
               <Box display="flex" flexDirection="column" alignItems="center" gap={1} mb={2}>
                 <QRCodeSVG value={fullShareLink} size={140} />
-                <Typography variant="caption" color="text.disabled">Scan to open on a mobile device</Typography>
+                <Typography variant="caption" color="text.disabled">{t('label.scanQr')}</Typography>
               </Box>
               <Alert severity="info" icon={<IconQrcode size={18} />}>
-                This link is valid for 30 days. It gives read-only setup information — no access to data or credentials.
+                {t('label.shareValidity')}
               </Alert>
             </>
           ) : (
-            <Alert severity="error">Could not generate the share link. Please try again.</Alert>
+            <Alert severity="error">{t('error.shareGenFailed')}</Alert>
           )}
         </Box>
         <Box sx={{ px: 3, py: 2, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1, flexShrink: 0 }}>
-          <Button onClick={() => setShareOpen(false)}>Close</Button>
+          <Button onClick={() => setShareOpen(false)}>{t('common:action.close', 'Close')}</Button>
           {fullShareLink && (
             <Button variant="contained" startIcon={<IconCopy size={18} />}
               onClick={() => { navigator.clipboard.writeText(fullShareLink); setShareLinkCopied(true); setTimeout(() => setShareLinkCopied(false), 2500) }}>
-              {shareLinkCopied ? 'Copied!' : 'Copy link'}
+              {shareLinkCopied ? t('tooltip.copiedBang') : t('action.copyLink')}
             </Button>
           )}
         </Box>
@@ -704,6 +712,7 @@ function ApiKeysPanel({ projectId, initialKeys, onChange }: {
   initialKeys: McpApiKeyEntry[]
   onChange: (keys: McpApiKeyEntry[]) => void
 }) {
+  const { t } = useTranslation('serverDetail')
   const [keys, setKeys] = useState<McpApiKeyEntry[]>(initialKeys)
   const [newKeyName, setNewKeyName] = useState('')
   const [addOpen, setAddOpen] = useState(false)
@@ -721,7 +730,7 @@ function ApiKeysPanel({ projectId, initialKeys, onChange }: {
   const syncKeys = (updated: McpApiKeyEntry[]) => { setKeys(updated); onChange(updated) }
 
   const handleAdd = async () => {
-    if (!newKeyName.trim()) { setAddError('Name is required.'); return }
+    if (!newKeyName.trim()) { setAddError(t('error.keyNameRequired')); return }
     setAdding(true)
     setAddError('')
     try {
@@ -734,8 +743,8 @@ function ApiKeysPanel({ projectId, initialKeys, onChange }: {
       setNewKeyName('')
     } catch (err: unknown) {
       const msg = err && typeof err === 'object' && 'response' in err
-        ? (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Error creating key.'
-        : 'Error creating key.'
+        ? (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? t('error.errorCreatingKey')
+        : t('error.errorCreatingKey')
       setAddError(msg)
     } finally { setAdding(false) }
   }
@@ -777,31 +786,30 @@ function ApiKeysPanel({ projectId, initialKeys, onChange }: {
           ? <IconLock size={18} style={{ color: '#13DEB9' }} />
           : <IconLockOpen size={18} style={{ opacity: 0.38 }} />}
         <Box display="flex" alignItems="center" gap={0.5} flexGrow={1}>
-          <Typography variant="subtitle1" fontWeight={700}>Access Keys</Typography>
-          <HelpButton title="Access Keys">
+          <Typography variant="subtitle1" fontWeight={700}>{t('heading.accessKeys')}</Typography>
+          <HelpButton title={t('heading.accessKeys')}>
             <Typography variant="body2" gutterBottom>
-              Named keys that control who can connect to this server's AI endpoint.
-              Every client must include <code>auth: &lt;key&gt;</code> in their configuration — requests without a valid key are rejected.
+              {t('hint.accessKeyHint')}
             </Typography>
             <Typography variant="body2" gutterBottom>
               Create <strong>one key per client</strong> (e.g. "Claude Desktop", "Cursor") so you can revoke access for a single client without affecting others.
             </Typography>
             <Typography variant="body2">
-              Without any key, the endpoint is <strong>publicly accessible</strong> to anyone who knows the URL.
+              {t('hint.publicAccess')}
             </Typography>
           </HelpButton>
         </Box>
         {can(Permission.ApiKeysCreate) && (
           <Button size="small" variant="contained" startIcon={<IconPlus size={18} />}
             onClick={() => { setAddOpen(true); setNewKeyName(''); setAddError('') }}>
-            Add key
+            {t('action.addKey')}
           </Button>
         )}
       </Box>
 
       {keys.length === 0 ? (
         <Typography variant="body2" color="text.disabled">
-          No keys — any MCP client can connect without authentication.
+          {t('label.noKeys')}
         </Typography>
       ) : (
         <Box display="flex" flexDirection="column" gap={1}>
@@ -819,7 +827,7 @@ function ApiKeysPanel({ projectId, initialKeys, onChange }: {
                 <Box flexGrow={1} minWidth={0}>
                   <Box display="flex" alignItems="center" gap={0.75} mb={0.25}>
                     <Typography fontWeight={600} fontSize="0.875rem">{entry.name}</Typography>
-                    {isNew && <Chip label="new — copy now" size="small" color="success" sx={{ fontSize: '0.65rem', height: 18 }} />}
+                    {isNew && <Chip label={t('label.newCopyNow')} size="small" color="success" sx={{ fontSize: '0.65rem', height: 18 }} />}
                   </Box>
                   <Box sx={{
                     fontFamily: 'monospace', fontSize: '0.78rem', color: 'text.secondary',
@@ -828,21 +836,21 @@ function ApiKeysPanel({ projectId, initialKeys, onChange }: {
                     {isVisible ? entry.key : maskKey(entry.key)}
                   </Box>
                   <Typography variant="caption" color="text.disabled">
-                    Created {new Date(entry.createdAt).toLocaleDateString()}
+                    {t('label.createdAt', { date: new Date(entry.createdAt).toLocaleDateString() })}
                   </Typography>
                 </Box>
-                <Tooltip title={isVisible ? 'Hide key' : 'Show key'}>
+                <Tooltip title={isVisible ? t('action.hideKey') : t('action.showKey')}>
                   <IconButton size="small" onClick={() => toggleVisible(entry.id)}>
                     {isVisible ? <IconEyeOff size={18} /> : <IconEye size={18} />}
                   </IconButton>
                 </Tooltip>
-                <Tooltip title={copiedId === entry.id ? 'Copied!' : 'Copy key'}>
+                <Tooltip title={copiedId === entry.id ? t('tooltip.copiedBang') : t('common:action.copy')}>
                   <IconButton size="small" color={copiedId === entry.id ? 'primary' : 'default'} onClick={() => handleCopy(entry)}>
                     <IconCopy size={18} />
                   </IconButton>
                 </Tooltip>
                 {can(Permission.ApiKeysDelete) && (
-                  <Tooltip title="Revoke key">
+                  <Tooltip title={t('confirm.revokeLabel')}>
                     <IconButton size="small" color="error" onClick={() => setRevokeTarget(entry)}>
                       <IconTrash size={18} />
                     </IconButton>
@@ -852,7 +860,7 @@ function ApiKeysPanel({ projectId, initialKeys, onChange }: {
             )
           })}
           <Typography variant="caption" color="text.secondary" mt={0.5}>
-            Use in the header: <Box component="code" sx={{ bgcolor: 'action.hover', px: 0.8, py: 0.2, borderRadius: 0.5, fontSize: '0.75rem' }}>auth: &lt;key&gt;</Box>
+            {t('label.useInHeader')} <Box component="code" sx={{ bgcolor: 'action.hover', px: 0.8, py: 0.2, borderRadius: 0.5, fontSize: '0.75rem' }}>auth: &lt;key&gt;</Box>
           </Typography>
         </Box>
       )}
@@ -861,24 +869,24 @@ function ApiKeysPanel({ projectId, initialKeys, onChange }: {
       <Drawer anchor="right" open={addOpen} onClose={() => setAddOpen(false)}
         PaperProps={{ sx: { width: { xs: '100vw', sm: 420 }, display: 'flex', flexDirection: 'column' } }}>
         <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
-          <Typography variant="h6" fontWeight={700} flexGrow={1}>Add API key</Typography>
+          <Typography variant="h6" fontWeight={700} flexGrow={1}>{t('action.addKey')}</Typography>
           <IconButton size="small" onClick={() => setAddOpen(false)}><IconX size={18} /></IconButton>
         </Box>
         <Box sx={{ flex: 1, overflowY: 'auto', px: 3, py: 2.5 }}>
           {addError && <Alert severity="error" sx={{ mb: 2 }}>{addError}</Alert>}
-          <TextField size="small" fullWidth autoFocus label="Key name"
+          <TextField size="small" fullWidth autoFocus label={t('common:label.name')}
             placeholder="e.g. Claude Desktop, Production client"
             value={newKeyName}
             onChange={(e) => { setNewKeyName(e.target.value); setAddError('') }}
             onKeyDown={(e) => e.key === 'Enter' && !adding && handleAdd()}
-            helperText="A label to identify which client uses this key"
+            helperText={t('hint.keyLabel')}
           />
         </Box>
         <Box sx={{ px: 3, py: 2, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1, flexShrink: 0 }}>
-          <Button onClick={() => setAddOpen(false)}>Cancel</Button>
+          <Button onClick={() => setAddOpen(false)}>{t('common:action.cancel')}</Button>
           <Button variant="contained" onClick={handleAdd} disabled={adding}
             startIcon={adding ? <CircularProgress size={14} color="inherit" /> : <IconLock size={18} />}>
-            {adding ? 'Creating…' : 'Create key'}
+            {adding ? t('action.creating') : t('action.createKey')}
           </Button>
         </Box>
       </Drawer>
@@ -886,9 +894,9 @@ function ApiKeysPanel({ projectId, initialKeys, onChange }: {
       {/* Revoke confirm */}
       <ConfirmDialog
         open={revokeTarget !== null}
-        title={`Revoke "${revokeTarget?.name}"?`}
-        message="Any client using this key will immediately lose access."
-        confirmLabel="Revoke"
+        title={t('confirm.revokeKey', { name: revokeTarget?.name })}
+        message={t('confirm.revokeKeyMessage')}
+        confirmLabel={t('confirm.revokeLabel')}
         confirmColor="error"
         loading={revoking}
         onConfirm={handleRevokeConfirm}
@@ -907,6 +915,7 @@ function OAuthClientPanel({ projectId, initialClientId, initialClientSecret, ser
   serverBase: string
   onChange: (clientId: string | null, clientSecret: string | null) => void
 }) {
+  const { t } = useTranslation('serverDetail')
   const { can } = useAuth()
   const [clientId, setClientId] = useState(initialClientId ?? '')
   const [clientSecret, setClientSecret] = useState(initialClientSecret ?? '')
@@ -966,10 +975,10 @@ function OAuthClientPanel({ projectId, initialClientId, initialClientSecret, ser
       <Box display="flex" alignItems="center" gap={1} mb={2}>
         <IconKey size={18} style={{ color: hasCredentials ? '#5D87FF' : undefined, opacity: hasCredentials ? 1 : 0.38 }} />
         <Box display="flex" alignItems="center" gap={0.5} flexGrow={1}>
-          <Typography variant="subtitle1" fontWeight={700}>OAuth Client</Typography>
-          <HelpButton title="ChatGPT OAuth Client">
+          <Typography variant="subtitle1" fontWeight={700}>{t('heading.oauthClient')}</Typography>
+          <HelpButton title={t('heading.oauthClient')}>
             <Typography variant="body2" gutterBottom>
-              Allows ChatGPT (and other OAuth 2.0 clients) to connect to this server's MCP endpoint using your account credentials.
+              {t('hint.oauthHint')}
             </Typography>
             <Typography variant="body2" gutterBottom>
               Generate a <strong>Client ID</strong> and <strong>Client Secret</strong>, then paste the Auth and Token URLs into ChatGPT's connector settings.
@@ -981,7 +990,7 @@ function OAuthClientPanel({ projectId, initialClientId, initialClientSecret, ser
         </Box>
         {hasCredentials && can(Permission.ServersEditSettings) && (
           <Button size="small" color="error" onClick={() => setConfirmRemove(true)}>
-            Remove
+            {t('confirm.removeLabel')}
           </Button>
         )}
       </Box>
@@ -990,11 +999,11 @@ function OAuthClientPanel({ projectId, initialClientId, initialClientSecret, ser
         <>
           {/* URLs to paste into ChatGPT */}
           <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.75}>
-            Paste these URLs into ChatGPT
+            {t('label.pasteUrls')}
           </Typography>
           {([
-            { label: 'Auth URL', value: authUrl, key: 'auth' as const },
-            { label: 'Token URL', value: tokenUrl, key: 'token' as const },
+            { label: t('label.authUrl'), value: authUrl, key: 'auth' as const },
+            { label: t('label.tokenUrl'), value: tokenUrl, key: 'token' as const },
           ]).map(({ label, value, key }) => (
             <Box key={key} display="flex" alignItems="center" gap={1} mb={1}
               sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, px: 1.5, py: 0.75 }}>
@@ -1004,7 +1013,7 @@ function OAuthClientPanel({ projectId, initialClientId, initialClientSecret, ser
                   {value}
                 </Box>
               </Box>
-              <Tooltip title={copied === key ? 'Copied!' : `Copy ${label}`}>
+              <Tooltip title={copied === key ? t('tooltip.copiedBang') : t('common:action.copy')}>
                 <IconButton size="small" color={copied === key ? 'primary' : 'default'} onClick={() => copy(value, key)}>
                   <IconCopy size={16} />
                 </IconButton>
@@ -1016,10 +1025,10 @@ function OAuthClientPanel({ projectId, initialClientId, initialClientSecret, ser
 
           {/* Client credentials */}
           <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.75}>
-            Client credentials
+            {t('label.clientCredentials')}
           </Typography>
           {([
-            { label: 'Client ID', value: initialClientId!, key: 'id' as const, mono: true },
+            { label: t('label.clientId'), value: initialClientId!, key: 'id' as const, mono: true },
           ]).map(({ label, value, key }) => (
             <Box key={key} display="flex" alignItems="center" gap={1} mb={1}
               sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, px: 1.5, py: 0.75 }}>
@@ -1027,7 +1036,7 @@ function OAuthClientPanel({ projectId, initialClientId, initialClientSecret, ser
                 <Typography variant="caption" color="text.secondary">{label}</Typography>
                 <Box sx={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>{value}</Box>
               </Box>
-              <Tooltip title={copied === key ? 'Copied!' : 'Copy'}>
+              <Tooltip title={copied === key ? t('tooltip.copiedBang') : t('common:action.copy')}>
                 <IconButton size="small" color={copied === key ? 'primary' : 'default'} onClick={() => copy(value, key)}>
                   <IconCopy size={16} />
                 </IconButton>
@@ -1037,17 +1046,17 @@ function OAuthClientPanel({ projectId, initialClientId, initialClientSecret, ser
           <Box display="flex" alignItems="center" gap={1} mb={1}
             sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, px: 1.5, py: 0.75 }}>
             <Box flexGrow={1} minWidth={0}>
-              <Typography variant="caption" color="text.secondary">Client Secret</Typography>
+              <Typography variant="caption" color="text.secondary">{t('label.clientSecret')}</Typography>
               <Box sx={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>
                 {secretVisible ? initialClientSecret : '••••••••••••••••••••••••'}
               </Box>
             </Box>
-            <Tooltip title={secretVisible ? 'Hide' : 'Show'}>
+            <Tooltip title={secretVisible ? t('action.hide') : t('action.show')}>
               <IconButton size="small" onClick={() => setSecretVisible((v) => !v)}>
                 {secretVisible ? <IconEyeOff size={16} /> : <IconEye size={16} />}
               </IconButton>
             </Tooltip>
-            <Tooltip title={copied === 'secret' ? 'Copied!' : 'Copy'}>
+            <Tooltip title={copied === 'secret' ? t('tooltip.copiedBang') : t('common:action.copy')}>
               <IconButton size="small" color={copied === 'secret' ? 'primary' : 'default'} onClick={() => copy(initialClientSecret!, 'secret')}>
                 <IconCopy size={16} />
               </IconButton>
@@ -1057,27 +1066,27 @@ function OAuthClientPanel({ projectId, initialClientId, initialClientSecret, ser
       ) : (
         <>
           <Typography variant="body2" color="text.disabled" mb={2}>
-            No OAuth client configured — ChatGPT cannot connect via OAuth.
+            {t('label.noOAuthClient')}
           </Typography>
           {can(Permission.ServersEditSettings) && (
             <Box display="flex" flexDirection="column" gap={1.5}>
               <Box display="flex" gap={1}>
-                <TextField size="small" fullWidth label="Client ID" value={clientId}
+                <TextField size="small" fullWidth label={t('label.clientId')} value={clientId}
                   onChange={(e) => setClientId(e.target.value)}
                   inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
                 />
-                <TextField size="small" fullWidth label="Client Secret" value={clientSecret}
+                <TextField size="small" fullWidth label={t('label.clientSecret')} value={clientSecret}
                   onChange={(e) => setClientSecret(e.target.value)}
                   inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
                 />
               </Box>
               <Box display="flex" gap={1}>
                 <Button size="small" variant="outlined" onClick={handleGenerate}>
-                  Auto-generate
+                  {t('action.autoGenerate')}
                 </Button>
                 <Button size="small" variant="contained" onClick={handleSave} disabled={saving || !clientId.trim() || !clientSecret.trim()}
                   startIcon={saving ? <CircularProgress size={14} color="inherit" /> : <IconKey size={16} />}>
-                  {saving ? 'Saving…' : 'Save credentials'}
+                  {saving ? t('common:action.saving') : t('action.saveCredentials')}
                 </Button>
               </Box>
             </Box>
@@ -1087,9 +1096,9 @@ function OAuthClientPanel({ projectId, initialClientId, initialClientSecret, ser
 
       <ConfirmDialog
         open={confirmRemove}
-        title="Remove OAuth client?"
-        message="ChatGPT and any other OAuth clients will immediately lose access."
-        confirmLabel="Remove"
+        title={t('confirm.removeOAuth')}
+        message={t('confirm.removeOAuthMessage')}
+        confirmLabel={t('confirm.removeLabel')}
         confirmColor="error"
         loading={removing}
         onConfirm={handleRemove}
@@ -1124,6 +1133,7 @@ function EndpointAccordion({ endpoint, projectId, anyApiKey, canTest, onEdit, on
   const [savingSchema, setSavingSchema] = useState(false)
   const [schemaOpen, setSchemaOpen] = useState(false)
 
+  const { t } = useTranslation('serverDetail')
   const { can } = useAuth()
 
   useEffect(() => { setTool(endpoint.tool) }, [endpoint.tool])
@@ -1196,7 +1206,7 @@ function EndpointAccordion({ endpoint, projectId, anyApiKey, canTest, onEdit, on
           <Chip label={endpoint.tool.name} size="small"
             sx={{ fontFamily: 'monospace', fontSize: '0.68rem', height: 20, bgcolor: 'action.hover', flexShrink: 0, display: { xs: 'none', md: 'flex' } }} />
           {onEdit && (
-            <Tooltip title="Edit endpoint">
+            <Tooltip title={t('action.editEndpoint')}>
               <IconButton size="small" onClick={(e) => { e.stopPropagation(); onEdit() }}
                 sx={{ flexShrink: 0, ml: 0.5 }}>
                 <IconEdit size={15} />
@@ -1221,7 +1231,7 @@ function EndpointAccordion({ endpoint, projectId, anyApiKey, canTest, onEdit, on
         {/* Parameters table */}
         {paramEntries.length > 0 && (
           <>
-            <Typography variant="subtitle2" fontWeight={700} mb={1}>Parameters</Typography>
+            <Typography variant="subtitle2" fontWeight={700} mb={1}>{t('heading.parameters')}</Typography>
             <Box sx={{ overflowX: 'auto', mb: 2.5 }}>
               <Table size="small" sx={{
                 minWidth: 460,
@@ -1230,11 +1240,11 @@ function EndpointAccordion({ endpoint, projectId, anyApiKey, canTest, onEdit, on
               }}>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Name</TableCell>
+                    <TableCell>{t('common:label.name')}</TableCell>
                     <TableCell>In</TableCell>
-                    <TableCell>Type</TableCell>
+                    <TableCell>{t('common:label.type')}</TableCell>
                     <TableCell>Required</TableCell>
-                    <TableCell>Description</TableCell>
+                    <TableCell>{t('common:label.description')}</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -1269,12 +1279,12 @@ function EndpointAccordion({ endpoint, projectId, anyApiKey, canTest, onEdit, on
 
         {/* Try it out */}
         <Box display="flex" alignItems="center" justifyContent="space-between" mb={tryMode && paramEntries.length ? 2 : 0}>
-          <Typography variant="subtitle2" fontWeight={700}>Try it out</Typography>
+          <Typography variant="subtitle2" fontWeight={700}>{t('heading.tryItOut')}</Typography>
           {canTest && (
             <Button size="small" variant={tryMode ? 'outlined' : 'contained'} color={tryMode ? 'error' : 'primary'}
               onClick={() => { setTryMode((v) => !v); setResponse(null) }}
               sx={{ fontWeight: 600, fontSize: '0.72rem', minWidth: 80 }}>
-              {tryMode ? 'Cancel' : 'Try'}
+              {tryMode ? t('common:action.cancel') : t('action.try')}
             </Button>
           )}
         </Box>
@@ -1289,12 +1299,12 @@ function EndpointAccordion({ endpoint, projectId, anyApiKey, canTest, onEdit, on
                       onChange={(v) => setFormValues((prev) => ({ ...prev, [name]: v }))} />
                   ))}
                 </Box>
-              : <Typography variant="body2" color="text.secondary" mt={1} mb={2}>No parameters.</Typography>}
+              : <Typography variant="body2" color="text.secondary" mt={1} mb={2}>{t('label.noParameters')}</Typography>}
             <Button variant="contained" size="small"
               startIcon={executing ? <CircularProgress size={13} color="inherit" /> : <IconPlayerPlay size={18} />}
               onClick={handleExecute} disabled={executing}
               sx={{ mb: response !== null ? 2 : 0, fontWeight: 600 }}>
-              {executing ? 'Executing…' : 'Execute'}
+              {executing ? t('action.executing') : t('action.execute')}
             </Button>
             {response !== null && (
               <>
@@ -1325,7 +1335,7 @@ function EndpointAccordion({ endpoint, projectId, anyApiKey, canTest, onEdit, on
                           onToolChanged?.(tool.name, updated)
                         } finally { setSavingSchema(false) }
                       }}>
-                      {savingSchema ? 'Saving…' : 'Use as output schema'}
+                      {savingSchema ? t('common:action.saving') : t('action.useAsOutputSchema')}
                     </Button>
                   ) : null
                 })()}
@@ -1338,10 +1348,10 @@ function EndpointAccordion({ endpoint, projectId, anyApiKey, canTest, onEdit, on
         <Divider sx={{ my: 2 }} />
         <Box display="flex" alignItems="center" justifyContent="space-between" mb={schemaOpen ? 1.5 : 0}>
           <Box display="flex" alignItems="center" gap={1}>
-            <Typography variant="subtitle2" fontWeight={700}>Output Schema</Typography>
+            <Typography variant="subtitle2" fontWeight={700}>{t('heading.outputSchema')}</Typography>
             {tool.outputSchema
-              ? <Chip label="configured" size="small" color="success" sx={{ fontSize: '0.65rem', height: 18 }} />
-              : <Chip label="none" size="small" sx={{ fontSize: '0.65rem', height: 18, opacity: 0.5 }} />}
+              ? <Chip label={t('label.schemaConfigured')} size="small" color="success" sx={{ fontSize: '0.65rem', height: 18 }} />
+              : <Chip label={t('label.schemaNone')} size="small" sx={{ fontSize: '0.65rem', height: 18, opacity: 0.5 }} />}
           </Box>
           <Box display="flex" gap={0.5}>
             {tool.outputSchema && can(Permission.ToolsEdit) && (
@@ -1356,12 +1366,12 @@ function EndpointAccordion({ endpoint, projectId, anyApiKey, canTest, onEdit, on
                     setSchemaOpen(false)
                   } finally { setSavingSchema(false) }
                 }}>
-                Clear
+                {t('common:action.clear')}
               </Button>
             )}
             {tool.outputSchema && (
               <Button size="small" onClick={() => setSchemaOpen((v) => !v)}>
-                {schemaOpen ? 'Hide' : 'View'}
+                {schemaOpen ? t('action.hide') : t('action.show')}
               </Button>
             )}
           </Box>
@@ -1391,6 +1401,7 @@ function ApiEndpointsTab({ tools, projectId, projectBaseUrl, anyApiKey, onToolAd
   onToolChanged: (oldName: string, newTool: GeneratedTool) => void
   onToolDeleted: (toolName: string) => void
 }) {
+  const { t } = useTranslation('serverDetail')
   const { can } = useAuth()
   const [search, setSearch] = useState('')
   const [methodFilter, setMethodFilter] = useState<string | null>(null)
@@ -1425,7 +1436,7 @@ function ApiEndpointsTab({ tools, projectId, projectBaseUrl, anyApiKey, onToolAd
       {/* Stats row */}
       <Grid container spacing={2} mb={3}>
         <Grid item xs={6} sm={3}>
-          <StatCard label="Total endpoints" value={endpoints.length} color="#5D87FF" />
+          <StatCard label={t('label.totalEndpoints')} value={endpoints.length} color="#5D87FF" />
         </Grid>
         {methods.map((m) => (
           <Grid item xs={6} sm={3} key={m}>
@@ -1437,13 +1448,13 @@ function ApiEndpointsTab({ tools, projectId, projectBaseUrl, anyApiKey, onToolAd
       {/* Search + filter + add button */}
       <Box display="flex" alignItems="center" gap={1} mb={2} flexWrap="wrap">
         <TextField
-          size="small" placeholder="Search by path, name or description…" value={search}
+          size="small" placeholder={t('placeholder.searchByPathNameDesc')} value={search}
           onChange={(e) => setSearch(e.target.value)} sx={{ width: 300 }}
           InputProps={{ startAdornment: <InputAdornment position="start"><IconSearch size={16} /></InputAdornment> }}
         />
         {methods.length > 1 && (
           <Box display="flex" gap={0.5} flexWrap="wrap">
-            <Chip label="All" size="small" clickable onClick={() => setMethodFilter(null)}
+            <Chip label={t('label.filterAll')} size="small" clickable onClick={() => setMethodFilter(null)}
               color={methodFilter === null ? 'primary' : 'default'}
               variant={methodFilter === null ? 'filled' : 'outlined'} />
             {methods.map((m) => (
@@ -1461,23 +1472,23 @@ function ApiEndpointsTab({ tools, projectId, projectBaseUrl, anyApiKey, onToolAd
         )}
         {(search || methodFilter) && (
           <Typography variant="body2" color="text.secondary">
-            {visible.length} of {endpoints.length}
+            {t('label.visible', { visible: visible.length, total: endpoints.length })}
           </Typography>
         )}
         <Box flexGrow={1} />
         {can(Permission.EndpointsCreate) && (
           <Button variant="contained" size="small" startIcon={<IconPlus size={16} />}
             onClick={() => setCreateOpen(true)}>
-            Add endpoint
+            {t('action.addEndpoint')}
           </Button>
         )}
       </Box>
 
       {/* Endpoint list */}
       {endpoints.length === 0 ? (
-        <Alert severity="info">No endpoints — upload an OpenAPI spec or click "Add endpoint" to create one manually.</Alert>
+        <Alert severity="info">{t('empty.noEndpoints')}</Alert>
       ) : visible.length === 0 ? (
-        <Alert severity="info">No endpoints match your search.</Alert>
+        <Alert severity="info">{t('empty.noEndpointsSearch')}</Alert>
       ) : (
         <Box display="flex" flexDirection="column" gap={'6px'}>
           {visible.map((e, i) => (
@@ -1519,6 +1530,7 @@ function ReimportSpecDialog({ projectId, open, onClose, onSuccess }: {
   onClose: () => void
   onSuccess: (result: { added: number; updated: number; baseUrl: string }) => void
 }) {
+  const { t } = useTranslation('serverDetail')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -1533,7 +1545,7 @@ function ReimportSpecDialog({ projectId, open, onClose, onSuccess }: {
   const acceptFile = (f: File) => {
     const n = f.name.toLowerCase()
     if (!n.endsWith('.yaml') && !n.endsWith('.yml') && !n.endsWith('.json')) {
-      setError('Unsupported format — use .yaml, .yml or .json')
+      setError(t('error.specFormat'))
       return
     }
     setFile(f)
@@ -1565,13 +1577,12 @@ function ReimportSpecDialog({ projectId, open, onClose, onSuccess }: {
       PaperProps={{ sx: { width: { xs: '100vw', sm: 480 }, display: 'flex', flexDirection: 'column' } }}>
       <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
         <IconRefresh size={18} />
-        <Typography variant="h6" fontWeight={700} flexGrow={1}>Re-import API spec</Typography>
+        <Typography variant="h6" fontWeight={700} flexGrow={1}>{t('reimport.title')}</Typography>
         <IconButton size="small" onClick={handleClose}><IconX size={18} /></IconButton>
       </Box>
       <Box sx={{ flex: 1, overflowY: 'auto', px: 3, py: 2.5 }}>
         <Typography variant="body2" color="text.secondary" mb={2}>
-          Upload a new version of the spec. Tools with the same name will be updated (schema + endpoint);
-          new tools will be added. Existing tools not in the new spec are kept — delete them manually if needed.
+          {t('reimport.description')}
         </Typography>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
@@ -1603,21 +1614,21 @@ function ReimportSpecDialog({ projectId, open, onClose, onSuccess }: {
           ) : (
             <Box display="flex" flexDirection="column" alignItems="center" gap={0.5}>
               <IconCloudUpload size={36} style={{ opacity: 0.5 }} />
-              <Typography variant="body2" fontWeight={500}>Drag spec here or click to browse</Typography>
-              <Typography variant="caption" color="text.disabled">.yaml · .yml · .json</Typography>
+              <Typography variant="body2" fontWeight={500}>{t('placeholder.dragOrBrowse')}</Typography>
+              <Typography variant="caption" color="text.disabled">{t('label.specFormat')}</Typography>
             </Box>
           )}
         </Paper>
 
-        <TextField size="small" fullWidth label="Base URL override" placeholder="https://api.example.com"
+        <TextField size="small" fullWidth label={t('reimport.baseUrlLabel')} placeholder="https://api.example.com"
           value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)}
-          helperText="Leave blank to use the URL declared in the spec" />
+          helperText={t('hint.baseUrlOverride')} />
       </Box>
       <Box sx={{ px: 3, py: 2, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1, flexShrink: 0 }}>
-        <Button onClick={handleClose}>Cancel</Button>
+        <Button onClick={handleClose}>{t('common:action.cancel')}</Button>
         <Button variant="contained" onClick={handleImport} disabled={!file || loading}
           startIcon={loading ? <CircularProgress size={14} color="inherit" /> : <IconRefresh size={18} />}>
-          {loading ? 'Importing…' : 'Import'}
+          {loading ? t('action.importing') : t('action.import')}
         </Button>
       </Box>
     </Drawer>
@@ -1697,415 +1708,6 @@ interface ToolDialogProps {
 }
 
 // ─── Auto-save indicator (compartilhado) ─────────────────────────────────────
-
-type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
-
-function SaveIndicator({ status, error }: { status: SaveStatus; error?: string }) {
-  if (status === 'idle') return null
-  if (status === 'saving') return (
-    <Box display="flex" alignItems="center" gap={0.5}>
-      <CircularProgress size={10} />
-      <Typography variant="caption" color="text.secondary">Saving…</Typography>
-    </Box>
-  )
-  if (status === 'saved') return (
-    <Box display="flex" alignItems="center" gap={0.5}>
-      <IconCheck size={14} />
-      <Typography variant="caption" color="success.main">Saved</Typography>
-    </Box>
-  )
-  return <Typography variant="caption" color="error.main">{error || 'Failed to save.'}</Typography>
-}
-
-
-// ─── Rate limit panel ─────────────────────────────────────────────────────────
-
-interface RateLimitPanelProps {
-  projectId: string
-  initialRateLimit?: { enabled: boolean; requestsPerMinute: number }
-  onChange: (rl: { enabled: boolean; requestsPerMinute: number }) => void
-}
-
-function RateLimitPanel({ projectId, initialRateLimit, onChange }: RateLimitPanelProps) {
-  const [enabled, setEnabled] = useState(initialRateLimit?.enabled ?? false)
-  const [rpm, setRpm] = useState(initialRateLimit?.requestsPerMinute ?? 60)
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
-  const [saveError, setSaveError] = useState('')
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pendingRef = useRef<{ enabled: boolean; requestsPerMinute: number } | null>(null)
-
-  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
-
-  const scheduleSave = useCallback((payload: { enabled: boolean; requestsPerMinute: number }, delay = 700) => {
-    pendingRef.current = payload
-    if (timerRef.current) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(async () => {
-      const p = pendingRef.current; if (!p) return
-      if (p.requestsPerMinute < 1 || p.requestsPerMinute > 10000) {
-        setSaveError('Value must be between 1 and 10,000.'); setSaveStatus('error'); return
-      }
-      setSaveStatus('saving')
-      try {
-        await api.patch(`/swagger/servers/${projectId}/rate-limit`, p)
-        onChange(p)
-        setSaveStatus('saved')
-        setTimeout(() => setSaveStatus('idle'), 2500)
-      } catch (err: any) {
-        setSaveError(err?.response?.data?.message ?? 'Failed to save.')
-        setSaveStatus('error')
-      }
-    }, delay)
-  }, [projectId, onChange])
-
-  const handleEnabledChange = (val: boolean) => {
-    setEnabled(val)
-    scheduleSave({ enabled: val, requestsPerMinute: rpm }, 0)
-  }
-
-  const handleRpmChange = (val: number) => {
-    setRpm(val)
-    scheduleSave({ enabled, requestsPerMinute: val }, 700)
-  }
-
-  return (
-    <Paper variant="outlined" sx={{ p: 2, mb: 2, display: 'flex', alignItems: 'flex-start', gap: 2, flexWrap: 'wrap' }}>
-      <Box sx={{ color: enabled ? 'warning.main' : 'text.disabled', display: 'flex', alignItems: 'center', pt: 0.5 }}>
-        <IconGauge size={20} />
-      </Box>
-
-      <Box flex={1} minWidth={0}>
-        <Box display="flex" alignItems="center" justifyContent="space-between" mb={0.5}>
-          <Box display="flex" alignItems="center" gap={0.5}>
-            <Typography variant="subtitle2" fontWeight={700}>Request Limit</Typography>
-            <HelpButton title="Request Limit">
-              <Typography variant="body2" gutterBottom>
-                Caps the number of MCP requests this server accepts per minute. When the limit is exceeded, the server responds with <strong>HTTP 429 (Too Many Requests)</strong> and a <code>Retry-After</code> header — the AI client should wait before retrying.
-              </Typography>
-              <Typography variant="body2" gutterBottom>
-                <strong>Why set a rate limit?</strong>
-              </Typography>
-              <Box component="ul" sx={{ mt: 0, mb: 1, pl: 2.5 }}>
-                <Box component="li"><Typography variant="body2"><strong>Protect the upstream API:</strong> many APIs have their own rate limits. Staying within them prevents your API credentials from being throttled or suspended.</Typography></Box>
-                <Box component="li"><Typography variant="body2"><strong>Control costs:</strong> every call to a paid API costs money. A rate limit prevents AI agents from accidentally making thousands of calls in a loop.</Typography></Box>
-                <Box component="li"><Typography variant="body2"><strong>Prevent runaway agents:</strong> AI agents in agentic workflows can sometimes get stuck in retry loops. A rate limit acts as a circuit breaker.</Typography></Box>
-                <Box component="li"><Typography variant="body2"><strong>Fair usage:</strong> if multiple AI clients share this endpoint, a limit ensures no single client monopolises the quota.</Typography></Box>
-              </Box>
-              <Typography variant="body2" gutterBottom>
-                <strong>How to set the right limit:</strong> check your upstream API's documented rate limit (e.g. 100 req/min) and set Arthur's limit slightly below it to leave headroom. Start conservative and increase if the AI frequently hits 429.
-              </Typography>
-              <Typography variant="body2">
-                Toggle the switch to <strong>Inactive</strong> to disable rate limiting entirely. Changes save automatically.
-              </Typography>
-            </HelpButton>
-          </Box>
-          <SaveIndicator status={saveStatus} error={saveError} />
-        </Box>
-
-        <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
-          <FormControlLabel
-            control={
-              <Switch size="small" checked={enabled} onChange={(e) => handleEnabledChange(e.target.checked)} color="warning" />
-            }
-            label={<Typography variant="body2">{enabled ? 'Active' : 'Inactive'}</Typography>}
-            sx={{ mr: 0 }}
-          />
-          <TextField
-            size="small" type="number" label="Req / min"
-            value={rpm} disabled={!enabled}
-            onChange={(e) => handleRpmChange(Number(e.target.value))}
-            inputProps={{ min: 1, max: 10000 }}
-            sx={{ width: 130 }}
-          />
-        </Box>
-
-        <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
-          {enabled
-            ? `Limits MCP server calls to ${rpm} req/min. Exceeding the limit returns HTTP 429.`
-            : 'No request limit. Enable to restrict usage per minute.'}
-        </Typography>
-      </Box>
-    </Paper>
-  )
-}
-
-// ─── Auth config panel ────────────────────────────────────────────────────────
-
-const AUTH_TYPE_LABELS: Record<AuthType, string> = {
-  none: 'None (public API)',
-  bearer: 'Bearer Token',
-  'api-key': 'API Key',
-  basic: 'Basic Auth (username/password)',
-  'oauth2-client': 'OAuth2 Client Credentials',
-  custom: 'Custom headers',
-}
-
-function AuthConfigPanel({ projectId, initialAuth, onChange }: {
-  projectId: string
-  initialAuth?: AuthConfig
-  onChange: (auth: AuthConfig) => void
-}) {
-  const [authType, setAuthType] = useState<AuthType>((initialAuth?.type as AuthType) ?? 'none')
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
-  const [saveError, setSaveError] = useState('')
-  const { secrets, loading: loadingSecrets } = useSecrets()
-
-  // bearer
-  const [token, setToken] = useState((initialAuth as any)?.token ?? '')
-  // api-key
-  const [keyName, setKeyName] = useState((initialAuth as any)?.name ?? '')
-  const [keyValue, setKeyValue] = useState((initialAuth as any)?.value ?? '')
-  const [keyIn, setKeyIn] = useState<'header' | 'query'>((initialAuth as any)?.in ?? 'header')
-  // basic
-  const [basicUser, setBasicUser] = useState((initialAuth as any)?.username ?? '')
-  const [basicPass, setBasicPass] = useState((initialAuth as any)?.password ?? '')
-  // oauth2-client
-  const [oauthTokenUrl, setOauthTokenUrl] = useState((initialAuth as any)?.tokenUrl ?? '')
-  const [oauthClientId, setOauthClientId] = useState((initialAuth as any)?.clientId ?? '')
-  const [oauthClientSecret, setOauthClientSecret] = useState((initialAuth as any)?.clientSecret ?? '')
-  const [oauthScope, setOauthScope] = useState((initialAuth as any)?.scope ?? '')
-  // custom headers
-  const [customHeaders, setCustomHeaders] = useState<{ name: string; value: string }[]>(
-    (initialAuth as any)?.headers ?? [{ name: '', value: '' }]
-  )
-
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pendingRef = useRef<AuthConfig | null>(null)
-
-  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
-
-  const scheduleSave = useCallback((payload: AuthConfig, delay = 700) => {
-    pendingRef.current = payload
-    if (timerRef.current) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(async () => {
-      const p = pendingRef.current; if (!p) return
-      setSaveStatus('saving')
-      try {
-        await api.patch(`/swagger/servers/${projectId}/auth`, p)
-        onChange(p)
-        setSaveStatus('saved')
-        setTimeout(() => setSaveStatus('idle'), 2500)
-      } catch (err: any) {
-        setSaveError(err?.response?.data?.message ?? 'Failed to save.')
-        setSaveStatus('error')
-      }
-    }, delay)
-  }, [projectId, onChange])
-
-  const handleAuthTypeChange = (newType: AuthType) => {
-    setAuthType(newType)
-    let payload: AuthConfig
-    switch (newType) {
-      case 'bearer': payload = { type: 'bearer', token }; break
-      case 'api-key': payload = { type: 'api-key', name: keyName, value: keyValue, in: keyIn }; break
-      case 'basic': payload = { type: 'basic', username: basicUser, password: basicPass }; break
-      case 'oauth2-client': payload = { type: 'oauth2-client', tokenUrl: oauthTokenUrl, clientId: oauthClientId, clientSecret: oauthClientSecret, scope: oauthScope || undefined }; break
-      case 'custom': payload = { type: 'custom', headers: customHeaders.filter(h => h.name.trim()) }; break
-      default: payload = { type: 'none' }
-    }
-    scheduleSave(payload, 0)
-  }
-
-  const secretInput = (value: string, onChg: (v: string) => void, label: string) => (
-    <SecretAutocomplete
-      value={value}
-      onChange={onChg}
-      label={label}
-      secrets={secrets}
-      loadingSecrets={loadingSecrets}
-    />
-  )
-
-  const addCustomHeader = () => setCustomHeaders(prev => [...prev, { name: '', value: '' }])
-  const removeCustomHeader = (i: number) => {
-    const next = customHeaders.filter((_, idx) => idx !== i)
-    setCustomHeaders(next)
-    scheduleSave({ type: 'custom', headers: next.filter(h => h.name.trim()) }, 0)
-  }
-  const updateCustomHeader = (i: number, field: 'name' | 'value', val: string) => {
-    const next = customHeaders.map((h, idx) => idx === i ? { ...h, [field]: val } : h)
-    setCustomHeaders(next)
-    scheduleSave({ type: 'custom', headers: next.filter(h => h.name.trim()) }, 700)
-  }
-
-  return (
-    <Paper variant="outlined" sx={{ p: 2.5, mb: 2 }}>
-      <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
-        <Box display="flex" alignItems="center" gap={1}>
-          <IconKey size={18} />
-          <Typography variant="subtitle2" fontWeight={700}>API Credentials</Typography>
-          {authType !== 'none' && (
-            <Chip label={AUTH_TYPE_LABELS[authType]} size="small" color="primary" sx={{ fontSize: '0.7rem', height: 20 }} />
-          )}
-          <HelpButton title="API Authentication">
-            <Typography variant="body2" gutterBottom>
-              The credentials Arthur automatically attaches to every <strong>outgoing HTTP request</strong> when calling the upstream API on behalf of an AI tool call. The AI never sees or handles these credentials — Arthur injects them invisibly.
-            </Typography>
-            <Typography variant="body2" gutterBottom>
-              <strong>Choose the mode that matches your API's requirements:</strong>
-            </Typography>
-            <Box component="ul" sx={{ mt: 0, mb: 1, pl: 2.5 }}>
-              {([
-                ['None', 'Public API — no credentials are attached. Use for unauthenticated endpoints.'],
-                ['Bearer Token', 'Adds the header Authorization: Bearer <token>. Most modern REST APIs and OAuth2 resource servers use this.'],
-                ['API Key', 'Adds the key as a custom header (e.g. X-API-Key) or as a query parameter. Check your API\'s documentation for the exact field name.'],
-                ['Basic Auth', 'Adds Authorization: Basic <base64(username:password)>. Used by some legacy APIs and services like Jira or Confluence.'],
-                ['OAuth2 Client Credentials', 'Arthur fetches a Bearer token automatically using your client ID and secret, and renews it before it expires. Use for machine-to-machine integrations where no user is involved.'],
-                ['Custom Headers', 'Add any arbitrary HTTP headers. Useful for APIs with non-standard authentication schemes or when you need to pass multiple headers (e.g. X-Tenant-Id + X-Auth-Token).'],
-              ] as [string,string][]).map(([label, desc]) => (
-                <Box component="li" key={label} sx={{ mb: 0.5 }}>
-                  <Typography variant="body2"><strong>{label}:</strong> {desc}</Typography>
-                </Box>
-              ))}
-            </Box>
-            <Typography variant="body2" gutterBottom>
-              <strong>Important security note:</strong> credentials are stored encrypted in the database. Use tokens and keys with the <em>minimum required scope</em> — if a credential is exposed, a limited-scope key reduces the blast radius.
-            </Typography>
-            <Typography variant="body2">
-              These credentials are completely separate from the <strong>MCP Authentication key</strong> (which protects the MCP endpoint). One controls who can call Arthur; the other controls how Arthur calls your API.
-            </Typography>
-          </HelpButton>
-        </Box>
-        <SaveIndicator status={saveStatus} error={saveError} />
-      </Box>
-
-      {/* Type selector */}
-      <FormControl size="small" fullWidth sx={{ mb: 2 }}>
-        <InputLabel>Authentication type</InputLabel>
-        <Select
-          value={authType}
-          label="Authentication type"
-          onChange={(e) => handleAuthTypeChange(e.target.value as AuthType)}
-        >
-          {(Object.keys(AUTH_TYPE_LABELS) as AuthType[]).map((t) => (
-            <MenuItem key={t} value={t}>{AUTH_TYPE_LABELS[t]}</MenuItem>
-          ))}
-        </Select>
-      </FormControl>
-
-      {/* Dynamic fields */}
-      {authType === 'none' && (
-        <Typography variant="body2" color="text.secondary" fontSize="0.82rem">
-          The API is public and does not require authentication. No header will be added.
-        </Typography>
-      )}
-
-      {authType === 'bearer' && (
-        <Box display="flex" flexDirection="column" gap={1.5}>
-          {secretInput(token, (v) => { setToken(v); scheduleSave({ type: 'bearer', token: v }) }, 'Bearer Token')}
-          <Typography variant="caption" color="text.secondary">
-            Sent as: <code>Authorization: Bearer {'<token>'}</code>
-          </Typography>
-        </Box>
-      )}
-
-      {authType === 'api-key' && (
-        <Box display="flex" flexDirection="column" gap={1.5}>
-          <Grid container spacing={1.5}>
-            <Grid item xs={12} sm={5}>
-              <TextField size="small" fullWidth label="Parameter name" placeholder="X-Api-Key"
-                value={keyName}
-                onChange={(e) => { setKeyName(e.target.value); scheduleSave({ type: 'api-key', name: e.target.value, value: keyValue, in: keyIn }) }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={7}>
-              {secretInput(keyValue, (v) => { setKeyValue(v); scheduleSave({ type: 'api-key', name: keyName, value: v, in: keyIn }) }, 'Value')}
-            </Grid>
-          </Grid>
-          <FormControl size="small" fullWidth>
-            <InputLabel>Send as</InputLabel>
-            <Select value={keyIn} label="Send as"
-              onChange={(e) => { const v = e.target.value as 'header' | 'query'; setKeyIn(v); scheduleSave({ type: 'api-key', name: keyName, value: keyValue, in: v }, 0) }}>
-              <MenuItem value="header">Header HTTP</MenuItem>
-              <MenuItem value="query">Query param (?{keyName || 'key'}=…)</MenuItem>
-            </Select>
-          </FormControl>
-          <Typography variant="caption" color="text.secondary">
-            {keyIn === 'header'
-              ? `Sent as: ${keyName || '<name>'}: <value>`
-              : `Added to URL: ?${keyName || '<name>'}=<value>`}
-          </Typography>
-        </Box>
-      )}
-
-      {authType === 'basic' && (
-        <Box display="flex" flexDirection="column" gap={1.5}>
-          <TextField size="small" fullWidth label="Username"
-            value={basicUser}
-            onChange={(e) => { setBasicUser(e.target.value); scheduleSave({ type: 'basic', username: e.target.value, password: basicPass }) }}
-          />
-          {secretInput(basicPass, (v) => { setBasicPass(v); scheduleSave({ type: 'basic', username: basicUser, password: v }) }, 'Password')}
-          <Typography variant="caption" color="text.secondary">
-            Sent as: <code>Authorization: Basic {'<base64(username:password)>'}</code>
-          </Typography>
-        </Box>
-      )}
-
-      {authType === 'oauth2-client' && (
-        <Box display="flex" flexDirection="column" gap={1.5}>
-          <TextField size="small" fullWidth label="Token URL (token endpoint)"
-            placeholder="https://auth.example.com/oauth/token"
-            value={oauthTokenUrl}
-            onChange={(e) => { setOauthTokenUrl(e.target.value); scheduleSave({ type: 'oauth2-client', tokenUrl: e.target.value, clientId: oauthClientId, clientSecret: oauthClientSecret, scope: oauthScope || undefined }) }}
-          />
-          <Grid container spacing={1.5}>
-            <Grid item xs={12} sm={6}>
-              <TextField size="small" fullWidth label="Client ID"
-                value={oauthClientId}
-                onChange={(e) => { setOauthClientId(e.target.value); scheduleSave({ type: 'oauth2-client', tokenUrl: oauthTokenUrl, clientId: e.target.value, clientSecret: oauthClientSecret, scope: oauthScope || undefined }) }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              {secretInput(oauthClientSecret, (v) => { setOauthClientSecret(v); scheduleSave({ type: 'oauth2-client', tokenUrl: oauthTokenUrl, clientId: oauthClientId, clientSecret: v, scope: oauthScope || undefined }) }, 'Client Secret')}
-            </Grid>
-          </Grid>
-          <TextField size="small" fullWidth label="Scope (optional)" placeholder="read write"
-            value={oauthScope}
-            onChange={(e) => { setOauthScope(e.target.value); scheduleSave({ type: 'oauth2-client', tokenUrl: oauthTokenUrl, clientId: oauthClientId, clientSecret: oauthClientSecret, scope: e.target.value || undefined }) }}
-          />
-          <Typography variant="caption" color="text.secondary">
-            Uses <strong>client_credentials</strong>. Token is fetched automatically and renewed when it expires.
-          </Typography>
-        </Box>
-      )}
-
-      {authType === 'custom' && (
-        <Box display="flex" flexDirection="column" gap={1}>
-          <Typography variant="caption" color="text.secondary" mb={0.5}>
-            Add any HTTP header to the request (e.g. <code>X-Tenant-Id</code>, <code>X-Auth-Token</code>).
-          </Typography>
-          {customHeaders.map((h, i) => (
-            <Box key={i} display="flex" gap={1} alignItems="flex-start">
-              <TextField size="small" label="Header" placeholder="X-Custom-Header" sx={{ flex: 1 }}
-                value={h.name} onChange={(e) => updateCustomHeader(i, 'name', e.target.value)} />
-              <Box sx={{ flex: 2 }}>
-                <SecretAutocomplete
-                  value={h.value}
-                  onChange={(v) => updateCustomHeader(i, 'value', v)}
-                  label="Value"
-                  secrets={secrets}
-                  loadingSecrets={loadingSecrets}
-                />
-              </Box>
-              <IconButton size="small" color="error" onClick={() => removeCustomHeader(i)}
-                disabled={customHeaders.length === 1} sx={{ mt: 0.5 }}>
-                <IconTrash size={18} />
-              </IconButton>
-            </Box>
-          ))}
-          <Button size="small" startIcon={<IconPlus size={18} />} onClick={addCustomHeader} sx={{ alignSelf: 'flex-start', mt: 0.5 }}>
-            Add header
-          </Button>
-        </Box>
-      )}
-
-      {authType !== 'none' && (
-        <Alert severity="warning" sx={{ mt: 2, py: 0.5, fontSize: '0.78rem' }}>
-          Credentials are stored in the database. Use tokens with minimum required scope.
-        </Alert>
-      )}
-    </Paper>
-  )
-}
 
 // ─── Project Controls Panel (pause / maintenance / availability) ──────────────
 
@@ -3144,7 +2746,7 @@ function ToolDialog({ open, onClose, onSaved, onDeleted, projectId, projectBaseU
                   sx={{ m: 0, flexShrink: 0 }} />
               </Box>
               <Box sx={{ px: 1.5, pb: 1.25, pl: '44px', borderTop: '1px solid', borderColor: 'action.hover' }}>
-                <TextField size="small" fullWidth multiline minRows={3} maxRows={8} label="Description"
+                <TextField size="small" fullWidth multiline minRows={4} maxRows={10} label="Description"
                   placeholder="Describe this parameter so the AI knows what to pass…"
                   value={p.description} onChange={(e) => setParam(p.id, 'description', e.target.value)}
                   sx={{ mt: 1, '& .MuiOutlinedInput-root': { fontSize: '0.8rem' } }} />
@@ -3194,7 +2796,7 @@ function ToolDialog({ open, onClose, onSaved, onDeleted, projectId, projectBaseU
               </FormControl>
             </Grid>
             <Grid item xs={12}>
-              <TextField size="small" fullWidth multiline minRows={3} maxRows={8} label="Description" value={form.description} onChange={(e) => setField('description', e.target.value)} />
+              <TextField size="small" fullWidth multiline minRows={4} maxRows={10} label="Description" value={form.description} onChange={(e) => setField('description', e.target.value)} />
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField size="small" fullWidth required label="Path" value={form.path} onChange={(e) => setField('path', e.target.value)} placeholder="/users/{id}" helperText={`Combined with server Base URL: ${projectBaseUrl}`} InputProps={{ sx: { fontFamily: 'monospace' } }} />
@@ -3415,7 +3017,7 @@ function ToolDialog({ open, onClose, onSaved, onDeleted, projectId, projectBaseU
               <Typography variant="subtitle2" fontWeight={700} mb={1.5}>4. Metadata & error</Typography>
               <Box display="flex" flexDirection="column" gap={2}>
                 <TextField size="small" fullWidth required label="Name" value={form.name} onChange={(e) => setField('name', e.target.value)} />
-                <TextField size="small" fullWidth multiline minRows={3} label="Description" value={form.description} onChange={(e) => setField('description', e.target.value)} />
+                <TextField size="small" fullWidth multiline minRows={4} label="Description" value={form.description} onChange={(e) => setField('description', e.target.value)} />
                 <TextField size="small" fullWidth label="Error message" value={errorMessage}
                   onChange={(e) => setErrorMessage(e.target.value)}
                   helperText='Shown to the MCP client if the API call fails. Use {{error}} to include the original error.' />
@@ -4460,7 +4062,7 @@ function DynamicResourceDialog({
                 onChange={(e) => setUri(e.target.value)}
                 helperText="Auto-generated from name"
                 InputProps={{ sx: { fontFamily: 'monospace' } }} />
-              <TextField size="small" fullWidth multiline minRows={3} label="Description" value={description}
+              <TextField size="small" fullWidth multiline minRows={4} label="Description" value={description}
                 onChange={(e) => setDescription(e.target.value)} />
               <TextField size="small" fullWidth label="Error message" value={errorMessage}
                 onChange={(e) => setErrorMessage(e.target.value)}
@@ -4800,8 +4402,8 @@ function ResourcesTab({ projectId, initialResources, tools, onChange, anyApiKey 
             onChange={(e) => setForm((f) => ({ ...f, uri: e.target.value }))}
             helperText="Unique identifier used by the MCP client to read this resource"
             InputProps={{ sx: { fontFamily: 'monospace' } }} />
-          <Box display="flex" gap={2}>
-            <TextField size="small" fullWidth multiline minRows={2} maxRows={4} label="Description" value={form.description}
+          <Box display="flex" gap={2} alignItems="flex-start">
+            <TextField size="small" fullWidth multiline minRows={4} maxRows={10} label="Description" value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
             <TextField size="small" label="MIME Type" value={form.mimeType}
               onChange={(e) => setForm((f) => ({ ...f, mimeType: e.target.value }))}
@@ -5207,7 +4809,7 @@ function ChainDialog({
             />
           </Box>
           <TextField
-            size="small" fullWidth multiline minRows={2} label="Description" value={description}
+            size="small" fullWidth multiline minRows={4} label="Description" value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="What this chain does…"
           />
@@ -6462,7 +6064,7 @@ function ConnectionTab({ projectId, connectionConfig, sourceType, onUpdated }: {
   )
 }
 
-// ─── QueriesTab + QueryDialog ─────────────────────────────────────────────────
+// ─── OperationsTab + OperationDialog (legacy DbQuery storage) ─────────────────
 
 function detectSqlParamsFromQuery(query: string): string[] {
   const matches = query.match(/:([a-zA-Z_][a-zA-Z0-9_]*)/g) ?? []
@@ -6485,7 +6087,7 @@ const SQL_SOURCES_SET = new Set<string>(['postgresql', 'mysql', 'mariadb', 'mssq
 function emptyDbQuery(sourceType: string): Partial<DbQuery> {
   if (SQL_SOURCES_SET.has(sourceType)) return { name: '', description: '', query: '', resultMode: 'rows', parameters: [] }
   if (sourceType === 'mongodb' || sourceType === 'firestore') return { name: '', description: '', collection: '', operationType: 'find', filterTemplate: '{}', parameters: [] }
-  if (sourceType === 'redis') return { name: '', description: '', command: 'GET', keyPattern: '', parameters: [] }
+  if (sourceType === 'redis') return { name: '', description: '', redisTemplate: 'exact_key' as const, keyPattern: '', parameters: [] }
   if (sourceType === 'dynamodb') return { name: '', description: '', tableName: '', dynamoOperation: 'getItem', parameters: [] }
   if (sourceType === 'elasticsearch') return { name: '', description: '', esIndex: '', esOperation: 'search', esBodyTemplate: '{}', parameters: [] }
   if (sourceType === 'graphql') return { name: '', description: '', gqlOperationType: 'query', gqlDocument: '', parameters: [] }
@@ -6497,71 +6099,243 @@ function ParamTable({ params, onParamChange }: {
   params: DbQueryParameter[]
   onParamChange: (params: DbQueryParameter[]) => void
 }) {
-  if (params.length === 0) return null
+  const addParam = () => {
+    let index = params.length + 1
+    let name = `param${index}`
+    while (params.some((p) => p.name === name)) {
+      index++
+      name = `param${index}`
+    }
+    onParamChange([...params, { name, type: 'string', required: false, description: '' }])
+  }
+
+  const updateParam = (index: number, patch: Partial<DbQueryParameter>) => {
+    const updated = [...params]
+    updated[index] = { ...updated[index], ...patch }
+    onParamChange(updated)
+  }
+
+  const removeParam = (index: number) => {
+    onParamChange(params.filter((_, i) => i !== index))
+  }
+
   return (
-    <Box>
-      <Typography variant="subtitle2" mb={1}>Parameters (auto-detected)</Typography>
-      <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              {['Name', 'Type', 'Required', 'Description', 'Default'].map((h) => (
-                <TableCell key={h} sx={{ fontWeight: 700, fontSize: '0.78rem' }}>{h}</TableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {params.map((p, i) => (
-              <TableRow key={p.name} sx={{ '&:last-child td': { border: 0 } }}>
-                <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.82rem' }}>{p.name}</TableCell>
-                <TableCell>
-                  <Select size="small" value={p.type} sx={{ fontSize: '0.82rem', minWidth: 90 }}
-                    onChange={(e) => {
-                      const updated = [...params]
-                      updated[i] = { ...updated[i], type: e.target.value as DbQueryParameter['type'] }
-                      onParamChange(updated)
-                    }}>
+    <Paper variant="outlined" sx={{ p: 1.5, borderColor: 'divider', bgcolor: 'background.paper' }}>
+      <Box display="flex" alignItems="flex-start" justifyContent="space-between" gap={1.5} mb={1.5}>
+        <Box minWidth={0}>
+          <Typography variant="subtitle2">Input parameters</Typography>
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.25 }}>
+            Define GET-like inputs for this operation. Use them as variables in SQL, JSON templates, Redis keys, GraphQL variables, or request templates.
+          </Typography>
+          <Box display="flex" gap={0.75} flexWrap="wrap" mt={1}>
+            {[':productId', '{{email}}', '$userId'].map((example) => (
+              <Chip
+                key={example}
+                size="small"
+                variant="outlined"
+                label={example}
+                sx={{ height: 22, fontFamily: 'monospace', fontSize: '0.72rem' }}
+              />
+            ))}
+          </Box>
+        </Box>
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<IconPlus size={14} />}
+          onClick={addParam}
+          sx={{ flexShrink: 0 }}
+        >
+          Add parameter
+        </Button>
+      </Box>
+      {params.length === 0 ? (
+        <Box
+          px={1.5}
+          py={1.25}
+          border="1px dashed"
+          borderColor="divider"
+          borderRadius={1}
+          display="flex"
+          alignItems="center"
+          justifyContent="space-between"
+          gap={1.5}
+        >
+          <Typography variant="body2" color="text.secondary">
+            No input parameters yet. Add one to expose it in the operation input schema.
+          </Typography>
+          <Button size="small" startIcon={<IconPlus size={14} />} onClick={addParam}>
+            Add
+          </Button>
+        </Box>
+      ) : (
+        <Box display="flex" flexDirection="column" gap={1}>
+          {params.map((p, i) => (
+            <Paper
+              key={`${p.name}-${i}`}
+              variant="outlined"
+              sx={{ p: 1, borderColor: 'divider', bgcolor: 'background.default' }}
+            >
+              <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                <TextField
+                  size="small"
+                  label="Name"
+                  value={p.name}
+                  placeholder="productId"
+                  sx={{ flex: '1 1 150px', minWidth: 140 }}
+                  inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.82rem' } }}
+                  onChange={(e) => {
+                    const nextName = e.target.value.trim().replace(/\s+/g, '_')
+                    updateParam(i, { name: nextName })
+                  }}
+                />
+                <FormControl size="small" sx={{ width: 132 }}>
+                  <InputLabel>Type</InputLabel>
+                  <Select
+                    value={p.type}
+                    label="Type"
+                    sx={{ fontSize: '0.82rem' }}
+                    onChange={(e) => updateParam(i, { type: e.target.value as DbQueryParameter['type'] })}
+                  >
                     {['string', 'number', 'boolean', 'array', 'object'].map((t) => (
                       <MenuItem key={t} value={t}>{t}</MenuItem>
                     ))}
                   </Select>
-                </TableCell>
-                <TableCell>
-                  <Switch size="small" checked={p.required ?? false}
-                    onChange={(e) => {
-                      const updated = [...params]
-                      updated[i] = { ...updated[i], required: e.target.checked }
-                      onParamChange(updated)
-                    }} />
-                </TableCell>
-                <TableCell>
-                  <TextField size="small" value={p.description ?? ''} placeholder="Description"
-                    onChange={(e) => {
-                      const updated = [...params]
-                      updated[i] = { ...updated[i], description: e.target.value }
-                      onParamChange(updated)
-                    }} />
-                </TableCell>
-                <TableCell>
-                  <TextField size="small" value={String(p.default ?? '')} placeholder="—"
-                    onChange={(e) => {
-                      const updated = [...params]
-                      updated[i] = { ...updated[i], default: e.target.value || undefined }
-                      onParamChange(updated)
-                    }} />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </Paper>
-    </Box>
+                </FormControl>
+                <FormControlLabel
+                  sx={{ mx: 0, minWidth: 96 }}
+                  control={(
+                    <Switch
+                      size="small"
+                      checked={p.required ?? false}
+                      onChange={(e) => updateParam(i, { required: e.target.checked })}
+                    />
+                  )}
+                  label={<Typography variant="caption">Required</Typography>}
+                />
+                <TextField
+                  size="small"
+                  label="Default"
+                  value={String(p.default ?? '')}
+                  placeholder="Optional"
+                  sx={{ flex: '0 1 130px', minWidth: 120 }}
+                  onChange={(e) => updateParam(i, { default: e.target.value || undefined })}
+                />
+                <Tooltip title="Remove parameter">
+                  <IconButton size="small" color="error" onClick={() => removeParam(i)} sx={{ ml: 'auto' }}>
+                    <IconTrash size={15} />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+              <TextField
+                size="small"
+                label="Description"
+                value={p.description ?? ''}
+                placeholder="Describe how this input is used"
+                fullWidth
+                sx={{ mt: 1 }}
+                onChange={(e) => updateParam(i, { description: e.target.value })}
+              />
+            </Paper>
+          ))}
+        </Box>
+      )}
+
+      {params.length > 0 && (
+        <Box sx={{ mt: 1.5, px: 0.5 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.5 }}>
+            Each parameter becomes a variable you can inject into the command or query below using{' '}
+            <Box component="span" fontFamily="monospace" sx={{ bgcolor: 'action.hover', px: 0.5, borderRadius: 0.5, fontSize: '0.72rem' }}>
+              {'{{paramName}}'}
+            </Box>
+            . Arthur replaces it with the value sent by the MCP client at call time.
+          </Typography>
+        </Box>
+      )}
+    </Paper>
   )
 }
 
 function mergeParams(detected: string[], existing: DbQueryParameter[]): DbQueryParameter[] {
   const map = new Map(existing.map((p) => [p.name, p]))
   return detected.map((name) => map.get(name) ?? { name, type: 'string' as const, required: true, description: '' })
+}
+
+function buildInputSchemaFromParams(params: DbQueryParameter[] = []): JsonSchema {
+  const properties: Record<string, JsonSchema> = {}
+  const required: string[] = []
+  for (const param of params) {
+    properties[param.name] = {
+      type: param.type,
+      ...(param.description ? { description: param.description } : {}),
+      ...(param.default !== undefined ? { default: param.default } : {}),
+    }
+    if (param.required) required.push(param.name)
+  }
+  return { type: 'object', properties, ...(required.length ? { required } : {}) }
+}
+
+function parseJsonSchemaInput(raw: string): JsonSchema | undefined {
+  const trimmed = raw.trim()
+  if (!trimmed) return undefined
+  const parsed = JSON.parse(trimmed)
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('Schema must be a JSON object.')
+  }
+  return parsed as JsonSchema
+}
+
+function CodeEditor({ label, value, language, height = 160, helperText, onChange, onExpand }: {
+  label: string
+  value: string
+  language: string
+  height?: number | string
+  helperText?: string
+  onChange: (v: string) => void
+  onExpand?: () => void
+}) {
+  const { mode } = useColorMode()
+  const monacoOpts = {
+    minimap: { enabled: false },
+    fontSize: 13,
+    lineNumbers: 'on' as const,
+    wordWrap: 'on' as const,
+    scrollBeyondLastLine: false,
+    tabSize: 2,
+    automaticLayout: true,
+    padding: { top: 8 },
+  }
+  return (
+    <Box>
+      <Box display="flex" alignItems="center" mb={0.5}>
+        <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ flexGrow: 1 }}>
+          {label}
+        </Typography>
+        {onExpand && (
+          <Tooltip title="Expand editor">
+            <IconButton size="small" onClick={onExpand} sx={{ p: 0.25 }}>
+              <IconArrowsMaximize size={14} />
+            </IconButton>
+          </Tooltip>
+        )}
+      </Box>
+      <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden', height }}>
+        <MonacoEditor
+          height="100%"
+          language={language}
+          value={value}
+          theme={mode === 'dark' ? 'vs-dark' : 'light'}
+          onChange={(v) => onChange(v ?? '')}
+          options={monacoOpts}
+        />
+      </Box>
+      {helperText && (
+        <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
+          {helperText}
+        </Typography>
+      )}
+    </Box>
+  )
 }
 
 function QueryDialog({ open, onClose, onSaved, projectId, sourceType, editQuery }: {
@@ -6580,6 +6354,9 @@ function QueryDialog({ open, onClose, onSaved, projectId, sourceType, editQuery 
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<unknown>(null)
   const [testError, setTestError] = useState('')
+  const [outputSchemaText, setOutputSchemaText] = useState('')
+  const [expandedField, setExpandedField] = useState<{ key: string; label: string; language: string } | null>(null)
+  const { mode: colorMode } = useColorMode()
 
   useEffect(() => {
     if (open) {
@@ -6588,8 +6365,29 @@ function QueryDialog({ open, onClose, onSaved, projectId, sourceType, editQuery 
       setTestResult(null)
       setTestError('')
       setTestOpen(false)
+      setOutputSchemaText(editQuery?.outputSchema ? JSON.stringify(editQuery.outputSchema, null, 2) : '')
+      setExpandedField(null)
     }
   }, [open, editQuery, sourceType])
+
+  const getExpandedProps = (key: string): { value: string; onChange: (v: string) => void } | null => {
+    switch (key) {
+      case 'query': return { value: form.query ?? '', onChange: syncSqlParams }
+      case 'filterTemplate': return { value: form.filterTemplate ?? '{}', onChange: (v) => syncTemplateParams('filterTemplate', v) }
+      case 'projectionTemplate': return { value: form.projectionTemplate ?? '', onChange: (v) => syncTemplateParams('projectionTemplate', v) }
+      case 'updateTemplate': return { value: form.updateTemplate ?? '{"$set": {}}', onChange: (v) => syncTemplateParams('updateTemplate', v) }
+      case 'pipeline': return { value: form.pipeline ?? '[]', onChange: (v) => syncTemplateParams('pipeline', v) }
+      case 'valueTemplate': return { value: form.valueTemplate ?? '', onChange: (v) => syncTemplateParams('valueTemplate', v) }
+      case 'valuePattern': return { value: form.valuePattern ?? '', onChange: (v) => syncTemplateParams('valuePattern', v) }
+      case 'esBodyTemplate': return { value: form.esBodyTemplate ?? '{}', onChange: (v) => syncTemplateParams('esBodyTemplate', v) }
+      case 'gqlDocument': return { value: form.gqlDocument ?? '', onChange: syncGqlParams }
+      case 'grpcRequestTemplate': return { value: form.grpcRequestTemplate ?? '{}', onChange: (v) => syncTemplateParams('grpcRequestTemplate', v) }
+      case 'outputSchema': return { value: outputSchemaText, onChange: setOutputSchemaText }
+      default: return null
+    }
+  }
+
+  const expandedProps = expandedField ? getExpandedProps(expandedField.key) : null
 
   const setField = <K extends keyof DbQuery>(key: K, val: DbQuery[K]) => {
     setForm((prev) => ({ ...prev, [key]: val }))
@@ -6631,7 +6429,13 @@ function QueryDialog({ open, onClose, onSaved, projectId, sourceType, editQuery 
     setSaving(true)
     setSaveError('')
     try {
-      const body = { ...form, sourceType }
+      const outputSchema = parseJsonSchemaInput(outputSchemaText)
+      const body = {
+        ...form,
+        sourceType,
+        inputSchema: buildInputSchemaFromParams(form.parameters ?? []),
+        outputSchema,
+      }
       let res: DbQuery
       if (editQuery) {
         const r = await api.put<DbQuery>(`/swagger/servers/${projectId}/queries/${editQuery.id}`, body)
@@ -6644,7 +6448,7 @@ function QueryDialog({ open, onClose, onSaved, projectId, sourceType, editQuery 
       onClose()
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } }
-      setSaveError(err?.response?.data?.message ?? 'Save failed')
+      setSaveError(err?.response?.data?.message ?? (e instanceof Error ? e.message : 'Save failed'))
     } finally {
       setSaving(false)
     }
@@ -6657,13 +6461,13 @@ function QueryDialog({ open, onClose, onSaved, projectId, sourceType, editQuery 
     try {
       let r: { data: { result: unknown; error?: string } }
       if (editQuery?.id) {
-        // Existing query — run by ID (picks up latest saved version)
+        // Existing operation — run by ID (picks up latest saved version)
         r = await api.post<{ result: unknown; error?: string }>(
           `/swagger/servers/${projectId}/queries/${editQuery.id}/run`,
           { args: testArgs },
         )
       } else {
-        // New (unsaved) query — run inline with current form state
+        // New (unsaved) operation — run inline with current form state
         r = await api.post<{ result: unknown; error?: string }>(
           `/swagger/servers/${projectId}/run-query-inline`,
           { query: { ...form, sourceType, id: '__inline__' }, args: testArgs },
@@ -6692,30 +6496,69 @@ function QueryDialog({ open, onClose, onSaved, projectId, sourceType, editQuery 
   const ES_OPS = ['search', 'get', 'index', 'update', 'delete']
 
   return (
+    <>
+    {expandedField && expandedProps && (
+      <Drawer anchor="left" open={!!expandedField} onClose={() => setExpandedField(null)}
+        PaperProps={{ sx: { width: 'calc(100vw - 580px)', display: 'flex', flexDirection: 'column' } }}>
+        <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+          <Typography fontWeight={700} flexGrow={1}>{expandedField.label}</Typography>
+          <Tooltip title="Collapse editor">
+            <IconButton size="small" onClick={() => setExpandedField(null)}>
+              <IconArrowsMinimize size={16} />
+            </IconButton>
+          </Tooltip>
+        </Box>
+        <Box sx={{ flex: 1, overflow: 'hidden' }}>
+          <MonacoEditor
+            height="100%"
+            language={expandedField.language}
+            value={expandedProps.value}
+            theme={colorMode === 'dark' ? 'vs-dark' : 'light'}
+            onChange={(v) => expandedProps.onChange(v ?? '')}
+            options={{
+              minimap: { enabled: true },
+              fontSize: 14,
+              lineNumbers: 'on',
+              wordWrap: 'on',
+              scrollBeyondLastLine: false,
+              tabSize: 2,
+              automaticLayout: true,
+              padding: { top: 12 },
+            }}
+          />
+        </Box>
+      </Drawer>
+    )}
     <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: 580 } }}>
       <Box display="flex" alignItems="center" justifyContent="space-between" px={2.5} py={2}
         sx={{ borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
-        <Typography fontWeight={700} fontSize="1rem">{editQuery ? 'Edit query' : 'New query'}</Typography>
+        <Typography fontWeight={700} fontSize="1rem">{editQuery ? 'Edit operation' : 'New operation'}</Typography>
         <IconButton size="small" onClick={onClose}><IconX size={18} /></IconButton>
       </Box>
       <Box flexGrow={1} overflow="auto" px={2.5} py={2}>
         <Box display="flex" flexDirection="column" gap={2}>
-          <Box display="flex" gap={2}>
-            <TextField label="Name" value={form.name ?? ''} size="small" fullWidth required
-              onChange={(e) => setField('name', e.target.value)} />
-            <TextField label="Description" value={form.description ?? ''} size="small" fullWidth
-              onChange={(e) => setField('description', e.target.value)} />
-          </Box>
+          <TextField label="Name" value={form.name ?? ''} size="small" fullWidth required
+            onChange={(e) => setField('name', e.target.value)} />
+          <TextField label="Description" value={form.description ?? ''} size="small" fullWidth multiline minRows={4}
+            onChange={(e) => setField('description', e.target.value)} />
+
+          {/* Input parameters */}
+          <ParamTable
+            params={form.parameters ?? []}
+            onParamChange={(params) => setField('parameters', params)}
+          />
 
           {/* SQL */}
           {isSql && (
             <>
-              <TextField
-                label="SQL Query" value={form.query ?? ''} size="small" fullWidth multiline minRows={5} maxRows={15}
-                placeholder="SELECT * FROM users WHERE id = :userId"
+              <CodeEditor
+                label="SQL Query"
+                value={form.query ?? ''}
+                language="sql"
+                height={200}
                 helperText="Use :paramName for parameters"
-                inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
-                onChange={(e) => syncSqlParams(e.target.value)}
+                onChange={syncSqlParams}
+                onExpand={() => setExpandedField({ key: 'query', label: 'SQL Query', language: 'sql' })}
               />
               <FormControl size="small" sx={{ width: 220 }}>
                 <InputLabel>Result mode</InputLabel>
@@ -6744,33 +6587,54 @@ function QueryDialog({ open, onClose, onSaved, projectId, sourceType, editQuery 
                 </Select>
               </FormControl>
               {(form.operationType === 'find' || form.operationType === 'findOne' || form.operationType === 'updateOne' || form.operationType === 'deleteOne' || form.operationType === 'count') && (
-                <TextField label='Filter template (JSON with {{param}} placeholders)'
-                  value={form.filterTemplate ?? '{}'} size="small" fullWidth multiline minRows={3}
-                  inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
-                  onChange={(e) => syncTemplateParams('filterTemplate', e.target.value)} />
+                <CodeEditor
+                  label='Filter template (JSON with {{param}} placeholders)'
+                  value={form.filterTemplate ?? '{}'}
+                  language="json"
+                  height={140}
+                  onChange={(v) => syncTemplateParams('filterTemplate', v)}
+                  onExpand={() => setExpandedField({ key: 'filterTemplate', label: 'Filter template', language: 'json' })}
+                />
               )}
               {(form.operationType === 'find' || form.operationType === 'findOne') && (
-                <TextField label="Projection (optional JSON)" value={form.projectionTemplate ?? ''} size="small" fullWidth multiline minRows={2}
-                  inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
-                  onChange={(e) => syncTemplateParams('projectionTemplate', e.target.value)} />
+                <CodeEditor
+                  label="Projection (optional JSON)"
+                  value={form.projectionTemplate ?? ''}
+                  language="json"
+                  height={100}
+                  onChange={(v) => syncTemplateParams('projectionTemplate', v)}
+                  onExpand={() => setExpandedField({ key: 'projectionTemplate', label: 'Projection', language: 'json' })}
+                />
               )}
               {form.operationType === 'insertOne' && (
-                <TextField label='Document template (JSON with {{param}} placeholders)'
-                  value={form.filterTemplate ?? '{}'} size="small" fullWidth multiline minRows={3}
-                  inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
-                  onChange={(e) => syncTemplateParams('filterTemplate', e.target.value)} />
+                <CodeEditor
+                  label='Document template (JSON with {{param}} placeholders)'
+                  value={form.filterTemplate ?? '{}'}
+                  language="json"
+                  height={140}
+                  onChange={(v) => syncTemplateParams('filterTemplate', v)}
+                  onExpand={() => setExpandedField({ key: 'filterTemplate', label: 'Document template', language: 'json' })}
+                />
               )}
               {form.operationType === 'updateOne' && (
-                <TextField label='Update template (e.g. {"$set": {"name": "{{name}}"}})'
-                  value={form.updateTemplate ?? '{"$set": {}}'} size="small" fullWidth multiline minRows={3}
-                  inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
-                  onChange={(e) => syncTemplateParams('updateTemplate', e.target.value)} />
+                <CodeEditor
+                  label='Update template (e.g. {"$set": {"name": "{{name}}"}})'
+                  value={form.updateTemplate ?? '{"$set": {}}'}
+                  language="json"
+                  height={140}
+                  onChange={(v) => syncTemplateParams('updateTemplate', v)}
+                  onExpand={() => setExpandedField({ key: 'updateTemplate', label: 'Update template', language: 'json' })}
+                />
               )}
               {form.operationType === 'aggregate' && (
-                <TextField label="Pipeline stages (JSON array)"
-                  value={form.pipeline ?? '[]'} size="small" fullWidth multiline minRows={4}
-                  inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
-                  onChange={(e) => syncTemplateParams('pipeline', e.target.value)} />
+                <CodeEditor
+                  label="Pipeline stages (JSON array)"
+                  value={form.pipeline ?? '[]'}
+                  language="json"
+                  height={160}
+                  onChange={(v) => syncTemplateParams('pipeline', v)}
+                  onExpand={() => setExpandedField({ key: 'pipeline', label: 'Pipeline stages', language: 'json' })}
+                />
               )}
               {(form.operationType === 'find' || form.operationType === 'findOne') && (
                 <Box display="flex" gap={2}>
@@ -6785,25 +6649,145 @@ function QueryDialog({ open, onClose, onSaved, projectId, sourceType, editQuery 
           )}
 
           {/* Redis */}
-          {isRedis && (
-            <>
-              <FormControl size="small" sx={{ width: 160 }}>
-                <InputLabel>Command</InputLabel>
-                <Select value={form.command ?? 'GET'} label="Command"
-                  onChange={(e) => setField('command', e.target.value)}>
-                  {REDIS_COMMANDS.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
-                </Select>
-              </FormControl>
-              <TextField label="Key pattern" value={form.keyPattern ?? ''} size="small" fullWidth
-                placeholder="user:{{userId}}" helperText="Use {{paramName}} for parameters"
-                onChange={(e) => syncTemplateParams('keyPattern', e.target.value)} />
-              {['SET', 'HSET', 'LPUSH'].includes(form.command ?? '') && (
-                <TextField label="Value template" value={form.valueTemplate ?? ''} size="small" fullWidth
-                  placeholder="{{value}}"
-                  onChange={(e) => syncTemplateParams('valueTemplate', e.target.value)} />
-              )}
-            </>
-          )}
+          {isRedis && (() => {
+            const tpl = form.redisTemplate ?? 'exact_key'
+            return (
+              <>
+                <FormControl size="small" fullWidth>
+                  <InputLabel>Operation type</InputLabel>
+                  <Select value={tpl} label="Operation type"
+                    onChange={(e) => {
+                      setField('redisTemplate', e.target.value as DbQuery['redisTemplate'])
+                      setForm((p) => ({ ...p, parameters: [] }))
+                    }}>
+                    <MenuItem value="exact_key">Exact key lookup</MenuItem>
+                    <MenuItem value="key_prefix">Key prefix scan</MenuItem>
+                    <MenuItem value="key_range">Key range (sorted set)</MenuItem>
+                    <MenuItem value="search_by_value">Search by value</MenuItem>
+                    <MenuItem value="secondary_index">Secondary index</MenuItem>
+                    <MenuItem value="full_text">Full-text search (RediSearch)</MenuItem>
+                    <MenuItem value="composite">Composite / custom command</MenuItem>
+                  </Select>
+                </FormControl>
+
+                {tpl === 'exact_key' && (
+                  <TextField label="Key" value={form.keyPattern ?? ''} size="small" fullWidth
+                    placeholder="user:{{userId}}"
+                    helperText="Use {{paramName}} — the exact key to read from Redis"
+                    onChange={(e) => syncTemplateParams('keyPattern', e.target.value)} />
+                )}
+
+                {tpl === 'key_prefix' && (
+                  <>
+                    <TextField label="Key prefix" value={form.keyPattern ?? ''} size="small" fullWidth
+                      placeholder="session:{{userId}}:"
+                      helperText="Use {{paramName}} — scans all keys that start with this prefix"
+                      onChange={(e) => syncTemplateParams('keyPattern', e.target.value)} />
+                    <Box display="flex" gap={2} alignItems="center">
+                      <TextField label="Limit (optional)" value={form.redisLimit ?? ''} size="small" type="number" sx={{ width: 160 }}
+                        helperText="Max keys returned"
+                        onChange={(e) => setField('redisLimit', e.target.value ? Number(e.target.value) : undefined)} />
+                      <FormControlLabel
+                        control={<Switch checked={form.redisFetchValues ?? false}
+                          onChange={(e) => setField('redisFetchValues', e.target.checked)} size="small" />}
+                        label={<Typography variant="body2">Fetch values</Typography>}
+                      />
+                    </Box>
+                  </>
+                )}
+
+                {tpl === 'key_range' && (
+                  <>
+                    <TextField label="Sorted set key" value={form.keyPattern ?? ''} size="small" fullWidth
+                      placeholder="leaderboard"
+                      helperText="The sorted set key to query with ZRANGEBYSCORE"
+                      onChange={(e) => syncTemplateParams('keyPattern', e.target.value)} />
+                    <Box display="flex" gap={2}>
+                      <TextField label="Min score" value={form.redisMinScore ?? ''} size="small" sx={{ flex: 1 }}
+                        placeholder="-inf or {{minScore}}"
+                        helperText="Use {{paramName}} or -inf"
+                        onChange={(e) => { setField('redisMinScore', e.target.value); syncTemplateParams('redisMinScore', e.target.value) }} />
+                      <TextField label="Max score" value={form.redisMaxScore ?? ''} size="small" sx={{ flex: 1 }}
+                        placeholder="+inf or {{maxScore}}"
+                        helperText="Use {{paramName}} or +inf"
+                        onChange={(e) => { setField('redisMaxScore', e.target.value); syncTemplateParams('redisMaxScore', e.target.value) }} />
+                      <TextField label="Limit" value={form.redisLimit ?? ''} size="small" type="number" sx={{ width: 120 }}
+                        onChange={(e) => setField('redisLimit', e.target.value ? Number(e.target.value) : undefined)} />
+                    </Box>
+                  </>
+                )}
+
+                {tpl === 'search_by_value' && (
+                  <>
+                    <TextField label="Key prefix filter (optional)" value={form.keyPrefixFilter ?? ''} size="small" fullWidth
+                      placeholder="session:*"
+                      helperText="Limits the SCAN scope — leave blank to scan all keys"
+                      onChange={(e) => setField('keyPrefixFilter', e.target.value)} />
+                    <TextField label="Value contains" value={form.valuePattern ?? ''} size="small" fullWidth
+                      placeholder="{{value}}"
+                      helperText='Use {{paramName}} — returns all keys whose stored value contains this string'
+                      onChange={(e) => syncTemplateParams('valuePattern', e.target.value)} />
+                    <TextField label="Limit (optional)" value={form.redisLimit ?? ''} size="small" type="number" sx={{ width: 160 }}
+                      onChange={(e) => setField('redisLimit', e.target.value ? Number(e.target.value) : undefined)} />
+                  </>
+                )}
+
+                {tpl === 'secondary_index' && (
+                  <>
+                    <TextField label="Index key" value={form.keyPattern ?? ''} size="small" fullWidth
+                      placeholder="idx:status:{{status}}"
+                      helperText="A Redis Set whose members are the keys to return — use {{paramName}} for dynamic segments"
+                      onChange={(e) => syncTemplateParams('keyPattern', e.target.value)} />
+                    <FormControlLabel
+                      control={<Switch checked={form.redisFetchValues ?? false}
+                        onChange={(e) => setField('redisFetchValues', e.target.checked)} size="small" />}
+                      label={<Typography variant="body2">Fetch values for each key (GET)</Typography>}
+                    />
+                  </>
+                )}
+
+                {tpl === 'full_text' && (
+                  <>
+                    <TextField label="RediSearch index name" value={form.redisFtIndex ?? ''} size="small" fullWidth
+                      placeholder="products-idx"
+                      helperText="The FT.CREATE index to search against"
+                      onChange={(e) => setField('redisFtIndex', e.target.value)} />
+                    <TextField label="Query" value={form.keyPattern ?? ''} size="small" fullWidth
+                      placeholder="{{query}}"
+                      helperText="RediSearch query syntax — use {{paramName}} for dynamic terms"
+                      onChange={(e) => syncTemplateParams('keyPattern', e.target.value)} />
+                    <TextField label="Limit (optional)" value={form.redisLimit ?? ''} size="small" type="number" sx={{ width: 160 }}
+                      onChange={(e) => setField('redisLimit', e.target.value ? Number(e.target.value) : undefined)} />
+                  </>
+                )}
+
+                {tpl === 'composite' && (
+                  <>
+                    <FormControl size="small" sx={{ width: 160 }}>
+                      <InputLabel>Command</InputLabel>
+                      <Select value={form.command ?? 'GET'} label="Command"
+                        onChange={(e) => setField('command', e.target.value)}>
+                        {REDIS_COMMANDS.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+                      </Select>
+                    </FormControl>
+                    <TextField label="Key pattern" value={form.keyPattern ?? ''} size="small" fullWidth
+                      placeholder="user:{{userId}}" helperText="Use {{paramName}} for parameters"
+                      onChange={(e) => syncTemplateParams('keyPattern', e.target.value)} />
+                    {['SET', 'HSET', 'LPUSH'].includes(form.command ?? '') && (
+                      <CodeEditor
+                        label="Value template"
+                        value={form.valueTemplate ?? ''}
+                        language="plaintext"
+                        height={80}
+                        onChange={(v) => syncTemplateParams('valueTemplate', v)}
+                        onExpand={() => setExpandedField({ key: 'valueTemplate', label: 'Value template', language: 'plaintext' })}
+                      />
+                    )}
+                  </>
+                )}
+              </>
+            )
+          })()}
 
           {/* DynamoDB */}
           {isDynamo && (
@@ -6817,10 +6801,14 @@ function QueryDialog({ open, onClose, onSaved, projectId, sourceType, editQuery 
                   {DYNAMO_OPS.map((op) => <MenuItem key={op} value={op}>{op}</MenuItem>)}
                 </Select>
               </FormControl>
-              <TextField label="Key condition / filter (JSON with {{param}} placeholders)"
-                value={form.filterTemplate ?? ''} size="small" fullWidth multiline minRows={3}
-                inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
-                onChange={(e) => syncTemplateParams('filterTemplate', e.target.value)} />
+              <CodeEditor
+                label="Key condition / filter (JSON with {{param}} placeholders)"
+                value={form.filterTemplate ?? ''}
+                language="json"
+                height={140}
+                onChange={(v) => syncTemplateParams('filterTemplate', v)}
+                onExpand={() => setExpandedField({ key: 'filterTemplate', label: 'Key condition / filter', language: 'json' })}
+              />
             </>
           )}
 
@@ -6836,10 +6824,14 @@ function QueryDialog({ open, onClose, onSaved, projectId, sourceType, editQuery 
                   {ES_OPS.map((op) => <MenuItem key={op} value={op}>{op}</MenuItem>)}
                 </Select>
               </FormControl>
-              <TextField label="Body template (JSON with {{param}} placeholders)"
-                value={form.esBodyTemplate ?? '{}'} size="small" fullWidth multiline minRows={4}
-                inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
-                onChange={(e) => syncTemplateParams('esBodyTemplate', e.target.value)} />
+              <CodeEditor
+                label="Body template (JSON with {{param}} placeholders)"
+                value={form.esBodyTemplate ?? '{}'}
+                language="json"
+                height={160}
+                onChange={(v) => syncTemplateParams('esBodyTemplate', v)}
+                onExpand={() => setExpandedField({ key: 'esBodyTemplate', label: 'Body template', language: 'json' })}
+              />
             </>
           )}
 
@@ -6854,11 +6846,14 @@ function QueryDialog({ open, onClose, onSaved, projectId, sourceType, editQuery 
                   <MenuItem value="mutation">Mutation</MenuItem>
                 </Select>
               </FormControl>
-              <TextField label="GraphQL document" value={form.gqlDocument ?? ''} size="small" fullWidth multiline minRows={6}
-                placeholder={'query GetUser($userId: ID!) {\n  user(id: $userId) { id name email }\n}'}
-                helperText="Use $variable syntax for parameters"
-                inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
-                onChange={(e) => syncGqlParams(e.target.value)} />
+              <CodeEditor
+                label="GraphQL document"
+                value={form.gqlDocument ?? ''}
+                language="graphql"
+                height={200}
+                onChange={syncGqlParams}
+                onExpand={() => setExpandedField({ key: 'gqlDocument', label: 'GraphQL document', language: 'graphql' })}
+              />
             </>
           )}
 
@@ -6871,18 +6866,29 @@ function QueryDialog({ open, onClose, onSaved, projectId, sourceType, editQuery 
                 <TextField label="Method name" value={form.grpcMethod ?? ''} size="small" sx={{ flex: 1 }}
                   onChange={(e) => setField('grpcMethod', e.target.value)} />
               </Box>
-              <TextField label="Request template (JSON with {{param}} placeholders)"
-                value={form.grpcRequestTemplate ?? '{}'} size="small" fullWidth multiline minRows={4}
-                inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
-                onChange={(e) => syncTemplateParams('grpcRequestTemplate', e.target.value)} />
+              <CodeEditor
+                label="Request template (JSON with {{param}} placeholders)"
+                value={form.grpcRequestTemplate ?? '{}'}
+                language="json"
+                height={160}
+                onChange={(v) => syncTemplateParams('grpcRequestTemplate', v)}
+                onExpand={() => setExpandedField({ key: 'grpcRequestTemplate', label: 'Request template', language: 'json' })}
+              />
             </>
           )}
 
-          {/* Parameters table */}
-          <ParamTable
-            params={form.parameters ?? []}
-            onParamChange={(params) => setField('parameters', params)}
-          />
+          <Box>
+            <Typography variant="subtitle2" mb={1}>Output schema</Typography>
+            <CodeEditor
+              label="Output Schema (JSON Schema)"
+              value={outputSchemaText}
+              language="json"
+              height={200}
+              helperText="Describe the normalized operation result returned to MCP clients."
+              onChange={setOutputSchemaText}
+              onExpand={() => setExpandedField({ key: 'outputSchema', label: 'Output Schema', language: 'json' })}
+            />
+          </Box>
 
           {/* Test panel — available in both create and edit modes */}
           <Box>
@@ -6940,6 +6946,7 @@ function QueryDialog({ open, onClose, onSaved, projectId, sourceType, editQuery 
         </Button>
       </Box>
     </Drawer>
+    </>
   )
 }
 
@@ -7025,14 +7032,14 @@ function QueriesTab({ projectId, sourceType, onQueriesChange }: {
   }
 
   const isMongo = sourceType === 'mongodb' || sourceType === 'firestore'
-  const label = isSql ? 'query' : 'operation'
-  const labelPlural = isSql ? 'queries' : 'operations'
+  const label = 'operation'
+  const labelPlural = 'operations'
 
   return (
     <Box>
       <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
         <Typography variant="h6" fontWeight={700}>
-          {isSql ? 'SQL Queries' : 'Operations'}
+          Operations
         </Typography>
         <Box display="flex" gap={1}>
           <Button size="small" variant="outlined" startIcon={<IconSearch size={16} />}
@@ -7062,7 +7069,7 @@ function QueriesTab({ projectId, sourceType, onQueriesChange }: {
         <Box display="flex" justifyContent="center" py={4}><CircularProgress /></Box>
       ) : queries.length === 0 ? (
         <Alert severity="info">
-          No {labelPlural} yet. Click "Add {label}" to define your first data source, then create tools from it in the Tools tab.
+          No {labelPlural} yet. Click "Add {label}" to define your first source operation, then create tools from it in the Tools tab.
         </Alert>
       ) : (
         <Paper variant="outlined" sx={{ overflow: 'hidden', mb: 2 }}>
@@ -7269,16 +7276,12 @@ function DbToolDialog({ open, onClose, onSaved, projectId, queries, editTool }: 
     setSaving(true)
     setSaveError('')
     try {
-      const properties: Record<string, JsonSchema> = {}
-      const required: string[] = []
-      for (const p of selectedQuery?.parameters ?? []) {
-        properties[p.name] = { type: p.type, description: p.description }
-        if (p.required) required.push(p.name)
-      }
+      const inputSchema = selectedQuery?.inputSchema ?? buildInputSchemaFromParams(selectedQuery?.parameters ?? [])
       const body: Partial<GeneratedTool> = {
         name: form.name,
         description: form.description,
-        inputSchema: { type: 'object', properties, required },
+        inputSchema,
+        outputSchema: selectedQuery?.outputSchema,
         executionRef: { type: 'db', dbQueryId: form.dbQueryId },
         outputTemplate: form.outputTemplate || undefined,
       }
@@ -7311,17 +7314,17 @@ function DbToolDialog({ open, onClose, onSaved, projectId, queries, editTool }: 
         <Box display="flex" flexDirection="column" gap={2}>
           {queries.length === 0 ? (
             <Alert severity="warning">
-              No queries defined yet. Create queries in the Queries tab first.
+              No operations defined yet. Create operations in the Operations tab first.
             </Alert>
           ) : (
             <>
               <TextField label="Tool name" value={form.name} size="small" fullWidth required
                 onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
-              <TextField label="Description" value={form.description} size="small" fullWidth multiline minRows={2}
+              <TextField label="Description" value={form.description} size="small" fullWidth multiline minRows={4}
                 onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} />
               <FormControl size="small" fullWidth required>
-                <InputLabel>Select query</InputLabel>
-                <Select value={form.dbQueryId} label="Select query"
+                <InputLabel>Select operation</InputLabel>
+                <Select value={form.dbQueryId} label="Select operation"
                   onChange={(e) => setForm((p) => ({ ...p, dbQueryId: e.target.value }))}>
                   {queries.map((q) => (
                     <MenuItem key={q.id} value={q.id}>
@@ -7338,6 +7341,11 @@ function DbToolDialog({ open, onClose, onSaved, projectId, queries, editTool }: 
               {selectedQuery && (selectedQuery.parameters ?? []).length > 0 && (
                 <Alert severity="info" sx={{ py: 0.5 }}>
                   Input schema will be built from {selectedQuery.parameters!.length} parameter{selectedQuery.parameters!.length !== 1 ? 's' : ''}: {selectedQuery.parameters!.map((p) => p.name).join(', ')}
+                </Alert>
+              )}
+              {selectedQuery?.outputSchema && (
+                <Alert severity="success" sx={{ py: 0.5 }}>
+                  Output schema will be copied from the selected operation.
                 </Alert>
               )}
               <TextField label="Output template (optional Handlebars)" value={form.outputTemplate} size="small" fullWidth multiline minRows={3}
@@ -7436,13 +7444,13 @@ function DbToolsTab({ tools, projectId, queries, onToolAdded, onToolChanged, onT
 
       {queries.length === 0 && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          Create queries first in the Queries tab, then come back to create tools.
+          Create operations first in the Operations tab, then come back to create tools.
         </Alert>
       )}
 
       {dbTools.length === 0 ? (
         <Alert severity="info">
-          No tools yet. {queries.length > 0 ? 'Click "New tool" to wrap a query as an MCP tool.' : ''}
+          No tools yet. {queries.length > 0 ? 'Click "New tool" to expose an operation as an MCP tool.' : ''}
         </Alert>
       ) : (
         <Paper variant="outlined" sx={{ overflow: 'hidden', mb: 2 }}>
@@ -7451,7 +7459,7 @@ function DbToolsTab({ tools, projectId, queries, onToolAdded, onToolChanged, onT
               <TableRow>
                 <TableCell sx={{ fontWeight: 700, fontSize: '0.78rem', width: 60 }}>On</TableCell>
                 <TableCell sx={{ fontWeight: 700, fontSize: '0.78rem' }}>Name</TableCell>
-                <TableCell sx={{ fontWeight: 700, fontSize: '0.78rem' }}>Query</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '0.78rem' }}>Operation</TableCell>
                 <TableCell sx={{ fontWeight: 700, fontSize: '0.78rem', width: 80 }}>Params</TableCell>
                 <TableCell sx={{ fontWeight: 700, fontSize: '0.78rem', width: 100 }}></TableCell>
               </TableRow>
@@ -7479,7 +7487,7 @@ function DbToolsTab({ tools, projectId, queries, onToolAdded, onToolChanged, onT
                         {refQuery ? (
                           <Chip label={refQuery.name} size="small" color="primary" variant="outlined" />
                         ) : (
-                          <Chip label="deleted query" size="small" color="error" variant="outlined" />
+                          <Chip label="deleted operation" size="small" color="error" variant="outlined" />
                         )}
                       </TableCell>
                       <TableCell>
@@ -7534,7 +7542,7 @@ function DbToolsTab({ tools, projectId, queries, onToolAdded, onToolChanged, onT
                               {trying ? 'Running…' : 'Execute'}
                             </Button>
                             {!refQuery && (
-                              <Typography variant="caption" color="error" sx={{ ml: 1 }}>Query was deleted — cannot execute.</Typography>
+                              <Typography variant="caption" color="error" sx={{ ml: 1 }}>Operation was deleted — cannot execute.</Typography>
                             )}
                             {tryError && <Alert severity="error" sx={{ mt: 1.5, fontSize: '0.8rem' }}>{tryError}</Alert>}
                             {tryResult !== null && !tryError && (
@@ -7697,7 +7705,7 @@ function StaticToolDialog({ open, onClose, onSaved, projectId, editTool }: {
           <TextField label="Tool name" value={form.name} size="small" fullWidth required
             onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
           <TextField label="Description" value={form.description} size="small" fullWidth
-            multiline minRows={2} maxRows={5}
+            multiline minRows={4} maxRows={10}
             onChange={e => setForm(p => ({ ...p, description: e.target.value }))} />
 
           <TextField
@@ -8229,7 +8237,6 @@ export default function ServerDetail() {
     const st = getSourceType(project)
     const sd = SOURCE_DISPLAY[st]
     const db = isDbSource(st)
-    const sql = isSqlSource(st)
     const blank = isBlankSource(st)
     const Tidx = {
       connect: 0,
@@ -8248,7 +8255,7 @@ export default function ServerDetail() {
     const items: ServerNavItem[] = [
       { label: 'Connect',      icon: <IconWorld size={16} />,         idx: Tidx.connect },
       ...(Tidx.apiEndpoints !== -1 ? [{ label: 'API Endpoints', icon: <IconRoute size={16} />, idx: Tidx.apiEndpoints, badge: project.tools.length || undefined }] : []),
-      ...(Tidx.queries !== -1 ? [{ label: sql ? 'Queries' : 'Operations', icon: <IconDatabase size={16} />, idx: Tidx.queries, badge: (project.dbQueries ?? []).length || undefined }] : []),
+      ...(Tidx.queries !== -1 ? [{ label: 'Operations', icon: <IconDatabase size={16} />, idx: Tidx.queries, badge: (project.dbQueries ?? []).length || undefined }] : []),
       { label: 'Tools',        icon: <IconTool size={16} />,          idx: Tidx.tools,     badge: project.tools.length || undefined },
       { label: 'Resources',    icon: <IconFile size={16} />,          idx: Tidx.resources, badge: (project.resources ?? []).length || undefined },
       { label: 'Prompts',      icon: <IconBulb size={16} />,          idx: Tidx.prompts,   badge: (project.prompts ?? []).length || undefined },
@@ -8288,7 +8295,6 @@ export default function ServerDetail() {
   const sourceType = getSourceType(project)
   const sourceDisplay = SOURCE_DISPLAY[sourceType]
   const dbSource = isDbSource(sourceType)
-  const sqlSource = isSqlSource(sourceType)
   const blankSource = isBlankSource(sourceType)
 
   const T = {
@@ -8307,31 +8313,14 @@ export default function ServerDetail() {
   }
 
   return (
-    <Box py={3} px={0}>
+    <Box>
       {/* Header */}
       <Paper variant="outlined" sx={{ mb: 2.5, borderRadius: '10px', overflow: 'hidden' }}>
-        {/* Breadcrumb row */}
+        {/* Chips + actions row */}
         <Box
           display="flex" alignItems="center" gap={0.75} px={2} py={1}
           sx={{ borderBottom: '1px solid', borderColor: 'divider' }}
         >
-          <Box
-            component="span"
-            onClick={() => navigate('/')}
-            sx={{
-              fontSize: '0.78rem', color: 'text.secondary', cursor: 'pointer',
-              '&:hover': { color: 'text.primary' }, transition: 'color 0.15s',
-            }}
-          >
-            Servers
-          </Box>
-          <Typography fontSize="0.78rem" color="divider">/</Typography>
-          <Box sx={{ fontSize: '0.78rem', color: sourceDisplay.color, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <span>{sourceDisplay.emoji}</span>
-            <span style={{ fontWeight: 500 }}>{project.name}</span>
-          </Box>
-          <Box flexGrow={1} />
-          {/* Status + source chip inline */}
           {isPaused
             ? <Chip label="Paused" size="small" color="warning" variant="outlined" sx={{ fontWeight: 600, height: 22, fontSize: '0.7rem' }} />
             : <Chip
@@ -8351,6 +8340,7 @@ export default function ServerDetail() {
             <Chip label={`v${project.version}`} size="small" variant="outlined"
               sx={{ height: 22, fontSize: '0.7rem', fontWeight: 500 }} />
           )}
+          <Box flexGrow={1} />
           {can(Permission.ServersCreate) && !dbSource && !blankSource && (
             <Tooltip title="Upload a new version of the spec">
               <IconButton size="small" onClick={() => { setReimportOpen(true); setReimportSuccess(null) }}>
@@ -8417,7 +8407,7 @@ export default function ServerDetail() {
               />
             )}
 
-            {/* ── Tab: Queries / Operations (DB only) ─────────────────────────── */}
+            {/* ── Tab: Operations (DB only) ───────────────────────────────────── */}
             {T.queries !== -1 && tab === T.queries && (
               <QueriesTab
                 projectId={id!}

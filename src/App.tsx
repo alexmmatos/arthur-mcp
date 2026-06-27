@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { ServerNavProvider } from './context/ServerNavContext'
+import { TerminologyProvider } from './context/TerminologyContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import ForgotPassword from './pages/ForgotPassword'
@@ -17,8 +18,12 @@ import SetupWizard from './pages/SetupWizard'
 import SharePage from './pages/SharePage'
 import Templates from './pages/Templates'
 import Prompts from './pages/Prompts'
+import NewPrompt from './pages/NewPrompt'
+import PromptDetail from './pages/PromptDetail'
 import PromptTemplates from './pages/PromptTemplates'
 import Secrets from './pages/Secrets'
+import NewSecret from './pages/NewSecret'
+import SecretDetail from './pages/SecretDetail'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem('token')
@@ -33,6 +38,7 @@ function RequireSetup({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <AuthProvider>
+    <TerminologyProvider>
     <ServerNavProvider>
     <BrowserRouter>
       <Routes>
@@ -63,8 +69,12 @@ export default function App() {
                   <Route path="/audit-logs" element={<AuditLogs />} />
                   <Route path="/templates" element={<Templates />} />
                   <Route path="/prompts" element={<Prompts />} />
+                  <Route path="/prompts/new" element={<NewPrompt />} />
+                  <Route path="/prompts/:id" element={<PromptDetail />} />
                   <Route path="/prompt-templates" element={<PromptTemplates />} />
                   <Route path="/secrets" element={<Secrets />} />
+                  <Route path="/secrets/new" element={<NewSecret />} />
+                  <Route path="/secrets/:id" element={<SecretDetail />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Layout>
@@ -74,6 +84,7 @@ export default function App() {
       </Routes>
     </BrowserRouter>
     </ServerNavProvider>
+    </TerminologyProvider>
     </AuthProvider>
   )
 }

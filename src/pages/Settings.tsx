@@ -3,7 +3,6 @@ import {
   Box,
   Button,
   CircularProgress,
-  Divider,
   Grid,
   IconButton,
   InputAdornment,
@@ -12,7 +11,6 @@ import {
   Typography,
 } from '@mui/material'
 import {
-  IconSettings,
   IconDeviceFloppy,
   IconMail,
   IconWorld,
@@ -20,9 +18,12 @@ import {
   IconPlus,
   IconTrash,
   IconHttpConnect,
+  IconLetterCase,
 } from '@tabler/icons-react'
+import { useTranslation } from 'react-i18next'
 import api from '../api'
 import { useAuth, Permission } from '../context/AuthContext'
+import { useTerminology } from '../context/TerminologyContext'
 import HelpButton from '../components/HelpButton'
 import AppSnackbar from '../components/AppSnackbar'
 
@@ -41,9 +42,13 @@ interface SettingsData {
   smtpFrom: string
   smtpPassSet: boolean
   globalRequestHeaders?: { name: string; value: string }[]
+  termServer?: string
+  termTool?: string
+  termResource?: string
+  termPrompt?: string
+  termChain?: string
+  termSecret?: string
 }
-
-// ─── Inline-validated TextField wrapper ───────────────────────────────────────
 
 import { TextField } from '@mui/material'
 
@@ -57,16 +62,21 @@ function portValid(v: number) {
 
 export default function Settings() {
   const { can, loading: authLoading } = useAuth()
+  const { reload: reloadTerminology } = useTerminology()
+  const { t } = useTranslation('settings')
   const [data, setData] = useState<SettingsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  // Snackbar
   const [snackOpen, setSnackOpen] = useState(false)
   const [snackMsg, setSnackMsg] = useState('')
   const [snackSeverity, setSnackSeverity] = useState<'success' | 'error'>('success')
 
-  // Form state
+  const showSnack = (msg: string, sev: 'success' | 'error') => {
+    setSnackMsg(msg); setSnackSeverity(sev); setSnackOpen(true)
+  }
+
+  // Main form state
   const [serverBaseUrl, setServerBaseUrl] = useState('')
   const [defaultTimeoutMs, setDefaultTimeoutMs] = useState(30000)
   const [smtpHost, setSmtpHost] = useState('')
@@ -76,12 +86,22 @@ export default function Settings() {
   const [smtpFrom, setSmtpFrom] = useState('')
   const [globalHeaders, setGlobalHeaders] = useState<HeaderEntry[]>([])
 
-  const addGlobalHeader = () => setGlobalHeaders((prev) => [...prev, { id: Math.random().toString(36).slice(2), name: '', value: '' }])
-  const removeGlobalHeader = (id: string) => setGlobalHeaders((prev) => prev.filter((h) => h.id !== id))
+  // Terminology state
+  const [termServer, setTermServer] = useState('')
+  const [termTool, setTermTool] = useState('')
+  const [termResource, setTermResource] = useState('')
+  const [termPrompt, setTermPrompt] = useState('')
+  const [termChain, setTermChain] = useState('')
+  const [termSecret, setTermSecret] = useState('')
+  const [savingTerms, setSavingTerms] = useState(false)
+
+  const addGlobalHeader = () =>
+    setGlobalHeaders((prev) => [...prev, { id: Math.random().toString(36).slice(2), name: '', value: '' }])
+  const removeGlobalHeader = (id: string) =>
+    setGlobalHeaders((prev) => prev.filter((h) => h.id !== id))
   const setGlobalHeader = (id: string, field: 'name' | 'value', val: string) =>
     setGlobalHeaders((prev) => prev.map((h) => h.id === id ? { ...h, [field]: val } : h))
 
-  // Dirty tracking — original values
   const [orig, setOrig] = useState<Omit<SettingsData, 'smtpPassSet'> & { smtpPass: string; globalRequestHeaders: { name: string; value: string }[] } | null>(null)
 
   useEffect(() => {
@@ -95,6 +115,12 @@ export default function Settings() {
         setSmtpUser(r.data.smtpUser || '')
         setSmtpFrom(r.data.smtpFrom || '')
         setGlobalHeaders((r.data.globalRequestHeaders ?? []).map((h) => ({ id: Math.random().toString(36).slice(2), ...h })))
+        setTermServer(r.data.termServer || '')
+        setTermTool(r.data.termTool || '')
+        setTermResource(r.data.termResource || '')
+        setTermPrompt(r.data.termPrompt || '')
+        setTermChain(r.data.termChain || '')
+        setTermSecret(r.data.termSecret || '')
         setOrig({
           serverBaseUrl: r.data.serverBaseUrl || '',
           defaultTimeoutMs: r.data.defaultTimeoutMs || 30000,
@@ -106,11 +132,7 @@ export default function Settings() {
           globalRequestHeaders: r.data.globalRequestHeaders ?? [],
         })
       })
-      .catch(() => {
-        setSnackMsg('Failed to load settings.')
-        setSnackSeverity('error')
-        setSnackOpen(true)
-      })
+      .catch(() => showSnack(t('loadError'), 'error'))
       .finally(() => setLoading(false))
   }, [])
 
@@ -130,9 +152,7 @@ export default function Settings() {
 
   const handleSave = async () => {
     if (smtpFromError || smtpPortError) {
-      setSnackMsg('Please fix validation errors before saving.')
-      setSnackSeverity('error')
-      setSnackOpen(true)
+      showSnack(t('saveValidationError'), 'error')
       return
     }
     setSaving(true)
@@ -149,9 +169,7 @@ export default function Settings() {
       }
       if (smtpPass) dto.smtpPass = smtpPass
       await api.patch('/settings', dto)
-      setSnackMsg('Settings saved successfully.')
-      setSnackSeverity('success')
-      setSnackOpen(true)
+      showSnack(t('saveSuccess'), 'success')
       setSmtpPass('')
       setOrig({
         serverBaseUrl: serverBaseUrl.trim(),
@@ -165,51 +183,74 @@ export default function Settings() {
       })
     } catch (err: unknown) {
       const msg = err && typeof err === 'object' && 'response' in err
-        ? (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Error saving.'
-        : 'Error saving.'
-      setSnackMsg(msg)
-      setSnackSeverity('error')
-      setSnackOpen(true)
+        ? (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? t('saveError')
+        : t('saveError')
+      showSnack(msg, 'error')
     } finally {
       setSaving(false)
     }
   }
 
-  if (loading || authLoading) return <Box display="flex" justifyContent="center" alignItems="center" height="40vh"><CircularProgress /></Box>
+  const handleSaveTerminology = async () => {
+    setSavingTerms(true)
+    try {
+      await api.patch('/settings', {
+        termServer: termServer.trim() || null,
+        termTool: termTool.trim() || null,
+        termResource: termResource.trim() || null,
+        termPrompt: termPrompt.trim() || null,
+        termChain: termChain.trim() || null,
+        termSecret: termSecret.trim() || null,
+      })
+      reloadTerminology()
+      showSnack(t('terminology.saveSuccess'), 'success')
+    } catch {
+      showSnack(t('terminology.saveError'), 'error')
+    } finally {
+      setSavingTerms(false)
+    }
+  }
+
+  if (loading || authLoading) return (
+    <Box display="flex" justifyContent="center" alignItems="center" height="40vh">
+      <CircularProgress />
+    </Box>
+  )
+
   if (!can(Permission.SettingsManage)) return (
     <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={12}>
-      <Typography variant="h6" color="text.secondary">Access restricted</Typography>
-      <Typography variant="body2" color="text.secondary">Only administrators can access system settings.</Typography>
+      <Typography variant="h6" color="text.secondary">{t('accessRestricted')}</Typography>
+      <Typography variant="body2" color="text.secondary">{t('accessRestrictedMsg')}</Typography>
     </Box>
   )
 
   return (
-    <Box py={3} px={0}>
+    <Box>
       <Box display="flex" alignItems="center" gap={1} mb={0.5}>
-        <Typography variant="h5" fontWeight={700} letterSpacing="-0.2px">Settings</Typography>
-        <HelpButton title="Settings">
+        <Typography variant="h5" fontWeight={700} letterSpacing="-0.2px">{t('title')}</Typography>
+        <HelpButton title={t('help.title')}>
           <Typography variant="body2" gutterBottom>
-            Global configuration for the entire Arthur MCP Adapter server. Changes saved here apply to <strong>all projects and all users</strong> — only administrators can access this page.
+            {t('help.intro')}
           </Typography>
           <Typography variant="body2" gutterBottom>
-            This page has two sections:
+            {t('help.sections')}
           </Typography>
           <Box component="ul" sx={{ mt: 0, mb: 1, pl: 2.5 }}>
-            <Box component="li"><Typography variant="body2"><strong>Server</strong> — the public URL of this instance and the default HTTP timeout for upstream API calls.</Typography></Box>
-            <Box component="li"><Typography variant="body2"><strong>E-mail (SMTP)</strong> — credentials used to send password-reset emails.</Typography></Box>
+            <Box component="li"><Typography variant="body2">{t('help.sectionServer')}</Typography></Box>
+            <Box component="li"><Typography variant="body2">{t('help.sectionEmail')}</Typography></Box>
           </Box>
           <Typography variant="body2">
-            Always click <strong>Save settings</strong> at the bottom after making changes. Navigating away without saving will discard your edits.
+            {t('help.saveReminder')}
           </Typography>
         </HelpButton>
       </Box>
-      <Typography variant="body2" color="text.secondary" mb={2.5}>Global system settings — changes apply to all projects and users.</Typography>
 
+      {/* Server */}
       <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
         <Box display="flex" alignItems="center" gap={1} mb={2}>
           <Box sx={{ color: 'primary.main', display: 'flex' }}><IconWorld size={18} /></Box>
-          <Typography variant="subtitle1" fontWeight={700}>Server</Typography>
-          <HelpButton title="Server settings">
+          <Typography variant="subtitle1" fontWeight={700}>{t('server.title')}</Typography>
+          <HelpButton title={t('server.helpTitle')}>
             <Typography variant="body2" gutterBottom>
               <strong>Public Server URL</strong> — the externally reachable address of this Arthur instance (e.g. <code>https://mcp.my-company.com</code>). This URL is used in two places:
             </Typography>
@@ -229,9 +270,9 @@ export default function Settings() {
           <Grid item xs={12} md={8}>
             <TextField
               size="small" fullWidth
-              label="Public Server URL"
-              placeholder="https://mcp.my-company.com"
-              helperText="Used to generate curl examples and password reset links."
+              label={t('server.urlLabel')}
+              placeholder={t('server.urlPlaceholder')}
+              helperText={t('server.urlHelper')}
               value={serverBaseUrl}
               onChange={(e) => setServerBaseUrl(e.target.value)}
               InputProps={{ startAdornment: <InputAdornment position="start"><IconWorld size={16} /></InputAdornment> }}
@@ -240,8 +281,8 @@ export default function Settings() {
           <Grid item xs={12} md={4}>
             <TextField
               size="small" fullWidth type="number"
-              label="Default timeout (ms)"
-              helperText="Max time per HTTP call."
+              label={t('server.timeoutLabel')}
+              helperText={t('server.timeoutHelper')}
               value={defaultTimeoutMs}
               onChange={(e) => setDefaultTimeoutMs(Number(e.target.value))}
               InputProps={{ startAdornment: <InputAdornment position="start"><IconClock size={16} /></InputAdornment> }}
@@ -254,17 +295,16 @@ export default function Settings() {
       <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
         <Box display="flex" alignItems="center" gap={1} mb={2}>
           <Box sx={{ color: 'primary.main', display: 'flex' }}><IconHttpConnect size={18} /></Box>
-          <Typography variant="subtitle1" fontWeight={700}>Global request headers</Typography>
+          <Typography variant="subtitle1" fontWeight={700}>{t('headers.title')}</Typography>
+          <HelpButton title={t('headers.helpTitle')}>
+            <Typography variant="body2">{t('headers.helpBody')}</Typography>
+          </HelpButton>
         </Box>
-        <Typography variant="body2" color="text.secondary" mb={2}>
-          These headers are sent on every API call made by any server, regardless of the endpoint.
-          Individual endpoints can add their own specific headers on top of these.
-        </Typography>
 
         {globalHeaders.length === 0 ? (
           <Box sx={{ border: '1px dashed', borderColor: 'divider', borderRadius: 1, py: 2.5, textAlign: 'center', mb: 1.5 }}>
             <Typography variant="body2" color="text.disabled">
-              No global headers defined — click <strong>Add header</strong> to set one
+              {t('headers.empty')}
             </Typography>
           </Box>
         ) : (
@@ -272,17 +312,17 @@ export default function Settings() {
             {globalHeaders.map((h) => (
               <Box key={h.id} display="flex" alignItems="center" gap={1}>
                 <TextField
-                  size="small" placeholder="Header-Name" value={h.name}
+                  size="small" placeholder={t('headers.placeholderName')} value={h.name}
                   onChange={(e) => setGlobalHeader(h.id, 'name', e.target.value)}
                   InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.82rem' } }}
                   sx={{ width: 220, flexShrink: 0 }}
                 />
                 <TextField
-                  size="small" fullWidth placeholder="value" value={h.value}
+                  size="small" fullWidth placeholder={t('headers.placeholderValue')} value={h.value}
                   onChange={(e) => setGlobalHeader(h.id, 'value', e.target.value)}
                   InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.82rem' } }}
                 />
-                <Tooltip title="Remove">
+                <Tooltip title={t('headers.removeTooltip')}>
                   <IconButton size="small" color="error" onClick={() => removeGlobalHeader(h.id)}>
                     <IconTrash size={16} />
                   </IconButton>
@@ -293,7 +333,7 @@ export default function Settings() {
         )}
 
         <Button size="small" variant="outlined" startIcon={<IconPlus size={14} />} onClick={addGlobalHeader}>
-          Add header
+          {t('headers.addHeader')}
         </Button>
       </Paper>
 
@@ -301,8 +341,8 @@ export default function Settings() {
       <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
         <Box display="flex" alignItems="center" gap={1} mb={2}>
           <Box sx={{ color: 'primary.main', display: 'flex' }}><IconMail size={18} /></Box>
-          <Typography variant="subtitle1" fontWeight={700}>E-mail (SMTP)</Typography>
-          <HelpButton title="E-mail (SMTP)">
+          <Typography variant="subtitle1" fontWeight={700}>{t('smtp.title')}</Typography>
+          <HelpButton title={t('smtp.helpTitle')}>
             <Typography variant="body2" gutterBottom>
               SMTP (Simple Mail Transfer Protocol) credentials used by Arthur to send transactional emails — currently only the password-reset flow. Without valid SMTP settings the "Forgot password" feature silently fails and users will not receive reset links.
             </Typography>
@@ -321,30 +361,31 @@ export default function Settings() {
             </Typography>
           </HelpButton>
         </Box>
-        <Typography variant="body2" color="text.secondary" mb={2}>
-          Required for sending password reset emails.
-          {data?.smtpPassSet && ' SMTP password already set — leave blank to keep it.'}
-        </Typography>
+        {data?.smtpPassSet && (
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            {t('smtp.passwordAlreadySet')}
+          </Typography>
+        )}
         <Grid container spacing={2}>
           <Grid item xs={12} sm={8}>
-            <TextField size="small" fullWidth label="SMTP Host" placeholder="smtp.gmail.com" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} />
+            <TextField size="small" fullWidth label={t('smtp.hostLabel')} placeholder="smtp.gmail.com" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} />
           </Grid>
           <Grid item xs={12} sm={4}>
             <TextField
-              size="small" fullWidth type="number" label="Port"
+              size="small" fullWidth type="number" label={t('smtp.portLabel')}
               value={smtpPort}
               onChange={(e) => setSmtpPort(Number(e.target.value))}
               error={smtpPortError}
-              helperText={smtpPortError ? 'Port must be between 1 and 65535' : ''}
+              helperText={smtpPortError ? t('smtp.portError') : ''}
             />
           </Grid>
           <Grid item xs={12} sm={6}>
-            <TextField size="small" fullWidth label="SMTP User" value={smtpUser} onChange={(e) => setSmtpUser(e.target.value)} />
+            <TextField size="small" fullWidth label={t('smtp.userLabel')} value={smtpUser} onChange={(e) => setSmtpUser(e.target.value)} />
           </Grid>
           <Grid item xs={12} sm={6}>
             <TextField
               size="small" fullWidth type="password"
-              label={data?.smtpPassSet ? 'New SMTP password (blank = keep)' : 'SMTP Password'}
+              label={data?.smtpPassSet ? t('smtp.passwordChangeLabel') : t('smtp.passwordLabel')}
               value={smtpPass}
               onChange={(e) => setSmtpPass(e.target.value)}
             />
@@ -352,27 +393,100 @@ export default function Settings() {
           <Grid item xs={12}>
             <TextField
               size="small" fullWidth
-              label='Sender email ("From:")'
-              placeholder="noreply@company.com"
+              label={t('smtp.fromLabel')}
+              placeholder={t('smtp.fromPlaceholder')}
               value={smtpFrom}
               onChange={(e) => setSmtpFrom(e.target.value)}
               error={smtpFromError}
-              helperText={smtpFromError ? 'Invalid email format' : ''}
+              helperText={smtpFromError ? t('smtp.fromError') : ''}
             />
           </Grid>
         </Grid>
       </Paper>
 
-      <Box display="flex" justifyContent="flex-end" mt={1}>
+      <Box display="flex" justifyContent="flex-end" mt={1} mb={3}>
         <Button
           variant="contained"
+          size="small"
           onClick={handleSave}
           disabled={saving || !isDirty}
           startIcon={saving ? <CircularProgress size={14} color="inherit" /> : <IconDeviceFloppy size={18} />}
         >
-          {saving ? 'Saving…' : 'Save settings'}
+          {saving ? t('saving') : t('saveSettings')}
         </Button>
       </Box>
+
+      {/* Terminology */}
+      <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
+        <Box display="flex" alignItems="center" gap={1} mb={2}>
+          <Box sx={{ color: 'primary.main', display: 'flex' }}><IconLetterCase size={18} /></Box>
+          <Typography variant="subtitle1" fontWeight={700}>{t('terminology.title')}</Typography>
+          <HelpButton title={t('terminology.helpTitle')}>
+            <Typography variant="body2">{t('terminology.helpBody')}</Typography>
+          </HelpButton>
+        </Box>
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={6} md={4}>
+            <TextField size="small" fullWidth
+              label={t('terminology.serverLabel')}
+              placeholder="Server"
+              value={termServer}
+              onChange={(e) => setTermServer(e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={4}>
+            <TextField size="small" fullWidth
+              label={t('terminology.toolLabel')}
+              placeholder="Tool"
+              value={termTool}
+              onChange={(e) => setTermTool(e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={4}>
+            <TextField size="small" fullWidth
+              label={t('terminology.resourceLabel')}
+              placeholder="Resource"
+              value={termResource}
+              onChange={(e) => setTermResource(e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={4}>
+            <TextField size="small" fullWidth
+              label={t('terminology.promptLabel')}
+              placeholder="Prompt"
+              value={termPrompt}
+              onChange={(e) => setTermPrompt(e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={4}>
+            <TextField size="small" fullWidth
+              label={t('terminology.chainLabel')}
+              placeholder="Chain"
+              value={termChain}
+              onChange={(e) => setTermChain(e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={4}>
+            <TextField size="small" fullWidth
+              label={t('terminology.secretLabel')}
+              placeholder="Secret"
+              value={termSecret}
+              onChange={(e) => setTermSecret(e.target.value)}
+            />
+          </Grid>
+        </Grid>
+        <Box display="flex" justifyContent="flex-end" mt={2}>
+          <Button
+            variant="contained"
+            size="small"
+            onClick={handleSaveTerminology}
+            disabled={savingTerms}
+            startIcon={savingTerms ? <CircularProgress size={14} color="inherit" /> : <IconDeviceFloppy size={18} />}
+          >
+            {savingTerms ? t('saving') : t('terminology.save')}
+          </Button>
+        </Box>
+      </Paper>
 
       <AppSnackbar
         open={snackOpen}

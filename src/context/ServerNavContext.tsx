@@ -15,6 +15,8 @@ export interface ServerDetailNav {
   navItems: ServerNavItem[]
   tab: number
   onTabChange: (n: number) => void
+  backLabel?: string
+  backPath?: string
 }
 
 interface ServerNavContextValue {

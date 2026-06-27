@@ -1,0 +1,125 @@
+import { UnauthorizedException } from '@nestjs/common';
+import * as jwt from 'jsonwebtoken';
+import { OAuthService } from './oauth.service';
+import { UsersService } from '../users/users.service';
+import { ISwaggerProjectRepository, SwaggerProjectRecord } from '../swagger/swagger-project.repository';
+
+const server = (override: Partial<SwaggerProjectRecord> = {}): SwaggerProjectRecord => ({
+  _id: 'server-1',
+  name: 'Payments',
+  baseUrl: 'https://api.example.com',
+  tools: [],
+  auth: { type: 'none' },
+  status: 'active',
+  mcpApiKeys: [],
+  resources: [],
+  prompts: [],
+  chains: [],
+  oauthClientId: 'client-id',
+  oauthClientSecret: 'client-secret',
+  tags: [],
+  rateLimit: { enabled: false, requestsPerMinute: 60 },
+  isPaused: false,
+  maintenanceMode: { enabled: false, message: '' },
+  availabilityWindow: { enabled: false, timezone: 'UTC', schedule: [] },
+  alertConfig: { enabled: false, errorThresholdPct: 10, notifyEmail: '' },
+  ...override,
+});
+
+describe('OAuthService', () => {
+  const users: jest.Mocked<Pick<UsersService, 'findByUsername' | 'validatePassword'>> = {
+    findByUsername: jest.fn(),
+    validatePassword: jest.fn(),
+  };
+  const projectRepo: jest.Mocked<Pick<ISwaggerProjectRepository, 'findById'>> = {
+    findById: jest.fn(),
+  };
+
+  let service: OAuthService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new OAuthService(users as unknown as UsersService, projectRepo as unknown as ISwaggerProjectRepository);
+  });
+
+  it('validates OAuth clients and optional secrets', async () => {
+    projectRepo.findById.mockResolvedValue(server());
+
+    await expect(service.validateClient('server-1', 'client-id', 'client-secret')).resolves.toBeUndefined();
+  });
+
+  it('rejects missing or invalid OAuth clients', async () => {
+    projectRepo.findById.mockResolvedValueOnce(null);
+    await expect(service.validateClient('missing', 'client-id')).rejects.toThrow(UnauthorizedException);
+
+    projectRepo.findById.mockResolvedValueOnce(server({ oauthClientId: undefined }));
+    await expect(service.validateClient('server-1', 'client-id')).rejects.toThrow(UnauthorizedException);
+
+    projectRepo.findById.mockResolvedValueOnce(server());
+    await expect(service.validateClient('server-1', 'bad-client')).rejects.toThrow(UnauthorizedException);
+
+    projectRepo.findById.mockResolvedValueOnce(server());
+    await expect(service.validateClient('server-1', 'client-id', 'bad-secret')).rejects.toThrow(UnauthorizedException);
+  });
+
+  it('validates users through UsersService', async () => {
+    users.findByUsername.mockResolvedValue({ _id: 'user-1', username: 'alex', role: 'admin', password: 'hash' } as any);
+    users.validatePassword.mockResolvedValue(true);
+
+    await expect(service.validateUser('alex', 'password')).resolves.toEqual({
+      _id: 'user-1',
+      username: 'alex',
+      role: 'admin',
+    });
+  });
+
+  it('returns null for unknown users or invalid passwords', async () => {
+    users.findByUsername.mockResolvedValueOnce(null);
+    await expect(service.validateUser('missing', 'password')).resolves.toBeNull();
+
+    users.findByUsername.mockResolvedValueOnce({ password: 'hash' } as any);
+    users.validatePassword.mockResolvedValueOnce(false);
+    await expect(service.validateUser('alex', 'wrong')).resolves.toBeNull();
+  });
+
+  it('creates and consumes authorization codes once', () => {
+    const code = service.createCode('user-1', 'alex', 'admin', 'server-1', 'client-id', 'https://client/callback', 'state');
+
+    expect(service.consumeCode(code, 'server-1', 'client-id', 'https://client/callback')).toMatchObject({
+      userId: 'user-1',
+      username: 'alex',
+      role: 'admin',
+      serverId: 'server-1',
+      clientId: 'client-id',
+      redirectUri: 'https://client/callback',
+      state: 'state',
+    });
+    expect(service.consumeCode(code, 'server-1', 'client-id', 'https://client/callback')).toBeNull();
+  });
+
+  it('rejects expired or mismatched authorization codes', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+    const expired = service.createCode('user-1', 'alex', 'admin', 'server-1', 'client-id', 'https://client/callback', 'state');
+    jest.setSystemTime(new Date('2026-01-01T00:11:00.000Z'));
+    expect(service.consumeCode(expired, 'server-1', 'client-id', 'https://client/callback')).toBeNull();
+
+    jest.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+    const mismatched = service.createCode('user-1', 'alex', 'admin', 'server-1', 'client-id', 'https://client/callback', 'state');
+    expect(service.consumeCode(mismatched, 'server-2', 'client-id', 'https://client/callback')).toBeNull();
+    expect(service.consumeCode(mismatched, 'server-1', 'other-client', 'https://client/callback')).toBeNull();
+    expect(service.consumeCode(mismatched, 'server-1', 'client-id', 'https://client/other')).toBeNull();
+    jest.useRealTimers();
+  });
+
+  it('issues and verifies JWT access tokens', () => {
+    const token = service.issueToken('user-1', 'alex', 'admin', 'server-1');
+    const decoded = service.verifyToken(token);
+
+    expect(decoded).toMatchObject({ sub: 'user-1', username: 'alex', role: 'admin', serverId: 'server-1' });
+    expect(jwt.decode(token)).toMatchObject({ sub: 'user-1' });
+  });
+
+  it('returns null for invalid JWT access tokens', () => {
+    expect(service.verifyToken('not-a-token')).toBeNull();
+  });
+});

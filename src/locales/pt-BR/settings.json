@@ -1,0 +1,66 @@
+{
+  "title": "Configurações",
+  "accessRestricted": "Acesso restrito",
+  "accessRestrictedMsg": "Apenas administradores podem acessar as configurações do sistema.",
+  "help": {
+    "title": "Configurações",
+    "intro": "Configuração global para todo o servidor Arthur MCP Adapter. As alterações salvas aqui se aplicam a todos os projetos e usuários — apenas administradores podem acessar esta página.",
+    "sections": "Esta página tem duas seções:",
+    "sectionServer": "Servidor — a URL pública desta instância e o timeout HTTP padrão para chamadas de API.",
+    "sectionEmail": "E-mail (SMTP) — credenciais usadas para enviar e-mails de redefinição de senha.",
+    "saveReminder": "Sempre clique em Salvar configurações ao final após fazer alterações. Navegar para outra página sem salvar descartará suas edições."
+  },
+  "server": {
+    "title": "Servidor",
+    "helpTitle": "Configurações do servidor",
+    "urlLabel": "URL pública do servidor",
+    "urlPlaceholder": "https://mcp.minha-empresa.com",
+    "urlHelper": "Usada para gerar exemplos curl e links de redefinição de senha.",
+    "timeoutLabel": "Timeout padrão (ms)",
+    "timeoutHelper": "Tempo máximo por chamada HTTP."
+  },
+  "headers": {
+    "title": "Cabeçalhos globais de requisição",
+    "helpTitle": "Cabeçalhos globais de requisição",
+    "helpBody": "Esses cabeçalhos são enviados em todas as chamadas de API feitas por qualquer servidor, independentemente do endpoint. Endpoints individuais podem adicionar seus próprios cabeçalhos específicos além desses.",
+    "empty": "Nenhum cabeçalho global definido — clique em Adicionar cabeçalho para configurar um",
+    "addHeader": "Adicionar cabeçalho",
+    "placeholderName": "Nome-do-Cabeçalho",
+    "placeholderValue": "valor",
+    "removeTooltip": "Remover"
+  },
+  "smtp": {
+    "title": "E-mail (SMTP)",
+    "helpTitle": "E-mail (SMTP)",
+    "passwordAlreadySet": "Senha SMTP já configurada — deixe em branco para mantê-la.",
+    "hostLabel": "Host SMTP",
+    "portLabel": "Porta",
+    "portError": "A porta deve estar entre 1 e 65535",
+    "userLabel": "Usuário SMTP",
+    "passwordLabel": "Senha SMTP",
+    "passwordChangeLabel": "Nova senha SMTP (em branco = manter)",
+    "fromLabel": "E-mail remetente (\"De:\")",
+    "fromPlaceholder": "noreply@empresa.com",
+    "fromError": "Formato de e-mail inválido"
+  },
+  "terminology": {
+    "title": "Terminologia",
+    "helpTitle": "Personalização de terminologia",
+    "helpBody": "Substitua os rótulos padrão usados em toda a interface. Deixe um campo em branco para manter o termo padrão.",
+    "serverLabel": "Termo para servidor",
+    "toolLabel": "Termo para ferramenta",
+    "resourceLabel": "Termo para recurso",
+    "promptLabel": "Termo para prompt",
+    "chainLabel": "Termo para chain",
+    "secretLabel": "Termo para segredo",
+    "save": "Salvar terminologia",
+    "saveSuccess": "Terminologia salva.",
+    "saveError": "Falha ao salvar terminologia."
+  },
+  "saveSettings": "Salvar configurações",
+  "saving": "Salvando…",
+  "loadError": "Falha ao carregar configurações.",
+  "saveSuccess": "Configurações salvas com sucesso.",
+  "saveValidationError": "Corrija os erros de validação antes de salvar.",
+  "saveError": "Erro ao salvar."
+}

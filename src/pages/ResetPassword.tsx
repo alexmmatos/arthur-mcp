@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Alert,
   Box,
@@ -15,6 +16,7 @@ import {
 import api from '../api'
 
 export default function ResetPassword() {
+  const { t } = useTranslation('auth')
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const token = params.get('token') ?? ''
@@ -28,8 +30,8 @@ export default function ResetPassword() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    if (newPassword !== confirm) { setError('Passwords do not match.'); return }
-    if (newPassword.length < 6) { setError('Password must be at least 6 characters.'); return }
+    if (newPassword !== confirm) { setError(t('error.passwordMismatch')); return }
+    if (newPassword.length < 6) { setError(t('error.passwordTooShort')); return }
 
     setLoading(true)
     try {
@@ -37,7 +39,7 @@ export default function ResetPassword() {
       setSuccess(true)
       setTimeout(() => navigate('/login'), 3000)
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Invalid or expired token.')
+      setError(err?.response?.data?.message ?? t('error.resetFailed'))
     } finally {
       setLoading(false)
     }
@@ -83,17 +85,15 @@ export default function ResetPassword() {
             </Box>
 
             <Typography variant="subtitle1" textAlign="center" color="text.secondary" mb={3}>
-              Reset password
+              {t('heading.resetPassword')}
             </Typography>
 
             {!token && (
-              <Alert severity="error">Token not found in URL. Request a new recovery link.</Alert>
+              <Alert severity="error">{t('error.tokenMissing')}</Alert>
             )}
 
             {success ? (
-              <Alert severity="success">
-                Password reset successfully! Redirecting to login…
-              </Alert>
+              <Alert severity="success">{t('hint.resetSuccess')}</Alert>
             ) : token ? (
               <>
                 {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -101,22 +101,22 @@ export default function ResetPassword() {
                   <Stack spacing={3}>
                     <Box>
                       <Typography variant="subtitle1" fontWeight={600} component="label" display="block" mb="5px">
-                        New password
+                        {t('label.newPassword')}
                       </Typography>
                       <TextField type="password" variant="outlined" fullWidth required autoFocus
                         value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
                     </Box>
                     <Box>
                       <Typography variant="subtitle1" fontWeight={600} component="label" display="block" mb="5px">
-                        Confirm new password
+                        {t('label.confirmPassword')}
                       </Typography>
                       <TextField type="password" variant="outlined" fullWidth required
                         value={confirm} onChange={(e) => setConfirm(e.target.value)}
                         error={!!confirm && newPassword !== confirm}
-                        helperText={confirm && newPassword !== confirm ? 'Passwords do not match' : ''} />
+                        helperText={confirm && newPassword !== confirm ? t('error.passwordMismatchInline') : ''} />
                     </Box>
                     <Button type="submit" color="primary" variant="contained" size="large" fullWidth disabled={loading} disableElevation sx={{ py: 1.2 }}>
-                      {loading ? <CircularProgress size={22} color="inherit" /> : 'Reset password'}
+                      {loading ? <CircularProgress size={22} color="inherit" /> : t('action.resetPassword')}
                     </Button>
                   </Stack>
                 </Box>
@@ -125,7 +125,7 @@ export default function ResetPassword() {
 
             <Box textAlign="center" mt={2}>
               <Link component={RouterLink} to="/login" variant="body2">
-                Back to login
+                {t('link.backToLogin')}
               </Link>
             </Box>
           </Card>

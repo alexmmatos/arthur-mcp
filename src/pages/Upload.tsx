@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useAuth, Permission } from '../context/AuthContext'
 import {
   Alert,
@@ -23,6 +24,7 @@ interface UploadResult {
 }
 
 export default function Upload() {
+  const { t } = useTranslation('servers')
   const { can, loading: authLoading } = useAuth()
   const [file, setFile] = useState<File | null>(null)
   const [baseUrl, setBaseUrl] = useState('')
@@ -36,7 +38,7 @@ export default function Upload() {
   const accept = (f: File) => {
     const name = f.name.toLowerCase()
     if (!name.endsWith('.yaml') && !name.endsWith('.yml') && !name.endsWith('.json')) {
-      setErrorMsg('Invalid format. Use .yaml, .yml or .json')
+      setErrorMsg(t('upload.invalidFile'))
       setPhase('error')
       return
     }
@@ -72,7 +74,7 @@ export default function Upload() {
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        'Error processing the file.'
+        t('upload.processError')
       setErrorMsg(Array.isArray(msg) ? msg.join(', ') : msg)
       setPhase('error')
     }
@@ -81,8 +83,8 @@ export default function Upload() {
   if (!authLoading && !can(Permission.ServersCreate)) {
     return (
       <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={12}>
-        <Typography variant="h6" color="text.secondary">Access restricted</Typography>
-        <Typography variant="body2" color="text.secondary">You don't have permission to create servers.</Typography>
+        <Typography variant="h6" color="text.secondary">{t('error.accessRestricted')}</Typography>
+        <Typography variant="body2" color="text.secondary">{t('error.forbiddenCreate')}</Typography>
       </Box>
     )
   }
@@ -90,7 +92,7 @@ export default function Upload() {
   return (
     <Box p={3} maxWidth={640} mx="auto">
       <Box display="flex" alignItems="center" gap={1} mb={3}>
-        <Typography variant="h5" fontWeight="bold">API Upload</Typography>
+        <Typography variant="h5" fontWeight="bold">{t('upload.pageTitle')}</Typography>
         <HelpButton title="API Upload">
           <Typography variant="body2" gutterBottom>
             The API Upload page lets you create a fully configured MCP server by importing an existing API definition file, instead of creating tools one by one by hand.
@@ -153,9 +155,9 @@ export default function Upload() {
           <Typography fontWeight="bold">{file.name}</Typography>
         ) : (
           <>
-            <Typography>Drag your Swagger / OpenAPI file here</Typography>
+            <Typography>{t('upload.dragHint')}</Typography>
             <Typography variant="body2" color="text.secondary">
-              or click to select (.yaml, .yml, .json)
+              {t('upload.clickHint')}
             </Typography>
           </>
         )}
@@ -163,13 +165,13 @@ export default function Upload() {
 
       {/* Optional base URL */}
       <TextField
-        label="Base URL (optional)"
-        placeholder="https://api.example.com"
+        label={t('upload.baseUrlLabel')}
+        placeholder={t('upload.baseUrlPlaceholder')}
         fullWidth
         value={baseUrl}
         onChange={(e) => setBaseUrl(e.target.value)}
         sx={{ mt: 2 }}
-        helperText="Overrides the spec base URL"
+        helperText={t('upload.baseUrlHelper')}
       />
 
       <Button
@@ -181,7 +183,7 @@ export default function Upload() {
         onClick={handleSubmit}
         startIcon={phase === 'uploading' ? <CircularProgress size={18} color="inherit" /> : undefined}
       >
-        {phase === 'uploading' ? 'Processing…' : 'Upload'}
+        {phase === 'uploading' ? t('upload.processing') : t('upload.upload')}
       </Button>
 
       {phase === 'error' && (
@@ -200,12 +202,12 @@ export default function Upload() {
               size="small"
               onClick={() => navigate(`/servers/${result._id}`)}
             >
-              View server
+              {t('upload.viewServer')}
             </Button>
           }
         >
-          <strong>{result.name}</strong> imported successfully —{' '}
-          {result.tools.length} tool{result.tools.length !== 1 ? 's' : ''} generated.
+          <strong>{result.name}</strong> {t('upload.importedSuccess')} —{' '}
+          {t('label.toolsGenerated', { count: result.tools.length })}
         </Alert>
       )}
     </Box>

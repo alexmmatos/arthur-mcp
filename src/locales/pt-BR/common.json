@@ -1,0 +1,59 @@
+{
+  "action": {
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "delete": "Excluir",
+    "edit": "Editar",
+    "create": "Criar",
+    "add": "Adicionar",
+    "remove": "Remover",
+    "reload": "Recarregar",
+    "retry": "Tentar novamente",
+    "close": "Fechar",
+    "back": "Voltar",
+    "next": "Próximo",
+    "confirm": "Confirmar",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "clear": "Limpar",
+    "loading": "Carregando…",
+    "saving": "Salvando…",
+    "deleting": "Excluindo…",
+    "duplicate": "Duplicar"
+  },
+  "status": {
+    "active": "Ativo",
+    "paused": "Pausado",
+    "error": "Erro",
+    "connected": "Conectado",
+    "disconnected": "Desconectado",
+    "enabled": "Habilitado",
+    "disabled": "Desabilitado"
+  },
+  "label": {
+    "name": "Nome",
+    "description": "Descrição",
+    "tags": "Tags",
+    "createdAt": "Criado em",
+    "updatedAt": "Atualizado em",
+    "type": "Tipo",
+    "value": "Valor",
+    "optional": "opcional"
+  },
+  "error": {
+    "generic": "Algo deu errado. Tente novamente.",
+    "forbidden": "Você não tem permissão para realizar esta ação.",
+    "notFound": "Não encontrado.",
+    "loadFailed": "Falha ao carregar os dados."
+  },
+  "terms": {
+    "server": "Servidor",
+    "tool": "Ferramenta",
+    "resource": "Recurso",
+    "prompt": "Prompt",
+    "chain": "Chain",
+    "secret": "Segredo"
+  }
+}

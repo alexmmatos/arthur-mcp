@@ -48,6 +48,14 @@ export async function executeDbQuery(
       command: query.command ?? 'GET',
       keyPattern: query.keyPattern ?? '',
       valueTemplate: query.valueTemplate,
+      redisTemplate: query.redisTemplate ?? 'exact_key',
+      valuePattern: query.valuePattern,
+      keyPrefixFilter: query.keyPrefixFilter,
+      redisMinScore: query.redisMinScore,
+      redisMaxScore: query.redisMaxScore,
+      redisLimit: query.redisLimit,
+      redisFtIndex: query.redisFtIndex,
+      redisFetchValues: query.redisFetchValues,
     };
     return executeRedis(redisRef, args, cfg);
   }

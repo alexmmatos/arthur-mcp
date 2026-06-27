@@ -19,6 +19,21 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import type { AuthConfig, DbConnectionConfig, DbQuery, EndpointRef, ExecutionRef } from '../dynamic-mcp/types';
 import { SwaggerService } from './swagger.service';
+import {
+  AlertConfigDto,
+  AvailabilityWindowDto,
+  ChainDto,
+  CreateServerDto,
+  DbQueryDto,
+  MaintenanceModeDto,
+  OAuthClientDto,
+  RateLimitDto,
+  ResourceDto,
+  TenantConfigDto,
+  ToolEndpointDto,
+  UpdateServerInfoDto,
+  UpdateToolMetaDto,
+} from './dto/swagger.dto';
 
 @Controller('swagger')
 @UseGuards(JwtAuthGuard)
@@ -66,7 +81,7 @@ export class SwaggerController {
       baseUrl,
     );
 
-    // Retorna resumo sem o rawSpec e parameterMap completo
+    // Return a compact summary without rawSpec and the full parameterMap.
     return {
       _id: server._id,
       name: server.name,
@@ -80,9 +95,14 @@ export class SwaggerController {
   }
 
   @Post('servers')
-  createEmpty(@Body() dto: { name?: string; description?: string; baseUrl?: string }) {
+  createEmpty(@Body() dto: CreateServerDto) {
     if (!dto.name?.trim()) throw new BadRequestException('Name is required.');
-    return this.swaggerService.createEmpty({ ...dto, baseUrl: dto.baseUrl?.trim() || '' } as any);
+    return this.swaggerService.createEmpty({
+      name: dto.name,
+      description: dto.description,
+      baseUrl: dto.baseUrl?.trim() || '',
+      tags: dto.tags,
+    });
   }
 
   @Get('servers')
@@ -99,7 +119,7 @@ export class SwaggerController {
   @Patch('servers/:id/info')
   updateInfo(
     @Param('id') id: string,
-    @Body() dto: { name?: string; description?: string },
+    @Body() dto: UpdateServerInfoDto,
   ) {
     return this.swaggerService.updateInfo(id, dto);
   }
@@ -108,7 +128,7 @@ export class SwaggerController {
   updateToolMeta(
     @Param('id') id: string,
     @Param('toolName') toolName: string,
-    @Body() dto: { name?: string; description?: string; enabled?: boolean },
+    @Body() dto: UpdateToolMetaDto,
   ) {
     return this.swaggerService.updateToolMeta(id, toolName, dto);
   }
@@ -126,13 +146,13 @@ export class SwaggerController {
   updateTool(
     @Param('id') id: string,
     @Param('toolName') toolName: string,
-    @Body() dto: any,
+    @Body() dto: ToolEndpointDto,
   ) {
     return this.swaggerService.updateTool(id, toolName, dto);
   }
 
   @Post('servers/:id/tools')
-  addTool(@Param('id') id: string, @Body() dto: any) {
+  addTool(@Param('id') id: string, @Body() dto: ToolEndpointDto) {
     return this.swaggerService.addTool(id, dto);
   }
 
@@ -218,7 +238,7 @@ export class SwaggerController {
   @Patch('servers/:id/oauth-client')
   updateOAuthClient(
     @Param('id') id: string,
-    @Body() dto: { oauthClientId: string | null; oauthClientSecret: string | null },
+    @Body() dto: OAuthClientDto,
   ) {
     return this.swaggerService.updateOAuthClient(id, dto);
   }
@@ -226,7 +246,7 @@ export class SwaggerController {
   @Patch('servers/:id/rate-limit')
   updateRateLimit(
     @Param('id') id: string,
-    @Body() dto: { enabled: boolean; requestsPerMinute: number },
+    @Body() dto: RateLimitDto,
   ) {
     return this.swaggerService.updateRateLimit(id, dto);
   }
@@ -258,21 +278,21 @@ export class SwaggerController {
   // ── Maintenance mode ─────────────────────────────────────────────────────────
 
   @Patch('servers/:id/maintenance')
-  setMaintenanceMode(@Param('id') id: string, @Body() dto: { enabled: boolean; message?: string }) {
+  setMaintenanceMode(@Param('id') id: string, @Body() dto: MaintenanceModeDto) {
     return this.swaggerService.setMaintenanceMode(id, dto);
   }
 
   // ── Availability window ───────────────────────────────────────────────────────
 
   @Patch('servers/:id/availability')
-  setAvailabilityWindow(@Param('id') id: string, @Body() dto: { enabled: boolean; timezone: string; schedule: Array<{ day: number; startHour: number; endHour: number }> }) {
+  setAvailabilityWindow(@Param('id') id: string, @Body() dto: AvailabilityWindowDto) {
     return this.swaggerService.setAvailabilityWindow(id, dto);
   }
 
   // ── Alert config ─────────────────────────────────────────────────────────────
 
   @Patch('servers/:id/alert-config')
-  setAlertConfig(@Param('id') id: string, @Body() dto: { enabled: boolean; errorThresholdPct: number; notifyEmail: string }) {
+  setAlertConfig(@Param('id') id: string, @Body() dto: AlertConfigDto) {
     return this.swaggerService.setAlertConfig(id, dto);
   }
 
@@ -281,7 +301,7 @@ export class SwaggerController {
   @Patch('servers/:id/tenant-config')
   setTenantConfig(
     @Param('id') id: string,
-    @Body() dto: { enabled: boolean; params: Array<{ name: string; type: string; description?: string }> },
+    @Body() dto: TenantConfigDto,
   ) {
     return this.swaggerService.setTenantConfig(id, dto);
   }
@@ -290,17 +310,17 @@ export class SwaggerController {
 
   @Post('servers/:id/resources')
   @HttpCode(201)
-  addResource(@Param('id') id: string, @Body() dto: any) {
+  addResource(@Param('id') id: string, @Body() dto: ResourceDto) {
     return this.swaggerService.addResource(id, dto);
   }
 
   @Put('servers/:id/resources/:resourceId')
-  updateResource(@Param('id') id: string, @Param('resourceId') resourceId: string, @Body() dto: any) {
+  updateResource(@Param('id') id: string, @Param('resourceId') resourceId: string, @Body() dto: Partial<ResourceDto>) {
     return this.swaggerService.updateResource(id, resourceId, dto);
   }
 
   @Patch('servers/:id/resources/:resourceId')
-  patchResource(@Param('id') id: string, @Param('resourceId') resourceId: string, @Body() dto: any) {
+  patchResource(@Param('id') id: string, @Param('resourceId') resourceId: string, @Body() dto: Partial<ResourceDto>) {
     return this.swaggerService.updateResource(id, resourceId, dto);
   }
 
@@ -334,7 +354,7 @@ export class SwaggerController {
 
   @Post('servers/:id/chains')
   @HttpCode(201)
-  addChain(@Param('id') id: string, @Body() dto: any) {
+  addChain(@Param('id') id: string, @Body() dto: ChainDto) {
     return this.swaggerService.addChain(id, dto);
   }
 
@@ -342,7 +362,7 @@ export class SwaggerController {
   updateChain(
     @Param('id') id: string,
     @Param('chainId') chainId: string,
-    @Body() dto: any,
+    @Body() dto: Partial<ChainDto>,
   ) {
     return this.swaggerService.updateChain(id, chainId, dto);
   }
@@ -459,7 +479,7 @@ export class SwaggerController {
   }
 
   @Post('servers/:id/queries')
-  addDbQuery(@Param('id') id: string, @Body() dto: Omit<DbQuery, 'id'>) {
+  addDbQuery(@Param('id') id: string, @Body() dto: DbQueryDto) {
     if (!dto.name?.trim()) throw new BadRequestException('name is required.');
     if (!dto.sourceType) throw new BadRequestException('sourceType is required.');
     return this.swaggerService.addDbQuery(id, dto);
@@ -469,7 +489,7 @@ export class SwaggerController {
   updateDbQuery(
     @Param('id') id: string,
     @Param('queryId') queryId: string,
-    @Body() dto: Partial<Omit<DbQuery, 'id'>>,
+    @Body() dto: Partial<DbQueryDto>,
   ) {
     return this.swaggerService.updateDbQuery(id, queryId, dto);
   }

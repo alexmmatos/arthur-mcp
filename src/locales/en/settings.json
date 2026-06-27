@@ -1,0 +1,66 @@
+{
+  "title": "Settings",
+  "accessRestricted": "Access restricted",
+  "accessRestrictedMsg": "Only administrators can access system settings.",
+  "help": {
+    "title": "Settings",
+    "intro": "Global configuration for the entire Arthur MCP Adapter server. Changes saved here apply to all projects and all users — only administrators can access this page.",
+    "sections": "This page has two sections:",
+    "sectionServer": "Server — the public URL of this instance and the default HTTP timeout for upstream API calls.",
+    "sectionEmail": "E-mail (SMTP) — credentials used to send password-reset emails.",
+    "saveReminder": "Always click Save settings at the bottom after making changes. Navigating away without saving will discard your edits."
+  },
+  "server": {
+    "title": "Server",
+    "helpTitle": "Server settings",
+    "urlLabel": "Public Server URL",
+    "urlPlaceholder": "https://mcp.my-company.com",
+    "urlHelper": "Used to generate curl examples and password reset links.",
+    "timeoutLabel": "Default timeout (ms)",
+    "timeoutHelper": "Max time per HTTP call."
+  },
+  "headers": {
+    "title": "Global request headers",
+    "helpTitle": "Global request headers",
+    "helpBody": "These headers are sent on every API call made by any server, regardless of the endpoint. Individual endpoints can add their own specific headers on top of these.",
+    "empty": "No global headers defined — click Add header to set one",
+    "addHeader": "Add header",
+    "placeholderName": "Header-Name",
+    "placeholderValue": "value",
+    "removeTooltip": "Remove"
+  },
+  "smtp": {
+    "title": "E-mail (SMTP)",
+    "helpTitle": "E-mail (SMTP)",
+    "passwordAlreadySet": "SMTP password already set — leave blank to keep it.",
+    "hostLabel": "SMTP Host",
+    "portLabel": "Port",
+    "portError": "Port must be between 1 and 65535",
+    "userLabel": "SMTP User",
+    "passwordLabel": "SMTP Password",
+    "passwordChangeLabel": "New SMTP password (blank = keep)",
+    "fromLabel": "Sender email (\"From:\")",
+    "fromPlaceholder": "noreply@company.com",
+    "fromError": "Invalid email format"
+  },
+  "terminology": {
+    "title": "Terminology",
+    "helpTitle": "Terminology customization",
+    "helpBody": "Override the default labels used throughout the interface. Leave a field blank to keep the default term.",
+    "serverLabel": "Server term",
+    "toolLabel": "Tool term",
+    "resourceLabel": "Resource term",
+    "promptLabel": "Prompt term",
+    "chainLabel": "Chain term",
+    "secretLabel": "Secret term",
+    "save": "Save terminology",
+    "saveSuccess": "Terminology saved.",
+    "saveError": "Failed to save terminology."
+  },
+  "saveSettings": "Save settings",
+  "saving": "Saving…",
+  "loadError": "Failed to load settings.",
+  "saveSuccess": "Settings saved successfully.",
+  "saveValidationError": "Please fix validation errors before saving.",
+  "saveError": "Error saving."
+}

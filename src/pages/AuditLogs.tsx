@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth, Permission } from '../context/AuthContext'
 import {
-  Alert,
   Badge,
   Box,
   Button,
@@ -19,6 +18,7 @@ import {
   Typography,
 } from '@mui/material'
 import { IconRefresh, IconEye, IconEyeOff } from '@tabler/icons-react'
+import { useTranslation } from 'react-i18next'
 import api from '../api'
 import HelpButton from '../components/HelpButton'
 
@@ -44,27 +44,11 @@ const ACTION_COLORS: Record<string, 'error' | 'warning' | 'success' | 'default'>
   login: 'default',
 }
 
-const ACTION_LABELS: Record<string, string> = {
-  create: 'Created',
-  update: 'Updated',
-  delete: 'Deleted',
-  generate_key: 'Generated key',
-  revoke_key: 'Revoked key',
-  login: 'Login',
-}
-
-const ENTITY_LABELS: Record<string, string> = {
-  project: 'Project',
-  user: 'User',
-  tool: 'Tool',
-  settings: 'Settings',
-  'api-key': 'API Key',
-}
-
 const LIMIT = 50
 
 export default function AuditLogs() {
   const { can, loading: authLoading } = useAuth()
+  const { t } = useTranslation('audit')
   const [logs, setLogs] = useState<AuditEntry[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -85,7 +69,7 @@ export default function AuditLogs() {
       })
       .catch((err) => {
         if (err?.response?.status === 403) setError('forbidden')
-        else setError('Failed to load logs.')
+        else setError(t('loadError'))
       })
       .finally(() => setLoading(false))
   }
@@ -100,39 +84,43 @@ export default function AuditLogs() {
     load((page - 1) * LIMIT)
   }
 
+  const paginationLabel = total === 0
+    ? t('noEntries')
+    : t('pagination', { from: skip + 1, to: Math.min(skip + LIMIT, total), total })
+
   return (
-    <Box py={3} px={0}>
-      <Box display="flex" alignItems="center" justifyContent="space-between" mb={0.5}>
+    <Box>
+      <Box display="flex" alignItems="center" justifyContent="space-between" mb={2.5}>
         <Box display="flex" alignItems="center" gap={1}>
-          <Typography variant="h5" fontWeight={700} letterSpacing="-0.2px">Audit Logs</Typography>
-          <HelpButton title="Audit Logs">
+          <Typography variant="h5" fontWeight={700} letterSpacing="-0.2px">{t('title')}</Typography>
+          <HelpButton title={t('help.title')}>
             <Typography variant="body2" gutterBottom>
-              The Audit Log is a complete, tamper-proof record of every administrative change made on this Arthur MCP Adapter server. It is intended for security monitoring, compliance auditing, and debugging unexpected behaviour.
+              {t('help.intro')}
             </Typography>
             <Typography variant="body2" gutterBottom>
-              Every time a user creates, modifies, or deletes a server, tool, API key, or system setting, an entry is automatically written here. Login events are also recorded. <strong>Entries cannot be edited or deleted by any user.</strong>
+              {t('help.body')}
             </Typography>
-            <Typography variant="body2" gutterBottom>How to use it:</Typography>
+            <Typography variant="body2" gutterBottom>{t('help.howToUse')}</Typography>
             <Box component="ul" sx={{ mt: 0, mb: 1, pl: 2.5 }}>
-              <Box component="li"><Typography variant="body2"><strong>Investigate a change:</strong> Look at the Date/Time and Item columns to find when and what was changed.</Typography></Box>
-              <Box component="li"><Typography variant="body2"><strong>Find out who did something:</strong> The User column shows which account performed the action.</Typography></Box>
-              <Box component="li"><Typography variant="body2"><strong>Security incident response:</strong> The IP column shows where the request came from — useful for identifying unauthorised access.</Typography></Box>
-              <Box component="li"><Typography variant="body2"><strong>Compliance reviews:</strong> Share the log with auditors to demonstrate that configuration changes are tracked.</Typography></Box>
+              <Box component="li"><Typography variant="body2"><strong>{t('help.tipInvestigate')}</strong></Typography></Box>
+              <Box component="li"><Typography variant="body2"><strong>{t('help.tipWho')}</strong></Typography></Box>
+              <Box component="li"><Typography variant="body2"><strong>{t('help.tipSecurity')}</strong></Typography></Box>
+              <Box component="li"><Typography variant="body2"><strong>{t('help.tipCompliance')}</strong></Typography></Box>
             </Box>
             <Typography variant="body2">
-              Logs are stored in memory and retained for <strong>30 days</strong>. They are reset when the server restarts — export important entries before performing maintenance windows.
+              {t('help.retention')}
             </Typography>
           </HelpButton>
         </Box>
-        <Tooltip title="Refresh">
+        <Box display="flex" alignItems="center" gap={1}>
+          {total > 0 && (
+            <Chip label={t('entries', { count: total })} size="small" sx={{ height: 22, fontSize: '0.72rem' }} />
+          )}
           <Button size="small" variant="outlined" startIcon={<IconRefresh size={18} />} onClick={() => load(skip)}>
-            Refresh
+            {t('refresh')}
           </Button>
-        </Tooltip>
+        </Box>
       </Box>
-      <Typography variant="body2" color="text.secondary" mb={2.5}>
-        Record of all administrative actions.{total > 0 && ` ${total} entries total.`}
-      </Typography>
 
       {loading ? (
         <Paper variant="outlined" sx={{ overflow: 'hidden', mb: 2 }}>
@@ -153,13 +141,13 @@ export default function AuditLogs() {
         </Paper>
       ) : error === 'forbidden' || !can(Permission.AuditView) ? (
         <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={12}>
-          <Typography color="text.secondary" variant="h6">Access restricted</Typography>
-          <Typography color="text.secondary" variant="body2">You don't have permission to view audit logs.</Typography>
+          <Typography color="text.secondary" variant="h6">{t('accessRestricted')}</Typography>
+          <Typography color="text.secondary" variant="body2">{t('accessRestrictedMsg')}</Typography>
         </Box>
       ) : error ? (
-        <Box display="flex" alignItems="center" gap={2} py={4}>
-          <Alert severity="error" sx={{ flexGrow: 1 }}>{error}</Alert>
-          <Button variant="outlined" onClick={() => load(skip)}>Retry</Button>
+        <Box py={8} textAlign="center" display="flex" flexDirection="column" alignItems="center" gap={2}>
+          <Typography color="text.secondary">{t('loadFailed')}</Typography>
+          <Button size="small" variant="outlined" onClick={() => load(skip)}>{t('retry')}</Button>
         </Box>
       ) : (
         <>
@@ -168,34 +156,38 @@ export default function AuditLogs() {
               <TableHead>
                 <TableRow>
                   {([
-                    ['Date/Time', <>
-                      <Typography variant="body2" gutterBottom>The exact date and time (in your browser's local timezone) when the action was recorded by the server. Entries are listed newest-first.</Typography>
-                      <Typography variant="body2">If you are investigating an incident, compare the timestamp with your own activity timeline to determine exactly what changed and when. Precision here matters for security reviews.</Typography>
+                    [t('columns.dateTime'), <>
+                      <Typography variant="body2" gutterBottom>{t('help.dateTimeHelp')}</Typography>
+                      <Typography variant="body2">{t('help.dateTimeDetail')}</Typography>
                     </>],
-                    ['User', <>
-                      <Typography variant="body2" gutterBottom>The username of the account that performed the action. This is the account that was authenticated when the request was made.</Typography>
-                      <Typography variant="body2">System-generated actions (such as scheduled token refreshes) may show as <code>system</code>. If you see an action attributed to a user you don't recognise, investigate immediately — it could indicate a compromised account.</Typography>
+                    [t('columns.user'), <>
+                      <Typography variant="body2" gutterBottom>{t('help.userHelp')}</Typography>
+                      <Typography variant="body2">{t('help.userDetail')}</Typography>
                     </>],
-                    ['Action', <>
-                      <Typography variant="body2" gutterBottom>The type of operation that was performed. Possible values:</Typography>
+                    [t('columns.action'), <>
+                      <Typography variant="body2" gutterBottom>{t('help.actionHelp')}</Typography>
                       <Box component="ul" sx={{ mt: 0, mb: 0.5, pl: 2.5 }}>
                         {[
-                          ['Created (green)', 'A new object was added to the system.'],
-                          ['Updated (yellow)', 'An existing object was modified.'],
-                          ['Deleted (red)', 'An object was permanently removed.'],
-                          ['Generated key (grey)', 'An MCP API key was created for a server.'],
-                          ['Revoked key (red)', 'An MCP API key was deleted, revoking all client access.'],
-                          ['Login (grey)', 'A user successfully signed in.'],
-                        ].map(([a, d]) => <Box component="li" key={a}><Typography variant="body2"><strong>{a}</strong> — {d}</Typography></Box>)}
+                          t('help.actionCreated'),
+                          t('help.actionUpdated'),
+                          t('help.actionDeleted'),
+                          t('help.actionGeneratedKey'),
+                          t('help.actionRevokedKey'),
+                          t('help.actionLogin'),
+                        ].map((label) => (
+                          <Box component="li" key={label}>
+                            <Typography variant="body2">{label}</Typography>
+                          </Box>
+                        ))}
                       </Box>
                     </>],
-                    ['Entity', <>
-                      <Typography variant="body2" gutterBottom>The <em>type</em> of object that was affected by the action. Possible values: <strong>Server</strong>, <strong>Tool</strong>, <strong>User</strong>, <strong>Settings</strong>, <strong>API Key</strong>.</Typography>
-                      <Typography variant="body2">Combined with the Action column, this tells you exactly what kind of change occurred — for example, Action = "Deleted" + Entity = "Tool" means a tool was permanently removed from a server.</Typography>
+                    [t('columns.entity'), <>
+                      <Typography variant="body2" gutterBottom>{t('help.entityHelp')}</Typography>
+                      <Typography variant="body2">{t('help.entityDetail')}</Typography>
                     </>],
-                    ['Item', <>
-                      <Typography variant="body2" gutterBottom>The name or unique identifier of the <em>specific</em> object that was changed. For example, if a project named "Stripe API" was deleted, the Entity column shows "Project" and this column shows "Stripe API".</Typography>
-                      <Typography variant="body2">When a name is not available (e.g. for low-level API key operations), the internal database ID is shown instead. Use this column to quickly locate which exact record was affected without needing to search the rest of the system.</Typography>
+                    [t('columns.item'), <>
+                      <Typography variant="body2" gutterBottom>{t('help.itemHelp')}</Typography>
+                      <Typography variant="body2">{t('help.itemDetail')}</Typography>
                     </>],
                   ] as [string, React.ReactNode][]).map(([h, content]) => (
                     <TableCell key={h}>
@@ -206,17 +198,12 @@ export default function AuditLogs() {
                     </TableCell>
                   ))}
 
-                  {/* IP column header with toggle */}
                   <TableCell>
                     <Box display="flex" alignItems="center" gap={0.5}>
                       {showIp && 'IP'}
-                      <Tooltip title={showIp ? 'Hide IP column' : 'Show IP column'}>
+                      <Tooltip title={showIp ? t('columns.hideIp') : t('columns.showIp')}>
                         <IconButton size="small" onClick={() => setShowIp((v) => !v)} sx={{ p: 0.25 }}>
-                          <Badge
-                            variant="dot"
-                            color="primary"
-                            invisible={showIp}
-                          >
+                          <Badge variant="dot" color="primary" invisible={showIp}>
                             {showIp ? <IconEye size={14} /> : <IconEyeOff size={14} />}
                           </Badge>
                         </IconButton>
@@ -226,14 +213,11 @@ export default function AuditLogs() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {logs.length === 0 && (
-                  <TableRow><TableCell colSpan={showIp ? 6 : 6}><Typography color="text.secondary" fontSize="0.85rem" py={2} textAlign="center">No logs found.</Typography></TableCell></TableRow>
-                )}
                 {logs.map((log) => (
                   <TableRow key={log._id} hover sx={{ '&:last-child td': { border: 0 } }}>
                     <TableCell>
                       <Typography fontSize="0.78rem" color="text.secondary" whiteSpace="nowrap">
-                        {new Date(log.createdAt).toLocaleString('en-US')}
+                        {new Date(log.createdAt).toLocaleString()}
                       </Typography>
                     </TableCell>
                     <TableCell>
@@ -241,14 +225,16 @@ export default function AuditLogs() {
                     </TableCell>
                     <TableCell>
                       <Chip
-                        label={ACTION_LABELS[log.action] ?? log.action}
+                        label={t(`actions.${log.action}`, { defaultValue: log.action })}
                         size="small"
                         color={ACTION_COLORS[log.action] ?? 'default'}
                         sx={{ fontSize: '0.72rem', height: 22 }}
                       />
                     </TableCell>
                     <TableCell>
-                      <Typography fontSize="0.82rem">{ENTITY_LABELS[log.entity] ?? log.entity}</Typography>
+                      <Typography fontSize="0.82rem">
+                        {t(`entities.${log.entity}`, { defaultValue: log.entity })}
+                      </Typography>
                     </TableCell>
                     <TableCell>
                       <Typography fontSize="0.82rem" color="text.secondary">
@@ -266,9 +252,15 @@ export default function AuditLogs() {
             </Table>
           </Paper>
 
+          {logs.length === 0 && (
+            <Box py={6} textAlign="center">
+              <Typography color="text.secondary" variant="body2">{t('noLogs')}</Typography>
+            </Box>
+          )}
+
           <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
             <Typography variant="caption" color="text.secondary">
-              {total === 0 ? 'No entries' : `${skip + 1}–${Math.min(skip + LIMIT, total)} of ${total}`}
+              {paginationLabel}
             </Typography>
             {pageCount > 1 && (
               <Pagination

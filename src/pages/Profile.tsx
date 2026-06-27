@@ -38,6 +38,7 @@ import {
   IconLock,
   IconX,
 } from '@tabler/icons-react'
+import { useTranslation } from 'react-i18next'
 import api from '../api'
 import { useAuth, Permission } from '../context/AuthContext'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -53,56 +54,44 @@ interface UserProfile {
   createdAt: string
 }
 
-// ─── Role types ───────────────────────────────────────────────────────────────
-
 interface RolePermissions {
-  // Servers
   servers_view: boolean
   servers_create: boolean
   servers_edit_settings: boolean
   servers_delete: boolean
   servers_toggle_active: boolean
   servers_share: boolean
-  // Tools
   tools_view: boolean
   tools_create: boolean
   tools_edit: boolean
   tools_delete: boolean
   tools_test: boolean
   endpoints_create: boolean
-  // Resources
   resources_view: boolean
   resources_create: boolean
   resources_edit: boolean
   resources_delete: boolean
-  // Prompts
   prompts_view: boolean
   prompts_create: boolean
   prompts_edit: boolean
   prompts_delete: boolean
-  // Secrets
   secrets_view_names: boolean
   secrets_reveal_values: boolean
   secrets_create: boolean
   secrets_edit: boolean
   secrets_delete: boolean
-  // API Keys
   api_keys_view: boolean
   api_keys_create: boolean
   api_keys_delete: boolean
-  // Users & Roles
   users_view: boolean
   users_invite: boolean
   users_edit: boolean
   users_delete: boolean
   roles_view: boolean
   roles_manage: boolean
-  // Audit & Logs
   audit_view: boolean
   audit_export: boolean
-  // Templates
   templates_use: boolean
-  // Settings
   settings_manage: boolean
 }
 
@@ -117,7 +106,6 @@ interface Role {
 
 const PERMISSION_GROUPS: {
   label: string
-  icon?: string
   keys: (keyof RolePermissions)[]
   descriptions: Partial<Record<keyof RolePermissions, string>>
 }[] = [
@@ -295,8 +283,6 @@ const BUILTIN_ROLES: Role[] = [
 
 const emptyPermissions = (): RolePermissions => ({ ...ALL_OFF, servers_view: true })
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 function avatarLetter(username: string) {
   return username.charAt(0).toUpperCase()
 }
@@ -306,7 +292,7 @@ function avatarColor(username: string) {
   return colors[username.charCodeAt(0) % colors.length]
 }
 
-// ─── User form dialog (create / edit — admin) ─────────────────────────────────
+// ─── User dialog ──────────────────────────────────────────────────────────────
 
 interface UserDialogProps {
   open: boolean
@@ -319,6 +305,7 @@ interface UserDialogProps {
 }
 
 function UserDialog({ open, onClose, onSaved, editUser, onDeleted, canDelete, currentUserId }: UserDialogProps) {
+  const { t } = useTranslation('profile')
   const isEdit = !!editUser
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
@@ -338,19 +325,19 @@ function UserDialog({ open, onClose, onSaved, editUser, onDeleted, canDelete, cu
           label: role.name,
         }))
         setAvailableRoles([
-          { value: 'admin', label: 'Administrator' },
-          { value: 'developer', label: 'Developer' },
-          { value: 'editor', label: 'Editor' },
-          { value: 'viewer', label: 'Viewer' },
+          { value: 'admin', label: t('userDialog.roleAdmin') },
+          { value: 'developer', label: t('userDialog.roleDeveloper') },
+          { value: 'editor', label: t('userDialog.roleEditor') },
+          { value: 'viewer', label: t('userDialog.roleViewer') },
           ...dynamic,
         ])
       })
       .catch(() => {
         setAvailableRoles([
-          { value: 'admin', label: 'Administrator' },
-          { value: 'developer', label: 'Developer' },
-          { value: 'editor', label: 'Editor' },
-          { value: 'viewer', label: 'Viewer' },
+          { value: 'admin', label: t('userDialog.roleAdmin') },
+          { value: 'developer', label: t('userDialog.roleDeveloper') },
+          { value: 'editor', label: t('userDialog.roleEditor') },
+          { value: 'viewer', label: t('userDialog.roleViewer') },
         ])
       })
   }, [])
@@ -366,9 +353,9 @@ function UserDialog({ open, onClose, onSaved, editUser, onDeleted, canDelete, cu
   }, [open, editUser])
 
   const handleSave = async () => {
-    if (!username.trim()) { setError('Username is required.'); return }
-    if (!email.trim()) { setError('Email is required.'); return }
-    if (!isEdit && !password.trim()) { setError('Password is required for new users.'); return }
+    if (!username.trim()) { setError(t('userDialog.usernameRequired')); return }
+    if (!email.trim()) { setError(t('userDialog.emailRequired')); return }
+    if (!isEdit && !password.trim()) { setError(t('userDialog.passwordRequired')); return }
 
     setSaving(true); setError('')
     try {
@@ -384,8 +371,8 @@ function UserDialog({ open, onClose, onSaved, editUser, onDeleted, canDelete, cu
       onClose()
     } catch (err: unknown) {
       const msg = err && typeof err === 'object' && 'response' in err
-        ? (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Error saving.'
-        : 'Error saving.'
+        ? (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? t('userDialog.saveError')
+        : t('userDialog.saveError')
       setError(msg)
     } finally {
       setSaving(false)
@@ -410,23 +397,28 @@ function UserDialog({ open, onClose, onSaved, editUser, onDeleted, canDelete, cu
   return (
     <>
     <Drawer anchor="right" open={open} onClose={onClose}
-      PaperProps={{ sx: { width: { xs: '100vw', sm: 480 }, display: 'flex', flexDirection: 'column' } }}>
+      PaperProps={{ sx: { width: { xs: '100vw', sm: 560 }, display: 'flex', flexDirection: 'column' } }}>
       <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
-        <Typography variant="h6" fontWeight={700} flexGrow={1}>{isEdit ? 'Edit user' : 'New user'}</Typography>
-        <IconButton size="small" onClick={onClose}><IconX size={18} /></IconButton>
+        <Typography variant="h6" fontWeight={700} flexGrow={1}>
+          {isEdit ? t('userDialog.editTitle') : t('userDialog.newTitle')}
+        </Typography>
+        <Tooltip title={t('userDialog.closeTooltip')}>
+          <IconButton size="small" onClick={onClose}><IconX size={18} /></IconButton>
+        </Tooltip>
       </Box>
       <Box sx={{ flex: 1, overflowY: 'auto', px: 3, py: 2.5 }}>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         <Box display="flex" flexDirection="column" gap={2} pt={0.5}>
-          <TextField size="small" fullWidth required autoFocus label="Username"
+          <TextField size="small" fullWidth required autoFocus label={t('userDialog.usernameLabel')}
             value={username} onChange={(e) => { setUsername(e.target.value); setError('') }} />
-          <TextField size="small" fullWidth required label="Email" type="email"
+          <TextField size="small" fullWidth required label={t('userDialog.emailLabel')} type="email"
             value={email} onChange={(e) => { setEmail(e.target.value); setError('') }} />
-          <TextField size="small" fullWidth label={isEdit ? 'New password (leave blank to keep)' : 'Password *'}
+          <TextField size="small" fullWidth
+            label={isEdit ? t('userDialog.passwordChangeLabel') : t('userDialog.passwordLabel')}
             type="password" value={password} onChange={(e) => { setPassword(e.target.value); setError('') }} />
           <FormControl size="small" fullWidth>
-            <InputLabel>Role</InputLabel>
-            <Select value={role} label="Role" onChange={(e) => setRole(e.target.value)}>
+            <InputLabel>{t('userDialog.roleLabel')}</InputLabel>
+            <Select value={role} label={t('userDialog.roleLabel')} onChange={(e) => setRole(e.target.value)}>
               {availableRoles.map((r) => (
                 <MenuItem key={r.value} value={r.value}>{r.label}</MenuItem>
               ))}
@@ -438,22 +430,22 @@ function UserDialog({ open, onClose, onSaved, editUser, onDeleted, canDelete, cu
         {isEdit && canDelete && !isSelf && (
           <Button color="error" onClick={() => setDeleteConfirmOpen(true)} disabled={saving || deleting}
             startIcon={<IconTrash size={18} />} sx={{ mr: 'auto' }}>
-            Delete user
+            {t('userDialog.deleteUser')}
           </Button>
         )}
-        <Button onClick={onClose} disabled={saving || deleting}>Cancel</Button>
+        <Button onClick={onClose} disabled={saving || deleting}>{t('userDialog.cancel')}</Button>
         <Button variant="contained" onClick={handleSave} disabled={saving || deleting}
           startIcon={saving ? <CircularProgress size={14} color="inherit" /> : undefined}>
-          {saving ? 'Saving…' : isEdit ? 'Save' : 'Create user'}
+          {saving ? t('userDialog.saving') : isEdit ? t('userDialog.save') : t('userDialog.createUser')}
         </Button>
       </Box>
     </Drawer>
 
     <ConfirmDialog
       open={deleteConfirmOpen}
-      title={`Delete "${editUser?.username}"?`}
-      message="This action cannot be undone."
-      confirmLabel="Delete" confirmColor="error" loading={deleting}
+      title={t('userDialog.deleteConfirmTitle', { username: editUser?.username })}
+      message={t('userDialog.deleteConfirmMessage')}
+      confirmLabel={t('userDialog.delete')} confirmColor="error" loading={deleting}
       onConfirm={handleDeleteConfirm}
       onClose={() => setDeleteConfirmOpen(false)}
     />
@@ -464,6 +456,7 @@ function UserDialog({ open, onClose, onSaved, editUser, onDeleted, canDelete, cu
 // ─── My profile tab ───────────────────────────────────────────────────────────
 
 function MyProfileTab({ me, onUpdated }: { me: UserProfile; onUpdated: (u: UserProfile) => void }) {
+  const { t } = useTranslation('profile')
   const [username, setUsername] = useState(me.username)
   const [email, setEmail] = useState(me.email)
   const [currentPassword, setCurrentPassword] = useState('')
@@ -471,7 +464,6 @@ function MyProfileTab({ me, onUpdated }: { me: UserProfile; onUpdated: (u: UserP
   const [confirmPassword, setConfirmPassword] = useState('')
   const [saving, setSaving] = useState(false)
 
-  // Snackbar
   const [snackOpen, setSnackOpen] = useState(false)
   const [snackMsg, setSnackMsg] = useState('')
   const [snackSeverity, setSnackSeverity] = useState<'success' | 'error'>('success')
@@ -481,8 +473,12 @@ function MyProfileTab({ me, onUpdated }: { me: UserProfile; onUpdated: (u: UserP
   }
 
   const handleSave = async () => {
-    if (newPassword && newPassword !== confirmPassword) { showSnack('Passwords do not match.', 'error'); return }
-    if (newPassword && !currentPassword) { showSnack('Enter your current password to set a new one.', 'error'); return }
+    if (newPassword && newPassword !== confirmPassword) {
+      showSnack(t('myProfile.passwordMatchError'), 'error'); return
+    }
+    if (newPassword && !currentPassword) {
+      showSnack(t('myProfile.currentPasswordRequired'), 'error'); return
+    }
 
     setSaving(true)
     try {
@@ -491,16 +487,16 @@ function MyProfileTab({ me, onUpdated }: { me: UserProfile; onUpdated: (u: UserP
       if (email !== me.email) dto.email = email
       if (newPassword) { dto.currentPassword = currentPassword; dto.newPassword = newPassword }
 
-      if (Object.keys(dto).length === 0) { showSnack('No changes detected.', 'error'); return }
+      if (Object.keys(dto).length === 0) { showSnack(t('myProfile.noChanges'), 'error'); return }
 
       const res = await api.patch<UserProfile>('/users/me', dto)
       onUpdated(res.data)
       setCurrentPassword(''); setNewPassword(''); setConfirmPassword('')
-      showSnack('Profile updated successfully.', 'success')
+      showSnack(t('myProfile.saveSuccess'), 'success')
     } catch (err: unknown) {
       const msg = err && typeof err === 'object' && 'response' in err
-        ? (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Error updating.'
-        : 'Error updating.'
+        ? (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? t('myProfile.saveError')
+        : t('myProfile.saveError')
       showSnack(msg, 'error')
     } finally {
       setSaving(false)
@@ -509,7 +505,6 @@ function MyProfileTab({ me, onUpdated }: { me: UserProfile; onUpdated: (u: UserP
 
   return (
     <Box>
-      {/* Avatar / header */}
       <Paper variant="outlined" sx={{ p: 3, mb: 3, display: 'flex', alignItems: 'center', gap: 2.5 }}>
         <Avatar sx={{ width: 64, height: 64, fontSize: '1.5rem', bgcolor: avatarColor(me.username), fontWeight: 700 }}>
           {avatarLetter(me.username)}
@@ -517,43 +512,51 @@ function MyProfileTab({ me, onUpdated }: { me: UserProfile; onUpdated: (u: UserP
         <Box>
           <Typography variant="h6" fontWeight={700}>{me.username}</Typography>
           <Typography variant="body2" color="text.secondary">{me.email}</Typography>
-          <Chip label={me.role === 'admin' ? 'Administrator' : 'User'} size="small" color={me.role === 'admin' ? 'primary' : 'default'} sx={{ mt: 0.5 }} />
+          <Chip
+            label={me.role === 'admin' ? t('userDialog.roleAdmin') : me.role.charAt(0).toUpperCase() + me.role.slice(1)}
+            size="small"
+            color={me.role === 'admin' ? 'primary' : 'default'}
+            sx={{ mt: 0.5, height: 22 }}
+          />
         </Box>
       </Paper>
 
       <Grid container spacing={3}>
-        {/* Basic info */}
         <Grid item xs={12}>
-          <Typography variant="subtitle2" fontWeight={700} mb={2}>Account information</Typography>
+          <Divider textAlign="left" sx={{ mb: 2 }}>
+            <Typography variant="caption" color="text.secondary">{t('myProfile.accountInfo')}</Typography>
+          </Divider>
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
-              <TextField size="small" fullWidth label="Username" value={username}
+              <TextField size="small" fullWidth label={t('myProfile.usernameLabel')} value={username}
                 onChange={(e) => setUsername(e.target.value)} />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField size="small" fullWidth label="Email" type="email" value={email}
+              <TextField size="small" fullWidth label={t('myProfile.emailLabel')} type="email" value={email}
                 onChange={(e) => setEmail(e.target.value)} />
             </Grid>
           </Grid>
         </Grid>
 
-        {/* Change password */}
         <Grid item xs={12}>
-          <Typography variant="subtitle2" fontWeight={700} mb={2}>Change password</Typography>
+          <Divider textAlign="left" sx={{ mb: 2 }}>
+            <Typography variant="caption" color="text.secondary">{t('myProfile.changePassword')}</Typography>
+          </Divider>
           <Grid container spacing={2}>
             <Grid item xs={12} sm={4}>
-              <TextField size="small" fullWidth label="Current password" type="password"
+              <TextField size="small" fullWidth label={t('myProfile.currentPasswordLabel')} type="password"
                 value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <TextField size="small" fullWidth label="New password" type="password"
+              <TextField size="small" fullWidth label={t('myProfile.newPasswordLabel')} type="password"
                 value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <TextField size="small" fullWidth label="Confirm new password" type="password"
+              <TextField size="small" fullWidth label={t('myProfile.confirmPasswordLabel')} type="password"
                 value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
                 error={!!newPassword && !!confirmPassword && newPassword !== confirmPassword}
-                helperText={newPassword && confirmPassword && newPassword !== confirmPassword ? 'Passwords do not match' : ''} />
+                helperText={newPassword && confirmPassword && newPassword !== confirmPassword
+                  ? t('myProfile.passwordMismatchHelper') : ''} />
             </Grid>
           </Grid>
         </Grid>
@@ -561,7 +564,7 @@ function MyProfileTab({ me, onUpdated }: { me: UserProfile; onUpdated: (u: UserP
         <Grid item xs={12}>
           <Button size="small" variant="contained" onClick={handleSave} disabled={saving}
             startIcon={saving ? <CircularProgress size={14} color="inherit" /> : undefined}>
-            {saving ? 'Saving…' : 'Save changes'}
+            {saving ? t('myProfile.saving') : t('myProfile.saveChanges')}
           </Button>
         </Grid>
       </Grid>
@@ -571,9 +574,10 @@ function MyProfileTab({ me, onUpdated }: { me: UserProfile; onUpdated: (u: UserP
   )
 }
 
-// ─── Users management tab (admin) ─────────────────────────────────────────────
+// ─── Users tab ────────────────────────────────────────────────────────────────
 
 function UsersTab({ currentUserId }: { currentUserId: string }) {
+  const { t } = useTranslation('profile')
   const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -581,7 +585,6 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
   const [editingUser, setEditingUser] = useState<UserProfile | undefined>()
   const { can } = useAuth()
 
-  // Snackbar
   const [snackOpen, setSnackOpen] = useState(false)
   const [snackMsg, setSnackMsg] = useState('')
   const [snackSeverity, setSnackSeverity] = useState<'success' | 'error'>('success')
@@ -590,7 +593,7 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
     setLoading(true)
     api.get<UserProfile[]>('/users')
       .then((r) => setUsers(r.data))
-      .catch(() => setError('Failed to load users.'))
+      .catch(() => setError(t('users.loadError')))
       .finally(() => setLoading(false))
   }
 
@@ -607,7 +610,7 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
   const handleDeleted = (id: string) => {
     setUsers((prev) => prev.filter((u) => u._id !== id))
     setDialogOpen(false)
-    setSnackMsg('User deleted.')
+    setSnackMsg(t('users.deleteSuccess'))
     setSnackSeverity('success')
     setSnackOpen(true)
   }
@@ -616,15 +619,21 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
   const handleOpenEdit = (user: UserProfile) => { setEditingUser(user); setDialogOpen(true) }
 
   if (loading) return <Box display="flex" justifyContent="center" py={6}><CircularProgress /></Box>
-  if (error) return <Alert severity="error">{error}</Alert>
+  if (error) return (
+    <Box py={8} textAlign="center">
+      <Typography color="text.secondary">{error}</Typography>
+    </Box>
+  )
 
   return (
     <Box>
       <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
-        <Typography variant="subtitle1" fontWeight={700}>{users.length} user{users.length !== 1 ? 's' : ''}</Typography>
+        <Typography variant="subtitle1" fontWeight={700}>
+          {users.length === 1 ? t('users.countSingular') : t('users.countPlural', { count: users.length })}
+        </Typography>
         {can(Permission.UsersInvite) && (
           <Button variant="contained" startIcon={<IconPlus size={18} />} size="small" onClick={handleOpenCreate}>
-            New user
+            {t('users.newUser')}
           </Button>
         )}
       </Box>
@@ -633,10 +642,10 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>User</TableCell>
-              <TableCell>Email</TableCell>
-              <TableCell>Role</TableCell>
-              <TableCell>Created</TableCell>
+              <TableCell>{t('users.columns.user')}</TableCell>
+              <TableCell>{t('users.columns.email')}</TableCell>
+              <TableCell>{t('users.columns.role')}</TableCell>
+              <TableCell>{t('users.columns.created')}</TableCell>
               <TableCell align="right" />
             </TableRow>
           </TableHead>
@@ -649,7 +658,9 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
                       {avatarLetter(u.username)}
                     </Avatar>
                     <Typography fontSize="0.875rem" fontWeight={500}>{u.username}</Typography>
-                    {u._id === currentUserId && <Chip label="you" size="small" sx={{ height: 18, fontSize: '0.65rem' }} />}
+                    {u._id === currentUserId && (
+                      <Chip label={t('users.you')} size="small" variant="outlined" sx={{ height: 18, fontSize: '0.65rem' }} />
+                    )}
                   </Box>
                 </TableCell>
                 <TableCell><Typography fontSize="0.82rem" color="text.secondary">{u.email}</Typography></TableCell>
@@ -663,12 +674,12 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
                 </TableCell>
                 <TableCell>
                   <Typography fontSize="0.78rem" color="text.secondary">
-                    {new Date(u.createdAt).toLocaleDateString('en-US')}
+                    {new Date(u.createdAt).toLocaleDateString()}
                   </Typography>
                 </TableCell>
                 <TableCell align="right">
                   {can(Permission.UsersEdit) && (
-                    <Tooltip title="Edit">
+                    <Tooltip title={t('users.editTooltip')}>
                       <IconButton size="small" onClick={() => handleOpenEdit(u)}><IconEdit size={16} /></IconButton>
                     </Tooltip>
                   )}
@@ -704,6 +715,7 @@ function RoleDrawer({
   onSaved: (role: Role) => void
   editRole?: Role
 }) {
+  const { t } = useTranslation('profile')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [permissions, setPermissions] = useState<RolePermissions>(emptyPermissions())
@@ -740,7 +752,7 @@ function RoleDrawer({
   const allOn = allKeys.every((k) => permissions[k])
 
   const handleSave = async () => {
-    if (!name.trim()) { setError('Name is required.'); return }
+    if (!name.trim()) { setError(t('roleDrawer.nameRequired')); return }
     setSaving(true); setError('')
     try {
       const dto = { name: name.trim(), description: description.trim() || undefined, permissions }
@@ -756,8 +768,8 @@ function RoleDrawer({
       onClose()
     } catch (err: unknown) {
       const msg = err && typeof err === 'object' && 'response' in err
-        ? (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Error saving.'
-        : 'Error saving.'
+        ? (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? t('roleDrawer.saveError')
+        : t('roleDrawer.saveError')
       setError(msg)
     } finally {
       setSaving(false)
@@ -766,36 +778,34 @@ function RoleDrawer({
 
   return (
     <Drawer anchor="right" open={open} onClose={onClose}
-      PaperProps={{ sx: { width: { xs: '100vw', sm: 480 }, display: 'flex', flexDirection: 'column' } }}>
+      PaperProps={{ sx: { width: { xs: '100vw', sm: 560 }, display: 'flex', flexDirection: 'column' } }}>
       <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
-        <Typography variant="h6" fontWeight={700} flexGrow={1}>{editRole ? 'Edit role' : 'New role'}</Typography>
-        <IconButton size="small" onClick={onClose}><IconX size={18} /></IconButton>
+        <Typography variant="h6" fontWeight={700} flexGrow={1}>
+          {editRole ? t('roleDrawer.editTitle') : t('roleDrawer.newTitle')}
+        </Typography>
+        <Tooltip title={t('roleDrawer.closeTooltip')}>
+          <IconButton size="small" onClick={onClose}><IconX size={18} /></IconButton>
+        </Tooltip>
       </Box>
 
       <Box sx={{ flex: 1, overflowY: 'auto', px: 3, py: 2.5, display: 'flex', flexDirection: 'column', gap: 3 }}>
         {error && <Alert severity="error">{error}</Alert>}
 
         <Box display="flex" flexDirection="column" gap={2}>
-          <TextField size="small" fullWidth required autoFocus label="Role name"
+          <TextField size="small" fullWidth required autoFocus label={t('roleDrawer.nameLabel')}
             value={name} onChange={(e) => { setName(e.target.value); setError('') }}
-            placeholder="e.g. Developer, Analyst…" />
-          <TextField size="small" fullWidth multiline minRows={2} label="Description (optional)"
+            placeholder={t('roleDrawer.namePlaceholder')} />
+          <TextField size="small" fullWidth multiline minRows={4} label={t('roleDrawer.descriptionLabel')}
             value={description} onChange={(e) => setDescription(e.target.value)}
-            placeholder="What this role allows…" />
+            placeholder={t('roleDrawer.descriptionPlaceholder')} />
         </Box>
 
         <Box>
           <Box display="flex" alignItems="center" justifyContent="space-between" mb={1.5}>
-            <Typography variant="subtitle2" fontWeight={700}>Permissions</Typography>
+            <Typography variant="subtitle2" fontWeight={700}>{t('roleDrawer.permissionsTitle')}</Typography>
             <FormControlLabel
-              control={
-                <Switch
-                  size="small"
-                  checked={allOn}
-                  onChange={toggleAll}
-                />
-              }
-              label={<Typography fontSize="0.8rem" color="text.secondary">Select all</Typography>}
+              control={<Switch size="small" checked={allOn} onChange={toggleAll} />}
+              label={<Typography fontSize="0.8rem" color="text.secondary">{t('roleDrawer.selectAll')}</Typography>}
               sx={{ mr: 0 }}
             />
           </Box>
@@ -808,30 +818,18 @@ function RoleDrawer({
                   <Box display="flex" alignItems="center" justifyContent="space-between" mb={0.5}>
                     <Typography variant="caption" fontWeight={700} color="text.secondary"
                       sx={{ textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                      {group.label}
+                      {t(`permissionGroups.${group.label}`, { defaultValue: group.label })}
                     </Typography>
                     <FormControlLabel
-                      control={
-                        <Switch
-                          size="small"
-                          checked={groupAllOn}
-                          onChange={() => toggleGroup(group.keys)}
-                        />
-                      }
-                      label={<Typography fontSize="0.75rem" color="text.secondary">All</Typography>}
+                      control={<Switch size="small" checked={groupAllOn} onChange={() => toggleGroup(group.keys)} />}
+                      label={<Typography fontSize="0.75rem" color="text.secondary">{t('roleDrawer.all')}</Typography>}
                       sx={{ mr: 0 }}
                     />
                   </Box>
                   {group.keys.map((key) => (
                     <FormControlLabel
                       key={key}
-                      control={
-                        <Switch
-                          size="small"
-                          checked={permissions[key]}
-                          onChange={() => toggle(key)}
-                        />
-                      }
+                      control={<Switch size="small" checked={permissions[key]} onChange={() => toggle(key)} />}
                       label={<Typography fontSize="0.875rem">{group.descriptions[key]}</Typography>}
                       sx={{ display: 'flex', alignItems: 'center', mb: 0.25, ml: 0 }}
                     />
@@ -844,10 +842,10 @@ function RoleDrawer({
       </Box>
 
       <Box sx={{ px: 3, py: 2, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1, flexShrink: 0 }}>
-        <Button onClick={onClose} disabled={saving}>Cancel</Button>
+        <Button onClick={onClose} disabled={saving}>{t('roleDrawer.cancel')}</Button>
         <Button variant="contained" onClick={handleSave} disabled={saving}
           startIcon={saving ? <CircularProgress size={14} color="inherit" /> : undefined}>
-          {saving ? 'Saving…' : editRole ? 'Save changes' : 'Create role'}
+          {saving ? t('roleDrawer.saving') : editRole ? t('roleDrawer.save') : t('roleDrawer.create')}
         </Button>
       </Box>
     </Drawer>
@@ -857,6 +855,7 @@ function RoleDrawer({
 // ─── Roles tab ─────────────────────────────────────────────────────────────────
 
 function RolesTab() {
+  const { t } = useTranslation('profile')
   const [roles, setRoles] = useState<Role[]>([])
   const [loading, setLoading] = useState(true)
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -886,7 +885,10 @@ function RolesTab() {
       if (idx >= 0) { const next = [...prev]; next[idx] = role; return next }
       return [...prev, role]
     })
-    setSnack({ message: editRole ? 'Role updated.' : 'Role created.', severity: 'success' })
+    setSnack({
+      message: editRole ? t('roles.roleUpdated') : t('roles.roleCreated'),
+      severity: 'success',
+    })
   }
 
   const handleDeleteConfirm = async () => {
@@ -895,9 +897,9 @@ function RolesTab() {
     try {
       await api.delete(`/roles/${deleteTarget._id}`)
       setRoles((prev) => prev.filter((r) => r._id !== deleteTarget._id))
-      setSnack({ message: 'Role deleted.', severity: 'success' })
+      setSnack({ message: t('roles.roleDeleted'), severity: 'success' })
     } catch {
-      setSnack({ message: 'Failed to delete role.', severity: 'error' })
+      setSnack({ message: t('roles.roleDeleteFailed'), severity: 'error' })
     } finally {
       setDeleting(false)
       setDeleteTarget(null)
@@ -917,6 +919,7 @@ function RolesTab() {
     const allPermLabels = PERMISSION_GROUPS.flatMap((g) =>
       g.keys.map((k) => ({ k, desc: g.descriptions[k] ?? k }))
     )
+    const count = permissionCount(role.permissions)
     return (
       <Paper key={role._id} variant="outlined" sx={{ p: 2.5 }}>
         <Box display="flex" alignItems="flex-start" gap={1.5}>
@@ -927,9 +930,9 @@ function RolesTab() {
             <Box display="flex" alignItems="center" gap={1} mb={0.5}>
               <Typography fontWeight={700} fontSize="0.925rem">{role.name}</Typography>
               <Chip
-                label={`${permissionCount(role.permissions)} / ${totalPermissions} permissions`}
+                label={t('roles.permissions', { count, total: totalPermissions })}
                 size="small"
-                color={permissionCount(role.permissions) === totalPermissions ? 'primary' : 'default'}
+                color={count === totalPermissions ? 'primary' : 'default'}
                 sx={{ fontSize: '0.65rem', height: 18, borderRadius: '4px' }}
               />
             </Box>
@@ -948,12 +951,12 @@ function RolesTab() {
           </Box>
           {isDynamic && can(Permission.RolesManage) && (
             <Box display="flex" gap={0.5} flexShrink={0}>
-              <Tooltip title="Edit">
+              <Tooltip title={t('roles.editTooltip')}>
                 <IconButton size="small" onClick={() => { setEditRole(role); setDrawerOpen(true) }}>
                   <IconEdit size={16} />
                 </IconButton>
               </Tooltip>
-              <Tooltip title="Delete">
+              <Tooltip title={t('roles.deleteTooltip')}>
                 <IconButton size="small" color="error" onClick={() => setDeleteTarget(role)}>
                   <IconTrash size={16} />
                 </IconButton>
@@ -967,12 +970,11 @@ function RolesTab() {
 
   return (
     <Box>
-      {/* Static roles */}
       <Box mb={4}>
         <Box display="flex" alignItems="center" gap={1} mb={1.5}>
           <IconLock size={16} />
-          <Typography variant="subtitle2" fontWeight={700}>Built-in roles</Typography>
-          <Typography variant="body2" color="text.secondary">— read-only, always available</Typography>
+          <Typography variant="subtitle2" fontWeight={700}>{t('roles.builtinTitle')}</Typography>
+          <Typography variant="body2" color="text.secondary">{t('roles.builtinSubtitle')}</Typography>
         </Box>
         <Box display="flex" flexDirection="column" gap={1.5}>
           {staticRoles.map(renderRoleCard)}
@@ -981,24 +983,23 @@ function RolesTab() {
 
       <Divider sx={{ mb: 4 }} />
 
-      {/* Dynamic roles */}
       <Box>
         <Box display="flex" alignItems="flex-start" justifyContent="space-between" mb={1.5}>
           <Box display="flex" alignItems="center" gap={1}>
             <IconShield size={16} />
-            <Typography variant="subtitle2" fontWeight={700}>Custom roles</Typography>
+            <Typography variant="subtitle2" fontWeight={700}>{t('roles.customTitle')}</Typography>
           </Box>
           {can(Permission.RolesManage) && (
             <Button variant="contained" size="small" startIcon={<IconPlus size={16} />}
               onClick={() => { setEditRole(undefined); setDrawerOpen(true) }}>
-              New role
+              {t('roles.newRole')}
             </Button>
           )}
         </Box>
         {dynamicRoles.length === 0 ? (
-          <Alert severity="info" sx={{ fontSize: '0.85rem' }}>
-            No custom roles yet. Click <strong>New role</strong> to create one.
-          </Alert>
+          <Box py={4} textAlign="center">
+            <Typography color="text.secondary" variant="body2">{t('roles.noCustomRoles')}</Typography>
+          </Box>
         ) : (
           <Box display="flex" flexDirection="column" gap={1.5}>
             {dynamicRoles.map(renderRoleCard)}
@@ -1015,9 +1016,9 @@ function RolesTab() {
 
       <ConfirmDialog
         open={deleteTarget !== null}
-        title={`Delete role "${deleteTarget?.name}"?`}
-        message="Members assigned to this role will lose its permissions."
-        confirmLabel="Delete"
+        title={t('roles.deleteConfirmTitle', { name: deleteTarget?.name })}
+        message={t('roles.deleteConfirmMessage')}
+        confirmLabel={t('roles.delete')}
         confirmColor="error"
         loading={deleting}
         onConfirm={handleDeleteConfirm}
@@ -1037,6 +1038,7 @@ function RolesTab() {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function Profile() {
+  const { t } = useTranslation('profile')
   const [me, setMe] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'profile' | 'users' | 'roles'>('profile')
@@ -1049,20 +1051,29 @@ export default function Profile() {
       .finally(() => setLoading(false))
   }, [authLoading])
 
-  if (loading || authLoading) return <Box display="flex" justifyContent="center" alignItems="center" height="50vh"><CircularProgress /></Box>
-  if (!me) return <Alert severity="error">Unable to load profile.</Alert>
+  if (loading || authLoading) return (
+    <Box display="flex" justifyContent="center" alignItems="center" height="50vh">
+      <CircularProgress />
+    </Box>
+  )
+
+  if (!me) return (
+    <Box py={8} textAlign="center">
+      <Typography color="text.secondary">{t('loadError')}</Typography>
+    </Box>
+  )
 
   return (
-    <Box py={3} px={0}>
-      <Typography variant="h5" fontWeight={700} mb={2.5} letterSpacing="-0.2px">Profile</Typography>
+    <Box>
+      <Typography variant="h5" fontWeight={700} mb={2.5} letterSpacing="-0.2px">{t('title')}</Typography>
 
       <Tabs value={tab} onChange={(_, v) => setTab(v as typeof tab)} sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tab value="profile" icon={<IconUser size={16} />} iconPosition="start" label="My Profile" />
+        <Tab value="profile" icon={<IconUser size={16} />} iconPosition="start" label={t('tabs.myProfile')} />
         {can(Permission.UsersView) && (
-          <Tab value="users" icon={<IconUsers size={16} />} iconPosition="start" label="Users" />
+          <Tab value="users" icon={<IconUsers size={16} />} iconPosition="start" label={t('tabs.users')} />
         )}
         {can(Permission.RolesView) && (
-          <Tab value="roles" icon={<IconShield size={16} />} iconPosition="start" label="Roles" />
+          <Tab value="roles" icon={<IconShield size={16} />} iconPosition="start" label={t('tabs.roles')} />
         )}
       </Tabs>
 
@@ -1073,5 +1084,4 @@ export default function Profile() {
   )
 }
 
-// Re-export helpers for use in Layout
 export { avatarLetter, avatarColor }

@@ -1,0 +1,31 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "servers": "Servidores",
+    "prompts": "Prompts",
+    "secrets": "Segredos",
+    "settings": "Configurações",
+    "auditLogs": "Logs de Auditoria"
+  },
+  "section": {
+    "overview": "VISÃO GERAL",
+    "main": "PRINCIPAL",
+    "administration": "ADMINISTRAÇÃO"
+  },
+  "account": {
+    "menu": "Menu da conta",
+    "myProfile": "Meu Perfil",
+    "logout": "Sair"
+  },
+  "theme": {
+    "lightMode": "Modo claro",
+    "darkMode": "Modo escuro"
+  },
+  "promo": {
+    "title": "Arthur MCP Adapter",
+    "subtitle": "Conecte sua IA às suas APIs"
+  },
+  "sidebar": {
+    "backToServers": "Servidores"
+  }
+}

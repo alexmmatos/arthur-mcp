@@ -1,16 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Alert,
   Box,
   Button,
-  Card,
-  CardActionArea,
-  CardContent,
   Chip,
   Grid,
   IconButton,
   InputAdornment,
+  Paper,
   Skeleton,
   TextField,
   Tooltip,
@@ -53,29 +52,30 @@ interface HealthEntry {
 // ─── Traffic light dot ───────────────────────────────────────────────────────
 
 function TrafficLight({ health, isPaused }: { health?: HealthEntry; isPaused?: boolean }) {
+  const { t } = useTranslation('servers')
   if (isPaused) {
     return (
-      <Tooltip title="Paused by manager">
-        <Box sx={{ width: 11, height: 11, borderRadius: '50%', bgcolor: '#9e9e9e', flexShrink: 0, border: '1.5px solid #757575' }} />
+      <Tooltip title={t('status.pausedByManager')}>
+        <Box sx={{ width: 11, height: 11, borderRadius: '50%', bgcolor: 'text.disabled', flexShrink: 0, border: '1.5px solid', borderColor: 'text.secondary' }} />
       </Tooltip>
     )
   }
   if (!health || health.totalCalls === 0) {
     return (
-      <Tooltip title="No activity in the last hour">
-        <Box sx={{ width: 11, height: 11, borderRadius: '50%', bgcolor: '#e0e0e0', flexShrink: 0, border: '1.5px solid #bdbdbd' }} />
+      <Tooltip title={t('status.noActivity')}>
+        <Box sx={{ width: 11, height: 11, borderRadius: '50%', bgcolor: 'action.disabledBackground', flexShrink: 0, border: '1.5px solid', borderColor: 'action.disabled' }} />
       </Tooltip>
     )
   }
   const { errorRatePct } = health
-  const color = errorRatePct === 0 ? '#22c55e' : errorRatePct < 20 ? '#f59e0b' : '#ef4444'
-  const border = errorRatePct === 0 ? '#16a34a' : errorRatePct < 20 ? '#d97706' : '#dc2626'
+  const color = errorRatePct === 0 ? 'success.main' : errorRatePct < 20 ? 'warning.main' : 'error.main'
+  const border = errorRatePct === 0 ? 'success.dark' : errorRatePct < 20 ? 'warning.dark' : 'error.dark'
   const label = errorRatePct === 0
-    ? `All ${health.totalCalls} requests succeeded in the last hour`
-    : `${errorRatePct}% error rate in the last hour (${health.totalCalls} requests)`
+    ? t('status.requestsSucceeded', { count: health.totalCalls })
+    : t('status.errorRate', { rate: errorRatePct, count: health.totalCalls })
   return (
     <Tooltip title={label}>
-      <Box sx={{ width: 11, height: 11, borderRadius: '50%', bgcolor: color, flexShrink: 0, border: `1.5px solid ${border}` }} />
+      <Box sx={{ width: 11, height: 11, borderRadius: '50%', bgcolor: color, flexShrink: 0, border: '1.5px solid', borderColor: border }} />
     </Tooltip>
   )
 }
@@ -90,22 +90,26 @@ function ProjectCard({ p, health, onDelete, onDuplicate }: {
 }) {
   const navigate = useNavigate()
   const { can } = useAuth()
+  const { t } = useTranslation('servers')
   return (
-    <Card
+    <Paper
       variant="outlined"
+      onClick={() => navigate(`/servers/${p._id}`)}
       sx={{
         height: '100%',
         position: 'relative',
+        cursor: 'pointer',
         opacity: p.isPaused ? 0.8 : 1,
-        transition: 'border-color 0.15s, box-shadow 0.15s',
+        transition: 'border-color 0.15s',
         '&:hover': {
           borderColor: 'primary.main',
-          boxShadow: '0 2px 12px rgba(93,135,255,0.12)',
           '& .card-actions': { opacity: 1 },
         },
+        p: 1.5,
+        pr: 5,
       }}
     >
-      {/* Action buttons — outside CardActionArea, shown on hover */}
+      {/* Action buttons — shown on hover */}
       <Box
         className="card-actions"
         sx={{
@@ -120,100 +124,96 @@ function ProjectCard({ p, health, onDelete, onDuplicate }: {
         }}
       >
         {can(Permission.ServersCreate) && (
-          <Tooltip title="Duplicate server">
-            <IconButton size="small" onClick={() => onDuplicate(p._id)} sx={{ p: 0.5, bgcolor: 'background.paper', '&:hover': { bgcolor: 'action.hover' } }}>
+          <Tooltip title={t('common:action.duplicate')}>
+            <IconButton size="small" onClick={(e) => { e.stopPropagation(); onDuplicate(p._id) }} sx={{ p: 0.5, bgcolor: 'background.paper', '&:hover': { bgcolor: 'action.hover' } }}>
               <IconCopy size={15} />
             </IconButton>
           </Tooltip>
         )}
         {can(Permission.ServersDelete) && (
-          <Tooltip title="Delete server">
-            <IconButton size="small" color="error" onClick={() => onDelete(p._id)} sx={{ p: 0.5, bgcolor: 'background.paper', '&:hover': { bgcolor: 'action.hover' } }}>
+          <Tooltip title={t('common:action.delete')}>
+            <IconButton size="small" onClick={(e) => { e.stopPropagation(); onDelete(p._id) }} sx={{ p: 0.5, color: 'text.disabled', '&:hover': { color: 'error.main' } }}>
               <IconTrash size={15} />
             </IconButton>
           </Tooltip>
         )}
       </Box>
 
-      <CardActionArea sx={{ height: '100%', alignItems: 'flex-start' }} onClick={() => navigate(`/servers/${p._id}`)}>
-        <CardContent sx={{ pb: 1.5, pr: 5 /* leave room for abs buttons */ }}>
-          <Box display="flex" alignItems="center" gap={1} mb={0.5} minWidth={0}>
-            <TrafficLight health={health} isPaused={p.isPaused} />
-            <Typography fontWeight={700} fontSize="0.9375rem" noWrap lineHeight={1.3}>
-              {p.name}
-            </Typography>
-          </Box>
+      <Box display="flex" alignItems="center" gap={1} mb={0.5} minWidth={0}>
+        <TrafficLight health={health} isPaused={p.isPaused} />
+        <Typography fontWeight={700} fontSize="0.9375rem" noWrap lineHeight={1.3}>
+          {p.name}
+        </Typography>
+      </Box>
 
-          {p.description && (
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              mt={0.5}
-              mb={0.75}
-              sx={{
-                lineHeight: 1.45,
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-              }}
-            >
-              {p.description}
-            </Typography>
-          )}
+      {p.description && (
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          mt={0.5}
+          mb={0.75}
+          sx={{
+            lineHeight: 1.45,
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
+          {p.description}
+        </Typography>
+      )}
 
-          <Typography
-            variant="caption"
-            color="text.disabled"
-            display="block"
-            mb={1}
-            fontFamily="monospace"
-            fontSize="0.72rem"
-            sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-          >
-            {p.baseUrl}
-          </Typography>
+      <Typography
+        variant="caption"
+        color="text.disabled"
+        display="block"
+        mb={1}
+        fontFamily="monospace"
+        fontSize="0.72rem"
+        sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+      >
+        {p.baseUrl}
+      </Typography>
 
-          <Box display="flex" gap={0.75} flexWrap="wrap" alignItems="center">
-            {p.isPaused
-              ? <Chip label="Paused" size="small" color="default" sx={{ fontWeight: 600 }} />
-              : <Chip
-                  label={p.status === 'active' ? 'Active' : 'Error'}
-                  size="small"
-                  color={p.status === 'active' ? 'success' : 'error'}
-                  variant="outlined"
-                  sx={{ fontWeight: 600 }}
-                />
-            }
+      <Box display="flex" gap={0.75} flexWrap="wrap" alignItems="center">
+        {p.isPaused
+          ? <Chip label={t('status.paused')} size="small" color="default" sx={{ fontWeight: 600 }} />
+          : <Chip
+              label={p.status === 'active' ? t('status.active') : t('common:status.error')}
+              size="small"
+              color={p.status === 'active' ? 'success' : 'error'}
+              variant="outlined"
+              sx={{ fontWeight: 600 }}
+            />
+        }
+        <Chip
+          label={t('label.toolCount', { count: p.tools?.length ?? 0 })}
+          size="small"
+          variant="outlined"
+          sx={{ fontWeight: 500 }}
+        />
+        {p.version && (
+          <Chip label={`v${p.version}`} size="small" variant="outlined" sx={{ fontWeight: 500 }} />
+        )}
+      </Box>
+
+      {p.tags?.length > 0 && (
+        <Box display="flex" gap={0.5} flexWrap="wrap" mt={0.75}>
+          {p.tags.map((tag) => (
             <Chip
-              label={`${p.tools?.length ?? 0} tool${(p.tools?.length ?? 0) !== 1 ? 's' : ''}`}
+              key={tag}
+              icon={<IconLabel size={10} />}
+              label={tag}
               size="small"
               variant="outlined"
-              sx={{ fontWeight: 500 }}
+              color="primary"
+              sx={{ fontSize: '0.68rem', height: 18 }}
             />
-            {p.version && (
-              <Chip label={`v${p.version}`} size="small" variant="outlined" sx={{ fontWeight: 500 }} />
-            )}
-          </Box>
-
-          {p.tags?.length > 0 && (
-            <Box display="flex" gap={0.5} flexWrap="wrap" mt={0.75}>
-              {p.tags.map((tag) => (
-                <Chip
-                  key={tag}
-                  icon={<IconLabel size={10} />}
-                  label={tag}
-                  size="small"
-                  variant="outlined"
-                  color="primary"
-                  sx={{ fontSize: '0.68rem', height: 18 }}
-                />
-              ))}
-            </Box>
-          )}
-        </CardContent>
-      </CardActionArea>
-    </Card>
+          ))}
+        </Box>
+      )}
+    </Paper>
   )
 }
 
@@ -249,6 +249,7 @@ export default function Servers() {
   const [tagFilter, setTagFilter] = useState('')
   const navigate = useNavigate()
   const { can, loading: authLoading } = useAuth()
+  const { t } = useTranslation(['servers', 'common'])
 
   // Confirm dialog state
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -277,7 +278,7 @@ export default function Servers() {
       })
       .catch((err) => {
         if (err?.response?.status === 403) setError('forbidden')
-        else setError('Failed to load servers.')
+        else setError(t('servers:error.loadFailed'))
       })
       .finally(() => setLoading(false))
   }
@@ -299,11 +300,11 @@ export default function Servers() {
     try {
       await api.delete(`/swagger/servers/${confirmTarget}`)
       setProjects((prev) => prev.filter((p) => p._id !== confirmTarget))
-      setSnackMsg('Server deleted.')
+      setSnackMsg(t('servers:toast.deleted'))
       setSnackSeverity('success')
       setSnackOpen(true)
     } catch {
-      setSnackMsg('Could not delete the server.')
+      setSnackMsg(t('servers:toast.deleteFailed'))
       setSnackSeverity('error')
       setSnackOpen(true)
     } finally {
@@ -317,11 +318,11 @@ export default function Servers() {
     try {
       const res = await api.post<Project>(`/swagger/servers/${id}/duplicate`)
       setProjects((prev) => [res.data, ...prev])
-      setSnackMsg(`"${res.data.name}" created successfully.`)
+      setSnackMsg(t('servers:toast.duplicated', { name: res.data.name }))
       setSnackSeverity('success')
       setSnackOpen(true)
     } catch {
-      setSnackMsg('Could not duplicate the server.')
+      setSnackMsg(t('servers:toast.duplicateFailed'))
       setSnackSeverity('error')
       setSnackOpen(true)
     }
@@ -340,12 +341,12 @@ export default function Servers() {
   const confirmProjectName = projects.find((p) => p._id === confirmTarget)?.name ?? 'this server'
 
   return (
-    <Box py={3} px={0}>
+    <Box>
       {/* Header */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
         <Box display="flex" alignItems="center" gap={1}>
-          <Typography variant="h5" fontWeight={700} letterSpacing="-0.2px">Servers</Typography>
-          <HelpButton title="Servers">
+          <Typography variant="h5" fontWeight={700} letterSpacing="-0.2px">{t('servers:heading.title')}</Typography>
+          <HelpButton title={t('servers:heading.title')}>
             <Typography variant="body2" gutterBottom>
               A <strong>server</strong> is the central concept in Arthur MCP Adapter. Each server represents one external API (e.g. your CRM, payment provider, internal microservice) adapted to the MCP protocol so that AI clients can interact with it naturally.
             </Typography>
@@ -376,12 +377,12 @@ export default function Servers() {
         <Box display="flex" gap={1}>
           {can(Permission.TemplatesUse) && (
             <Button variant="outlined" startIcon={<IconSparkles size={18} />} onClick={() => navigate('/templates')}>
-              Browse templates
+              {t('servers:action.browseTemplates')}
             </Button>
           )}
           {can(Permission.ServersCreate) && (
             <Button variant="contained" startIcon={<IconPlus size={18} />} onClick={() => navigate('/servers/new')}>
-              New server
+              {t('servers:action.newServer')}
             </Button>
           )}
         </Box>
@@ -390,18 +391,18 @@ export default function Servers() {
       {/* Filters */}
       <Box display="flex" gap={1.5} mb={3} flexWrap="wrap" alignItems="center">
         <TextField
-          size="small" placeholder="Search servers…"
+          size="small" placeholder={t('servers:placeholder.search')}
           value={search} onChange={(e) => setSearch(e.target.value)}
           sx={{ minWidth: 220 }}
           InputProps={{ startAdornment: <InputAdornment position="start"><IconSearch size={16} /></InputAdornment> }}
         />
         {allTags.length > 0 && (
           <Box display="flex" gap={0.5} alignItems="center" flexWrap="wrap">
-            <Typography variant="caption" color="text.secondary">Tags:</Typography>
-            <Chip label="All" size="small" onClick={() => setTagFilter('')} color={tagFilter === '' ? 'primary' : 'default'} sx={{ cursor: 'pointer' }} />
+            <Typography variant="caption" color="text.secondary">{t('servers:label.tags')}</Typography>
+            <Chip label={t('servers:label.all')} size="small" onClick={() => setTagFilter('')} color={tagFilter === '' ? 'primary' : 'default'} sx={{ cursor: 'pointer', height: 22 }} />
             {allTags.map((tag) => (
               <Chip key={tag} label={tag} size="small" onClick={() => setTagFilter(tagFilter === tag ? '' : tag)}
-                color={tagFilter === tag ? 'primary' : 'default'} sx={{ cursor: 'pointer' }} />
+                color={tagFilter === tag ? 'primary' : 'default'} sx={{ cursor: 'pointer', height: 22 }} />
             ))}
           </Box>
         )}
@@ -411,27 +412,27 @@ export default function Servers() {
         <ProjectsSkeleton />
       ) : error === 'forbidden' || !can(Permission.ServersView) ? (
         <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={12}>
-          <Typography color="text.secondary" variant="h6">Access restricted</Typography>
-          <Typography color="text.secondary" variant="body2">You don't have permission to view servers.</Typography>
+          <Typography color="text.secondary" variant="h6">{t('servers:error.accessRestricted')}</Typography>
+          <Typography color="text.secondary" variant="body2">{t('servers:error.forbidden')}</Typography>
         </Box>
       ) : error ? (
         <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={10}>
           <Alert severity="error" sx={{ width: '100%', maxWidth: 560 }}>{error}</Alert>
-          <Button variant="contained" onClick={load}>Reload</Button>
+          <Button variant="contained" onClick={load}>{t('common:action.reload')}</Button>
         </Box>
       ) : filtered.length === 0 ? (
         <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={10}>
           {projects.length === 0 ? (
             <>
-              <Typography color="text.secondary" variant="h6">No servers yet</Typography>
+              <Typography color="text.secondary" variant="h6">{t('servers:empty.noServers')}</Typography>
               {can(Permission.ServersCreate) && (
                 <Button variant="contained" startIcon={<IconPlus size={18} />} onClick={() => navigate('/servers/new')}>
-                  Create your first server
+                  {t('servers:action.createFirst')}
                 </Button>
               )}
             </>
           ) : (
-            <Typography color="text.secondary">No servers match the filters.</Typography>
+            <Typography color="text.secondary">{t('servers:empty.noMatch')}</Typography>
           )}
         </Box>
       ) : (
@@ -446,9 +447,9 @@ export default function Servers() {
 
       <ConfirmDialog
         open={confirmOpen}
-        title="Delete server?"
-        message={`"${confirmProjectName}" will be permanently deleted. This action cannot be undone.`}
-        confirmLabel="Delete"
+        title={t('servers:confirm.deleteTitle')}
+        message={t('servers:confirm.deleteMessage', { name: confirmProjectName })}
+        confirmLabel={t('common:action.delete')}
         confirmColor="error"
         loading={confirmLoading}
         onConfirm={handleDeleteConfirm}

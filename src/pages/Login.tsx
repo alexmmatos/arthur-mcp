@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link as RouterLink, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '../context/AuthContext'
 import {
   Alert,
@@ -21,6 +22,7 @@ import api from '../api'
 export default function Login() {
   const navigate = useNavigate()
   const { reload } = useAuth()
+  const { t } = useTranslation('auth')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -39,7 +41,7 @@ export default function Login() {
       reload()
       navigate('/')
     } catch {
-      setError('Invalid username or password.')
+      setError(t('error.invalidCredentials'))
     } finally {
       setLoading(false)
     }
@@ -126,7 +128,7 @@ export default function Login() {
               color="text.secondary"
               mb={3}
             >
-              Sign in to your account
+              {t('heading.signIn')}
             </Typography>
 
             {error && (
@@ -146,7 +148,7 @@ export default function Login() {
                     display="block"
                     mb="5px"
                   >
-                    Username
+                    {t('label.username')}
                   </Typography>
                   <TextField
                     id="username"
@@ -169,7 +171,7 @@ export default function Login() {
                     display="block"
                     mb="5px"
                   >
-                    Password
+                    {t('label.password')}
                   </Typography>
                   <TextField
                     id="password"
@@ -187,11 +189,11 @@ export default function Login() {
                   <FormGroup>
                     <FormControlLabel
                       control={<Checkbox size="small" />}
-                      label={<Typography variant="body2">Remember me</Typography>}
+                      label={<Typography variant="body2">{t('label.rememberMe')}</Typography>}
                     />
                   </FormGroup>
                   <Link component={RouterLink} to="/forgot-password" variant="body2">
-                    Forgot password
+                    {t('link.forgotPassword')}
                   </Link>
                 </Stack>
 
@@ -208,7 +210,7 @@ export default function Login() {
                   {loading ? (
                     <CircularProgress size={22} color="inherit" />
                   ) : (
-                    'Sign in'
+                    t('action.signIn')
                   )}
                 </Button>
               </Stack>

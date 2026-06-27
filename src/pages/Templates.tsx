@@ -1,11 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
   Chip,
   CircularProgress,
   Drawer,
@@ -13,116 +12,123 @@ import {
   Grid,
   InputAdornment,
   LinearProgress,
+  Paper,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material'
-import { IconX } from '@tabler/icons-react'
-import SearchIcon from '@mui/icons-material/Search'
-import RocketLaunchIcon from '@mui/icons-material/RocketLaunch'
-import ArrowBackIcon from '@mui/icons-material/ArrowBack'
-import OpenInNewIcon from '@mui/icons-material/OpenInNew'
+import {
+  IconX,
+  IconSearch,
+  IconRocket,
+  IconArrowLeft,
+  IconExternalLink,
+  IconCircleCheck,
+} from '@tabler/icons-react'
 import api from '../api'
 import { useAuth, Permission } from '../context/AuthContext'
-import { API_TEMPLATES, ApiTemplate, TEMPLATE_CATEGORIES, buildToolPayload } from '../data/api-templates'
+import { API_TEMPLATES, ApiTemplate, SERVER_TEMPLATE_SOURCE_TAG, TEMPLATE_CATEGORIES, buildToolPayload } from '../data/api-templates'
 import SecretAutocomplete, { useSecrets } from '../components/SecretAutocomplete'
 
 // ─── Auth badge ───────────────────────────────────────────────────────────────
 
-const AUTH_LABELS: Record<string, string> = {
-  none: 'No auth needed',
-  bearer: 'Bearer Token',
-  'api-key': 'API Key',
-  basic: 'Basic Auth',
+const AUTH_LABEL_KEYS: Record<string, string> = {
+  none: 'template.authNone',
+  bearer: 'template.authBearer',
+  'api-key': 'template.authApiKey',
+  basic: 'template.authBasic',
 }
 
-const AUTH_COLORS: Record<string, string> = {
-  none: '#9e9e9e',
-  bearer: '#5D87FF',
-  'api-key': '#FFAE1F',
-  basic: '#FA896B',
+type AuthChipColor = 'default' | 'primary' | 'warning' | 'error'
+
+const AUTH_CHIP_COLORS: Record<string, AuthChipColor> = {
+  none: 'default',
+  bearer: 'primary',
+  'api-key': 'warning',
+  basic: 'error',
 }
 
 // ─── Template card ────────────────────────────────────────────────────────────
 
-function TemplateCard({ template, onUse }: { template: ApiTemplate; onUse: (t: ApiTemplate) => void }) {
-  const authColor = AUTH_COLORS[template.auth.type]
+function TemplateCard({ template, onUse }: { template: ApiTemplate; onUse: (tmpl: ApiTemplate) => void }) {
   const { can } = useAuth()
+  const { t } = useTranslation('servers')
   return (
-    <Card
+    <Paper
       variant="outlined"
       sx={{
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        transition: 'box-shadow 0.18s, border-color 0.18s',
-        '&:hover': { boxShadow: 4, borderColor: template.color },
+        p: 2,
+        transition: 'border-color 0.18s',
+        '&:hover': { borderColor: template.color },
       }}
     >
-      <CardContent sx={{ flexGrow: 1 }}>
-        {/* Icon + heading */}
-        <Box display="flex" alignItems="center" gap={1.5} mb={1.5}>
-          <Box
-            sx={{
-              width: 46, height: 46, borderRadius: 2, flexShrink: 0,
-              bgcolor: `${template.color}18`,
-              border: `1.5px solid ${template.color}35`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '1.5rem', lineHeight: 1,
-            }}
-          >
-            {template.emoji}
-          </Box>
-          <Box minWidth={0}>
-            <Typography fontWeight={700} fontSize="0.95rem" noWrap>{template.name}</Typography>
-            <Typography fontSize="0.75rem" color="text.secondary" noWrap>{template.tagline}</Typography>
-          </Box>
+      {/* Icon + heading */}
+      <Box display="flex" alignItems="center" gap={1.5} mb={1.5}>
+        <Box
+          sx={{
+            width: 46, height: 46, borderRadius: 2, flexShrink: 0,
+            bgcolor: 'action.hover',
+            border: '1.5px solid',
+            borderColor: 'divider',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '1.5rem', lineHeight: 1,
+          }}
+        >
+          {template.emoji}
         </Box>
-
-        <Typography variant="body2" color="text.secondary" fontSize="0.81rem" mb={2} sx={{ lineHeight: 1.5 }}>
-          {template.description}
-        </Typography>
-
-        <Box display="flex" gap={0.75} flexWrap="wrap" alignItems="center">
-          <Chip
-            label={AUTH_LABELS[template.auth.type]}
-            size="small"
-            sx={{
-              bgcolor: `${authColor}18`, color: authColor, borderColor: `${authColor}40`,
-              fontSize: '0.7rem', height: 20, fontWeight: 600,
-              border: `1px solid ${authColor}40`,
-            }}
-          />
-          <Chip
-            label={`${template.tools.length} tool${template.tools.length !== 1 ? 's' : ''}`}
-            size="small"
-            variant="outlined"
-            sx={{ fontSize: '0.7rem', height: 20 }}
-          />
+        <Box minWidth={0}>
+          <Typography fontWeight={700} fontSize="0.95rem" noWrap>{template.name}</Typography>
+          <Typography fontSize="0.75rem" color="text.secondary" noWrap>{template.tagline}</Typography>
         </Box>
-      </CardContent>
+      </Box>
 
-      <Box px={2} pb={2} display="flex" gap={1}>
+      <Typography variant="body2" color="text.secondary" fontSize="0.81rem" mb={2} sx={{ lineHeight: 1.5, flexGrow: 1 }}>
+        {template.description}
+      </Typography>
+
+      <Box display="flex" gap={0.75} flexWrap="wrap" alignItems="center" mb={2}>
+        <Chip
+          label={t(AUTH_LABEL_KEYS[template.auth.type] as Parameters<typeof t>[0])}
+          size="small"
+          color={AUTH_CHIP_COLORS[template.auth.type]}
+          variant="outlined"
+          sx={{ fontSize: '0.7rem', height: 20, fontWeight: 600 }}
+        />
+        <Chip
+          label={t('label.toolCount', { count: template.tools.length })}
+          size="small"
+          variant="outlined"
+          sx={{ fontSize: '0.7rem', height: 20 }}
+        />
+      </Box>
+
+      <Box display="flex" gap={1}>
         {template.docsUrl && (
-          <Button
-            size="small"
-            variant="text"
-            color="inherit"
-            href={template.docsUrl}
-            target="_blank"
-            rel="noreferrer"
-            sx={{ flexShrink: 0, color: 'text.secondary', minWidth: 0, px: 1 }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <OpenInNewIcon fontSize="small" />
-          </Button>
+          <Tooltip title={t('template.viewDocs')}>
+            <IconButton
+              size="small"
+              color="inherit"
+              href={template.docsUrl}
+              target="_blank"
+              rel="noreferrer"
+              component="a"
+              onClick={(e: React.MouseEvent) => e.stopPropagation()}
+              sx={{ color: 'text.secondary' }}
+            >
+              <IconExternalLink size={18} />
+            </IconButton>
+          </Tooltip>
         )}
         {can(Permission.TemplatesUse) && (
           <Button variant="outlined" size="small" fullWidth onClick={() => onUse(template)}>
-            Use template
+            {t('action.useTemplate')}
           </Button>
         )}
       </Box>
-    </Card>
+    </Paper>
   )
 }
 
@@ -136,6 +142,7 @@ function UseTemplateDialog({
   onClose: () => void
 }) {
   const navigate = useNavigate()
+  const { t } = useTranslation('servers')
   const [serverName, setProjectName] = useState(template.name)
   const [authValue, setAuthValue] = useState('')
   const [creating, setCreating] = useState(false)
@@ -163,16 +170,17 @@ function UseTemplateDialog({
 
     try {
       // 1. Create server
-      tick('Creating server…')
+      tick(t('template.creatingServer'))
       const { data: server } = await api.post('/swagger/servers', {
         name: serverName.trim(),
         baseUrl: template.baseUrl,
         description: template.description,
+        tags: [SERVER_TEMPLATE_SOURCE_TAG],
       })
 
       // 2. Set auth credentials
       if (template.auth.type !== 'none') {
-        tick('Configuring authentication…')
+        tick(t('template.configuring'))
         const authPayload =
           template.auth.type === 'bearer'
             ? { type: 'bearer', token: authValue }
@@ -181,12 +189,12 @@ function UseTemplateDialog({
             : { type: 'none' }
         await api.patch(`/swagger/servers/${server._id}/auth`, authPayload)
       } else {
-        tick('No auth required…')
+        tick(t('template.noAuthRequired'))
       }
 
       // 3. Create tools sequentially
       for (const toolDef of template.tools) {
-        tick(`Adding tool: ${toolDef.name}…`)
+        tick(t('template.addingTool', { name: toolDef.name }))
         const payload = buildToolPayload(toolDef, template.baseUrl)
         await api.post(`/swagger/servers/${server._id}/tools`, payload)
       }
@@ -194,22 +202,24 @@ function UseTemplateDialog({
       navigate(`/servers/${server._id}`)
     } catch (err: any) {
       setCreating(false)
-      setError(err?.response?.data?.message ?? 'Something went wrong creating the server.')
+      setError(err?.response?.data?.message ?? t('error.createTemplateError'))
     }
   }
 
   return (
     <Drawer anchor="right" open onClose={!creating ? onClose : undefined}
-      PaperProps={{ sx: { width: { xs: '100vw', sm: 520 }, display: 'flex', flexDirection: 'column' } }}>
+      PaperProps={{ sx: { width: { xs: '100vw', sm: 560 }, display: 'flex', flexDirection: 'column' } }}>
       <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
         <Box sx={{ fontSize: '1.6rem', lineHeight: 1 }}>{template.emoji}</Box>
         <Box flexGrow={1}>
           <Typography fontWeight={700} fontSize="1.05rem">{template.name}</Typography>
           <Typography variant="caption" color="text.secondary">
-            {template.tools.length} tool{template.tools.length !== 1 ? 's' : ''} pre-configured
+            {t('template.toolsPreConfigured', { count: template.tools.length })}
           </Typography>
         </Box>
-        <IconButton size="small" onClick={onClose} disabled={creating}><IconX size={18} /></IconButton>
+        <Tooltip title={t('template.close')}>
+          <IconButton size="small" onClick={onClose} disabled={creating}><IconX size={18} /></IconButton>
+        </Tooltip>
       </Box>
 
       <Box sx={{ flex: 1, overflowY: 'auto', px: 3, py: 2.5 }}>
@@ -226,7 +236,7 @@ function UseTemplateDialog({
               size="small"
               fullWidth
               autoFocus
-              label="Server name"
+              label={t('template.serverName')}
               value={serverName}
               onChange={(e) => setProjectName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && canCreate && handleCreate()}
@@ -238,7 +248,7 @@ function UseTemplateDialog({
                 <SecretAutocomplete
                   value={authValue}
                   onChange={setAuthValue}
-                  label={template.auth.type === 'api-key' ? 'API Key' : 'Access Token'}
+                  label={template.auth.type === 'api-key' ? t('template.labelApiKey') : t('template.labelToken')}
                   secrets={secrets}
                   loadingSecrets={loadingSecrets}
                 />
@@ -246,20 +256,21 @@ function UseTemplateDialog({
                   <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
                     {template.auth.hint}{' '}
                     {template.signupUrl && (
-                      <a href={template.signupUrl} target="_blank" rel="noreferrer">Get one here ↗</a>
+                      <a href={template.signupUrl} target="_blank" rel="noreferrer">{t('template.getOneHere')}</a>
                     )}
                   </Typography>
                 )}
               </Box>
             ) : (
-              <Alert severity="success" sx={{ fontSize: '0.82rem' }}>
-                No API key or login needed — ready to use immediately after creation.
-              </Alert>
+              <Box display="flex" alignItems="center" gap={0.75} py={0.5}>
+                <IconCircleCheck size={16} color="green" />
+                <Typography variant="body2" color="success.main">{t('template.noAuthReady')}</Typography>
+              </Box>
             )}
 
             <Box mt={2}>
               <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>
-                Tools that will be created
+                {t('template.toolsCreated')}
               </Typography>
               <Box display="flex" gap={0.5} flexWrap="wrap">
                 {template.tools.map((t) => (
@@ -272,14 +283,14 @@ function UseTemplateDialog({
       </Box>
 
       <Box sx={{ px: 3, py: 2, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1, flexShrink: 0 }}>
-        <Button onClick={onClose} disabled={creating}>Cancel</Button>
+        <Button onClick={onClose} disabled={creating}>{t('template.cancel')}</Button>
         <Button
           variant="contained"
           onClick={handleCreate}
           disabled={!canCreate}
-          startIcon={creating ? <CircularProgress size={14} color="inherit" /> : <RocketLaunchIcon fontSize="small" />}
+          startIcon={creating ? <CircularProgress size={14} color="inherit" /> : <IconRocket size={18} />}
         >
-          {creating ? 'Creating…' : 'Create server'}
+          {creating ? t('template.creating') : t('template.create')}
         </Button>
       </Box>
     </Drawer>
@@ -290,6 +301,7 @@ function UseTemplateDialog({
 
 export default function Templates() {
   const navigate = useNavigate()
+  const { t } = useTranslation('servers')
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All')
   const [selected, setSelected] = useState<ApiTemplate | null>(null)
@@ -305,10 +317,10 @@ export default function Templates() {
   })
 
   return (
-    <Box py={3} px={0}>
+    <Box>
       <Box mb={2}>
-        <Button startIcon={<ArrowBackIcon />} size="small" onClick={() => navigate('/')}>
-          Back to servers
+        <Button startIcon={<IconArrowLeft size={18} />} size="small" onClick={() => navigate('/')}>
+          {t('action.backToServers')}
         </Button>
       </Box>
 
@@ -316,22 +328,22 @@ export default function Templates() {
       <Box display="flex" alignItems="flex-start" justifyContent="space-between" mb={3} flexWrap="wrap" gap={2}>
         <Box>
           <Typography variant="h5" fontWeight={700} gutterBottom letterSpacing="-0.2px">
-            REST API Templates
+            {t('heading.templates')}
           </Typography>
           <Typography color="text.secondary" maxWidth={560}>
-            Start with a pre-built integration. Pick a template, name your server, and your AI will have working tools in under a minute.
+            {t('template.preconfiguredHint')}
           </Typography>
         </Box>
         <TextField
           size="small"
-          placeholder="Search templates…"
+          placeholder={t('placeholder.searchTemplates')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           sx={{ minWidth: 220 }}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
-                <SearchIcon fontSize="small" />
+                <IconSearch size={18} />
               </InputAdornment>
             ),
           }}
@@ -363,13 +375,13 @@ export default function Templates() {
         {filtered.length === 0 && (
           <Grid item xs={12}>
             <Typography color="text.secondary" textAlign="center" py={10}>
-              No templates match "{search || category}".
+              {t('template.noMatch', { query: search || category })}
             </Typography>
           </Grid>
         )}
       </Grid>
 
-      {/* Dialog */}
+      {/* Drawer */}
       {selected && <UseTemplateDialog template={selected} onClose={() => setSelected(null)} />}
     </Box>
   )

@@ -21,6 +21,7 @@ import {
   IconTag,
   IconX,
 } from '@tabler/icons-react'
+import { useTranslation } from 'react-i18next'
 import api from '../api'
 import { useAuth, Permission } from '../context/AuthContext'
 import { PROMPT_TEMPLATES, PROMPT_TEMPLATE_CATEGORIES, PromptTemplate } from '../data/prompt-templates'
@@ -49,6 +50,7 @@ const CATEGORY_COLOR: Record<string, string> = {
 // ─── Template card ────────────────────────────────────────────────────────────
 
 function PromptTemplateCard({ template, onUse }: { template: PromptTemplate; onUse: (t: PromptTemplate) => void }) {
+  const { t } = useTranslation('prompts')
   const { can } = useAuth()
   const color = CATEGORY_COLOR[template.category] ?? '#5D87FF'
 
@@ -106,7 +108,7 @@ function PromptTemplateCard({ template, onUse }: { template: PromptTemplate; onU
       <Box px={2} pb={2}>
         {can(Permission.PromptsCreate) && (
           <Button variant="outlined" size="small" fullWidth onClick={() => onUse(template)}>
-            Use template
+            {t('action.useTemplate')}
           </Button>
         )}
       </Box>
@@ -117,6 +119,7 @@ function PromptTemplateCard({ template, onUse }: { template: PromptTemplate; onU
 // ─── Use-template drawer ──────────────────────────────────────────────────────
 
 function UsePromptTemplateDrawer({ template, onClose }: { template: PromptTemplate; onClose: () => void }) {
+  const { t } = useTranslation('prompts')
   const navigate = useNavigate()
   const [name, setName] = useState(template.name)
   const [description, setDescription] = useState(template.description)
@@ -137,7 +140,7 @@ function UsePromptTemplateDrawer({ template, onClose }: { template: PromptTempla
       })
       navigate('/prompts')
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Failed to create prompt.')
+      setError(err?.response?.data?.message ?? t('error.createFailed'))
       setCreating(false)
     }
   }
@@ -161,16 +164,16 @@ function UsePromptTemplateDrawer({ template, onClose }: { template: PromptTempla
 
         <TextField
           size="small" fullWidth autoFocus required
-          label="Prompt name"
+          label={t('placeholder.promptNameField')}
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && canCreate && handleCreate()}
-          helperText="You can rename it later from the Prompts page"
+          helperText={t('hint.renameHint')}
         />
 
         <TextField
-          size="small" fullWidth multiline minRows={2} maxRows={4}
-          label="Description (optional)"
+          size="small" fullWidth multiline minRows={4} maxRows={10}
+          label={t('label.description')}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
@@ -179,7 +182,7 @@ function UsePromptTemplateDrawer({ template, onClose }: { template: PromptTempla
         {template.tags.length > 0 && (
           <Box>
             <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.75}>
-              Tags
+              {t('label.tags')}
             </Typography>
             <Box display="flex" gap={0.5} flexWrap="wrap">
               {template.tags.map((tag) => (
@@ -193,7 +196,7 @@ function UsePromptTemplateDrawer({ template, onClose }: { template: PromptTempla
         {/* Content preview */}
         <Box>
           <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.75}>
-            Content preview
+            {t('label.contentPreview')}
           </Typography>
           <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'action.hover', borderRadius: 1 }}>
             <Typography
@@ -207,19 +210,19 @@ function UsePromptTemplateDrawer({ template, onClose }: { template: PromptTempla
             </Typography>
           </Paper>
           <Typography variant="caption" color="text.disabled" display="block" mt={0.5}>
-            You can edit the full content after creation from the Prompts page.
+            {t('hint.editAfterCreate')}
           </Typography>
         </Box>
       </Box>
 
       {/* Footer */}
       <Box sx={{ px: 3, py: 2, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1, flexShrink: 0 }}>
-        <Button onClick={onClose} disabled={creating}>Cancel</Button>
+        <Button onClick={onClose} disabled={creating}>{t('common:action.cancel')}</Button>
         <Button
           variant="contained" onClick={handleCreate} disabled={!canCreate}
           startIcon={creating ? <CircularProgress size={14} color="inherit" /> : <IconPlus size={16} />}
         >
-          {creating ? 'Creating…' : 'Create prompt'}
+          {creating ? t('common:action.loading') : t('action.createPrompt')}
         </Button>
       </Box>
     </Drawer>
@@ -229,17 +232,18 @@ function UsePromptTemplateDrawer({ template, onClose }: { template: PromptTempla
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PromptTemplates() {
+  const { t } = useTranslation('prompts')
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All')
   const [selected, setSelected] = useState<PromptTemplate | null>(null)
 
-  const filtered = PROMPT_TEMPLATES.filter((t) => {
-    const matchCat = category === 'All' || t.category === category
+  const filtered = PROMPT_TEMPLATES.filter((tmpl) => {
+    const matchCat = category === 'All' || tmpl.category === category
     const matchSearch = !search ||
-      t.name.toLowerCase().includes(search.toLowerCase()) ||
-      t.tagline.toLowerCase().includes(search.toLowerCase()) ||
-      t.description.toLowerCase().includes(search.toLowerCase())
+      tmpl.name.toLowerCase().includes(search.toLowerCase()) ||
+      tmpl.tagline.toLowerCase().includes(search.toLowerCase()) ||
+      tmpl.description.toLowerCase().includes(search.toLowerCase())
     return matchCat && matchSearch
   })
 
@@ -247,7 +251,7 @@ export default function PromptTemplates() {
     <Box py={3}>
       <Box mb={2}>
         <Button size="small" startIcon={<IconArrowLeft size={16} />} onClick={() => navigate('/prompts')}>
-          Back to prompts
+          {t('action.backToPrompts')}
         </Button>
       </Box>
 
@@ -255,14 +259,14 @@ export default function PromptTemplates() {
       <Box display="flex" alignItems="flex-start" justifyContent="space-between" mb={3} flexWrap="wrap" gap={2}>
         <Box>
           <Typography variant="h5" fontWeight={700} gutterBottom letterSpacing="-0.2px">
-            Prompt Templates
+            {t('heading.templates')}
           </Typography>
           <Typography color="text.secondary" maxWidth={560}>
-            Start from a ready-made prompt. Pick a template, customize the name, and it's added to your library instantly.
+            {t('heading.templatesSubtitle')}
           </Typography>
         </Box>
         <TextField
-          size="small" placeholder="Search templates…" value={search}
+          size="small" placeholder={t('placeholder.searchTemplates')} value={search}
           onChange={(e) => setSearch(e.target.value)}
           sx={{ minWidth: 220 }}
           InputProps={{
@@ -284,15 +288,15 @@ export default function PromptTemplates() {
 
       {/* Grid */}
       <Grid container spacing={2}>
-        {filtered.map((t) => (
-          <Grid item xs={12} sm={6} md={4} lg={3} key={t.id}>
-            <PromptTemplateCard template={t} onUse={setSelected} />
+        {filtered.map((tmpl) => (
+          <Grid item xs={12} sm={6} md={4} lg={3} key={tmpl.id}>
+            <PromptTemplateCard template={tmpl} onUse={setSelected} />
           </Grid>
         ))}
         {filtered.length === 0 && (
           <Grid item xs={12}>
             <Typography color="text.secondary" textAlign="center" py={10}>
-              No templates match "{search || category}".
+              {t('empty.noTemplatesMatch', { query: search || category })}
             </Typography>
           </Grid>
         )}

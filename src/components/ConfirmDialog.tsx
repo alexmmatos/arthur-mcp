@@ -11,6 +11,7 @@ import {
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
+import { useTranslation } from 'react-i18next'
 
 export interface ConfirmDialogProps {
   open: boolean
@@ -33,12 +34,14 @@ export default function ConfirmDialog({
   open,
   title,
   message,
-  confirmLabel = 'Confirm',
+  confirmLabel,
   confirmColor = 'primary',
   onConfirm,
   onClose,
   loading = false,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation('common')
+
   return (
     <Dialog
       open={open}
@@ -66,7 +69,7 @@ export default function ConfirmDialog({
           disabled={loading}
           sx={{ minWidth: 100 }}
         >
-          Cancel
+          {t('action.cancel')}
         </Button>
         <Button
           variant="contained"
@@ -76,7 +79,7 @@ export default function ConfirmDialog({
           startIcon={loading ? <CircularProgress size={14} color="inherit" /> : undefined}
           sx={{ minWidth: 100 }}
         >
-          {loading ? 'Processing…' : confirmLabel}
+          {loading ? t('action.loading') : (confirmLabel ?? t('action.confirm'))}
         </Button>
       </DialogActions>
     </Dialog>

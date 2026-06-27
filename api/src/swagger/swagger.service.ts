@@ -14,6 +14,8 @@ import { executeRequest } from '../dynamic-mcp/http-client';
 import { PROJECT_REPO } from '../database/database.tokens';
 import { ISwaggerProjectRepository, McpApiKeyEntry, SwaggerProjectRecord } from './swagger-project.repository';
 import { parsePostmanCollection } from './postman-parser';
+import { SwaggerApiKeysService } from './swagger-api-keys.service';
+import { SwaggerImportService } from './swagger-import.service';
 
 const SHARE_SECRET = process.env.JWT_SECRET ?? 'mcp-share-secret';
 const SPEC_PATHS = [
@@ -31,6 +33,8 @@ export class SwaggerService {
   constructor(
     @Inject(PROJECT_REPO) private readonly projectRepo: ISwaggerProjectRepository,
     private readonly dynamicMcp: DynamicMcpService,
+    private readonly imports: SwaggerImportService,
+    private readonly apiKeys: SwaggerApiKeysService,
   ) {}
 
   private parseContent(content: string, filename: string): Record<string, any> {
@@ -70,32 +74,7 @@ export class SwaggerService {
     totalTools: number;
     tools: Array<{ name: string; description?: string; method: string; path: string }>;
   }> {
-    const rawSpec = this.parseContent(content, filename);
-    this.validateSpec(rawSpec);
-
-    let normalizedSpec: Awaited<ReturnType<typeof parseSpec>>;
-    try {
-      normalizedSpec = await parseSpec(rawSpec);
-    } catch (err: any) {
-      throw new BadRequestException(`Error processing the spec:${err?.message ?? err}`);
-    }
-
-    const baseUrl = baseUrlOverride?.trim() || normalizedSpec.servers[0]?.url || 'http://localhost';
-    const tools = generateTools(normalizedSpec, baseUrl);
-
-    return {
-      name: normalizedSpec.info.title,
-      version: normalizedSpec.info.version,
-      description: normalizedSpec.info.description,
-      resolvedBaseUrl: baseUrl,
-      totalTools: tools.length,
-      tools: tools.map((t) => ({
-        name: t.name,
-        description: t.description,
-        method: t.endpointRef.method,
-        path: t.endpointRef.path,
-      })),
-    };
+    return this.imports.previewSpec(content, filename, baseUrlOverride);
   }
 
   async create(
@@ -104,41 +83,7 @@ export class SwaggerService {
     baseUrlOverride?: string,
     auth?: AuthConfig,
   ): Promise<SwaggerProjectRecord> {
-    const rawSpec = this.parseContent(content, filename);
-    this.validateSpec(rawSpec);
-
-    let normalizedSpec: Awaited<ReturnType<typeof parseSpec>>;
-    try {
-      normalizedSpec = await parseSpec(rawSpec);
-    } catch (err: any) {
-      throw new BadRequestException(`Error processing the spec:${err?.message ?? err}`);
-    }
-
-    const baseUrl = baseUrlOverride?.trim() || normalizedSpec.servers[0]?.url || 'http://localhost';
-    const tools = generateTools(normalizedSpec, baseUrl);
-
-    this.logger.log(`Projeto "${normalizedSpec.info.title}" importado: ${tools.length} tools geradas`);
-
-    return this.projectRepo.create({
-      name: normalizedSpec.info.title ?? filename.replace(/\.(ya?ml|json)$/i, ''),
-      baseUrl,
-      description: normalizedSpec.info.description,
-      version: normalizedSpec.info.version,
-      rawSpec,
-      tools,
-      auth: auth ?? { type: 'none' },
-      status: 'active',
-      mcpApiKeys: [],
-      resources: [],
-      prompts: [],
-      chains: [],
-      tags: [],
-      rateLimit: { enabled: false, requestsPerMinute: 60 },
-      isPaused: false,
-      maintenanceMode: { enabled: false, message: '' },
-      availabilityWindow: { enabled: false, timezone: 'UTC', schedule: [] },
-      alertConfig: { enabled: false, errorThresholdPct: 20, notifyEmail: '' },
-    });
+    return this.imports.create(content, filename, baseUrlOverride, auth);
   }
 
   findAll(tags?: string[]): Promise<SwaggerProjectRecord[]> {
@@ -188,42 +133,19 @@ export class SwaggerService {
   }
 
   async generateApiKey(id: string): Promise<{ mcpApiKey: string }> {
-    const key = crypto.randomBytes(32).toString('hex');
-    const server = await this.projectRepo.update(id, { mcpApiKey: key });
-    if (!server) throw new NotFoundException('Project not found.');
-    return { mcpApiKey: key };
+    return this.apiKeys.generateLegacyKey(id);
   }
 
   async revokeApiKey(id: string): Promise<void> {
-    const server = await this.projectRepo.update(id, { mcpApiKey: null });
-    if (!server) throw new NotFoundException('Project not found.');
+    return this.apiKeys.revokeLegacyKey(id);
   }
 
   async addApiKey(id: string, name: string): Promise<McpApiKeyEntry> {
-    const server = await this.projectRepo.findById(id);
-    if (!server) throw new NotFoundException('Project not found.');
-
-    const entry: McpApiKeyEntry = {
-      id: crypto.randomUUID(),
-      name: name.trim(),
-      key: crypto.randomBytes(32).toString('hex'),
-      createdAt: new Date(),
-    };
-
-    server.mcpApiKeys.push(entry);
-    await this.projectRepo.save(server);
-    return entry;
+    return this.apiKeys.addKey(id, name);
   }
 
   async removeApiKey(id: string, keyId: string): Promise<void> {
-    const server = await this.projectRepo.findById(id);
-    if (!server) throw new NotFoundException('Project not found.');
-
-    const idx = server.mcpApiKeys.findIndex((k) => k.id === keyId);
-    if (idx === -1) throw new NotFoundException('Key not found.');
-
-    server.mcpApiKeys.splice(idx, 1);
-    await this.projectRepo.save(server);
+    return this.apiKeys.removeKey(id, keyId);
   }
 
   async reimportSpec(
@@ -232,47 +154,10 @@ export class SwaggerService {
     filename: string,
     baseUrlOverride?: string,
   ): Promise<{ added: number; updated: number; baseUrl: string }> {
-    const server = await this.projectRepo.findById(id);
-    if (!server) throw new NotFoundException('Project not found.');
-
-    const rawSpec = this.parseContent(content, filename);
-    this.validateSpec(rawSpec);
-
-    let normalizedSpec: Awaited<ReturnType<typeof parseSpec>>;
-    try {
-      normalizedSpec = await parseSpec(rawSpec);
-    } catch (err: any) {
-      throw new BadRequestException(`Error processing the spec:${err?.message ?? err}`);
-    }
-
-    const baseUrl = baseUrlOverride?.trim() || normalizedSpec.servers[0]?.url || server.baseUrl;
-    const newTools = generateTools(normalizedSpec, baseUrl);
-
-    let added = 0;
-    let updated = 0;
-
-    for (const newTool of newTools) {
-      const existingIdx = server.tools.findIndex((t) => t.name === newTool.name);
-      if (existingIdx === -1) {
-        server.tools.push(newTool);
-        added++;
-      } else {
-        (server.tools[existingIdx] as any).inputSchema = newTool.inputSchema;
-        (server.tools[existingIdx] as any).endpointRef = newTool.endpointRef;
-        updated++;
-      }
-    }
-
-    server.rawSpec = rawSpec;
-    server.baseUrl = baseUrl;
-    await this.projectRepo.save(server);
-    this.dynamicMcp.invalidate(id);
-
-    this.logger.log(`Re-import "${server.name}": +${added} adicionadas, ${updated} atualizadas`);
-    return { added, updated, baseUrl };
+    return this.imports.reimportSpec(id, content, filename, baseUrlOverride);
   }
 
-  async createEmpty(dto: { name: string; description?: string; baseUrl: string }): Promise<SwaggerProjectRecord> {
+  async createEmpty(dto: { name: string; description?: string; baseUrl: string; tags?: string[] }): Promise<SwaggerProjectRecord> {
     return this.projectRepo.create({
       name: dto.name.trim(),
       description: dto.description?.trim() || undefined,
@@ -284,7 +169,7 @@ export class SwaggerService {
       resources: [],
       prompts: [],
       chains: [],
-      tags: [],
+      tags: (dto.tags ?? []).map((t) => t.trim()).filter(Boolean),
       rateLimit: { enabled: false, requestsPerMinute: 60 },
       isPaused: false,
       maintenanceMode: { enabled: false, message: '' },
@@ -649,95 +534,18 @@ export class SwaggerService {
   }
 
   async discoverSpec(baseUrl: string): Promise<{ found: boolean; specUrl?: string; paths: { url: string; status: number }[] }> {
-    const base = baseUrl.replace(/\/$/, '');
-    const results: { url: string; status: number }[] = [];
-
-    for (const path of SPEC_PATHS) {
-      const url = `${base}${path}`;
-      try {
-        const res = await axios.get(url, { timeout: 5000, validateStatus: () => true });
-        results.push({ url, status: res.status });
-        if (res.status === 200) {
-          const data = res.data;
-          const isSpec =
-            (typeof data === 'object' && (data.openapi || data.swagger)) ||
-            (typeof data === 'string' && (data.includes('openapi:') || data.includes('swagger:')));
-          if (isSpec) return { found: true, specUrl: url, paths: results };
-        }
-      } catch {
-        results.push({ url, status: 0 });
-      }
-    }
-    return { found: false, paths: results };
+    return this.imports.discoverSpec(baseUrl);
   }
 
   async testConnection(
     baseUrl: string,
     auth?: AuthConfig,
   ): Promise<{ success: boolean; statusCode?: number; message: string; responseTimeMs: number }> {
-    const t0 = Date.now();
-    const headers: Record<string, string> = {};
-
-    if (auth) {
-      if (auth.type === 'bearer') headers['Authorization'] = `Bearer ${auth.token}`;
-      else if (auth.type === 'api-key' && auth.in === 'header') headers[auth.name] = auth.value;
-      else if (auth.type === 'basic') {
-        const encoded = Buffer.from(`${auth.username}:${auth.password}`).toString('base64');
-        headers['Authorization'] = `Basic ${encoded}`;
-      }
-    }
-
-    try {
-      const res = await axios.get(baseUrl.replace(/\/$/, ''), { headers, timeout: 8000, validateStatus: () => true });
-      const ms = Date.now() - t0;
-      const ok = res.status >= 200 && res.status < 500;
-      return {
-        success: ok,
-        statusCode: res.status,
-        responseTimeMs: ms,
-        message: ok
-          ? `Connected successfully — server responded with ${res.status} in ${ms}ms.`
-          : `Server returned ${res.status}. Check your base URL and credentials.`,
-      };
-    } catch (err: any) {
-      return {
-        success: false,
-        responseTimeMs: Date.now() - t0,
-        message: `Could not reach the server: ${err?.message ?? 'Unknown error'}. Check the URL and that the API is accessible from this machine.`,
-      };
-    }
+    return this.imports.testConnection(baseUrl, auth);
   }
 
   async fromPostman(content: string, baseUrlOverride?: string): Promise<SwaggerProjectRecord> {
-    let openApiSpec: Record<string, any>;
-    try {
-      openApiSpec = parsePostmanCollection(content);
-    } catch (err: any) {
-      throw new BadRequestException(err?.message ?? 'Failed to parse Postman collection.');
-    }
-
-    const base = baseUrlOverride?.trim() || openApiSpec.servers?.[0]?.url || 'http://localhost';
-    const normalizedSpec = await parseSpec(openApiSpec);
-    const tools = generateTools(normalizedSpec, base);
-
-    return this.projectRepo.create({
-      name: openApiSpec.info.title ?? 'Imported from Postman',
-      baseUrl: base,
-      description: openApiSpec.info.description,
-      tools,
-      auth: { type: 'none' },
-      status: 'active',
-      mcpApiKeys: [],
-      resources: [],
-      prompts: [],
-      chains: [],
-      tags: [],
-      rateLimit: { enabled: false, requestsPerMinute: 60 },
-      isPaused: false,
-      maintenanceMode: { enabled: false, message: '' },
-      availabilityWindow: { enabled: false, timezone: 'UTC', schedule: [] },
-      alertConfig: { enabled: false, errorThresholdPct: 20, notifyEmail: '' },
-    });
+    return this.imports.fromPostman(content, baseUrlOverride);
   }
 
   async previewPostman(
@@ -749,23 +557,7 @@ export class SwaggerService {
     totalTools: number;
     tools: Array<{ name: string; description?: string; method: string; path: string }>;
   }> {
-    let openApiSpec: Record<string, any>;
-    try {
-      openApiSpec = parsePostmanCollection(content);
-    } catch (err: any) {
-      throw new BadRequestException(err?.message ?? 'Failed to parse Postman collection.');
-    }
-
-    const base = baseUrlOverride?.trim() || openApiSpec.servers?.[0]?.url || 'http://localhost';
-    const normalizedSpec = await parseSpec(openApiSpec);
-    const tools = generateTools(normalizedSpec, base);
-
-    return {
-      name: openApiSpec.info.title ?? 'Postman Collection',
-      resolvedBaseUrl: base,
-      totalTools: tools.length,
-      tools: tools.map((t) => ({ name: t.name, description: t.description, method: t.endpointRef.method, path: t.endpointRef.path })),
-    };
+    return this.imports.previewPostman(content, baseUrlOverride);
   }
 
   async getHealthSummary(): Promise<{ serverId: string; errorRatePct: number; lastCallAt?: Date; totalCalls: number }[]> {

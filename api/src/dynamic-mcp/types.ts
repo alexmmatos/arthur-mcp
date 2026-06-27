@@ -1,4 +1,4 @@
-/** JSON Schema subset aceito por tools MCP */
+/** JSON Schema subset accepted by MCP tools */
 export type JsonSchema = {
   type?: string;
   properties?: Record<string, JsonSchema>;
@@ -57,7 +57,7 @@ export type SecurityScheme =
   | { type: 'http'; scheme: string; bearerFormat?: string }
   | { type: 'oauth2'; flows: Record<string, { tokenUrl?: string; scopes: Record<string, string> }> };
 
-/** Mapeamento de arg MCP → campo da request HTTP */
+/** Mapping from MCP arg to HTTP request field */
 export interface ParameterMapping {
   toolParamName: string;
   source: 'path' | 'query' | 'header' | 'body';
@@ -114,9 +114,17 @@ export interface DbQuery {
   limitValue?: number;
 
   // ── Redis
-  command?: string;                 // GET, SET, HGET, HSET, LPUSH, etc.
-  keyPattern?: string;              // key or pattern with {{param}}
-  valueTemplate?: string;
+  command?: string;                 // used in composite mode
+  keyPattern?: string;              // key, prefix, query, or index key depending on redisTemplate
+  valueTemplate?: string;           // value to write (composite SET/HSET/LPUSH)
+  redisTemplate?: 'exact_key' | 'key_prefix' | 'key_range' | 'search_by_value' | 'secondary_index' | 'full_text' | 'composite';
+  valuePattern?: string;            // search_by_value: substring to match against stored values
+  keyPrefixFilter?: string;         // search_by_value: SCAN MATCH prefix
+  redisMinScore?: string;           // key_range: ZRANGEBYSCORE min
+  redisMaxScore?: string;           // key_range: ZRANGEBYSCORE max
+  redisLimit?: number;              // max results for key_prefix / key_range / search_by_value / full_text
+  redisFtIndex?: string;            // full_text: FT.SEARCH index name
+  redisFetchValues?: boolean;       // key_prefix / secondary_index: GET value for each key
 
   // ── DynamoDB
   tableName?: string;
@@ -140,6 +148,8 @@ export interface DbQuery {
 
   // ── Common
   parameters?: DbQueryParameter[];
+  inputSchema?: JsonSchema;         // MCP input contract derived from or overriding parameters
+  outputSchema?: JsonSchema;        // MCP output contract for Tools/Resources generated from this operation
   iteratorPath?: string;            // for Resources: path in JSON response to iterate
 }
 
@@ -173,7 +183,7 @@ export type ExecutionRef =
       pipeline?: unknown[];
       documentTemplate?: unknown;
     }
-  | { type: 'redis'; command: string; keyPattern: string; valueTemplate?: string }
+  | { type: 'redis'; command?: string; keyPattern?: string; valueTemplate?: string; redisTemplate?: string; valuePattern?: string; keyPrefixFilter?: string; redisMinScore?: string; redisMaxScore?: string; redisLimit?: number; redisFtIndex?: string; redisFetchValues?: boolean }
   | { type: 'dynamodb'; table: string; operation: string; keyMapping: Record<string, string> }
   | { type: 'elasticsearch'; index: string; operation: string; queryTemplate?: unknown }
   | { type: 'snowflake'; query: string; warehouse?: string; schema?: string; paramStyle: 'named' | 'positional'; resultMode: 'rows' | 'first' | 'count' }

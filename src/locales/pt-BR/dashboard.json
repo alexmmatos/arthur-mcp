@@ -1,0 +1,106 @@
+{
+  "heading": {
+    "title": "Visão Geral de Atividades"
+  },
+  "period": {
+    "24h": "Hoje",
+    "7d": "Esta semana",
+    "30d": "Este mês",
+    "custom": "Personalizado",
+    "last24h": "nas últimas 24 horas",
+    "last7d": "nos últimos 7 dias",
+    "last30d": "nos últimos 30 dias",
+    "selected": "no período selecionado",
+    "from": "De",
+    "to": "Até",
+    "apply": "Aplicar"
+  },
+  "action": {
+    "refresh": "Atualizar"
+  },
+  "error": {
+    "forbidden": "Acesso restrito",
+    "forbiddenDetail": "Você não tem permissão para visualizar o painel.",
+    "loadFailed": "Falha ao carregar o painel. Atualize a página."
+  },
+  "banner": {
+    "noActivity": "Seu assistente de IA ainda não foi usado {{period}}. Assim que você conectar um cliente de IA a um servidor, a atividade aparecerá aqui.",
+    "allGood_one": "Tudo está funcionando bem. Sua IA concluiu {{total}} tarefa com sucesso {{period}}.",
+    "allGood_other": "Tudo está funcionando bem. Sua IA concluiu todas as {{total}} tarefas com sucesso {{period}}.",
+    "someErrors_one": "Sua IA executou {{total}} tarefa {{period}}. {{successes}} foram bem — {{errors}} tiveram problemas. Verifique os projetos abaixo para detalhes.",
+    "someErrors_other": "Sua IA executou {{total}} tarefas {{period}}. {{successes}} foram bem — {{errors}} tiveram problemas. Verifique os projetos abaixo para detalhes.",
+    "manyErrors_one": "Atenção necessária. {{errors}} de {{total}} tarefa tiveram problemas {{period}}. Revise as configurações do servidor.",
+    "manyErrors_other": "Atenção necessária. {{errors}} de {{total}} tarefas tiveram problemas {{period}}. Revise as configurações do servidor.",
+    "noServers": "Você ainda não tem servidores. Crie seu primeiro servidor para começar a conectar seu assistente de IA a uma API."
+  },
+  "stat": {
+    "tasksHeadline_one": "{{count}} tarefa executada",
+    "tasksHeadline_other": "{{count}} tarefas executadas",
+    "noTasksYet": "Sem tarefas ainda",
+    "allSucceeded": "Todas bem-sucedidas",
+    "successRate": "{{rate}}% bem-sucedidas",
+    "nothingToReport": "Nada a relatar",
+    "integrations_one": "{{count}} integração",
+    "integrations_other": "{{count}} integrações",
+    "runningNormally_one": "{{count}} funcionando normalmente",
+    "runningNormally_other": "{{count}} funcionando normalmente",
+    "noneYet": "Nenhuma configurada ainda",
+    "actions_one": "{{count}} ação",
+    "actions_other": "{{count}} ações",
+    "thingsAiCanDo": "coisas que sua IA pode fazer",
+    "secured": "{{with}} de {{total}} protegidas",
+    "withAccessControl": "com controle de acesso"
+  },
+  "help": {
+    "tasksTitle": "Quantas tarefas sua IA executou",
+    "tasksContent": "Cada vez que seu assistente de IA chama uma de suas integrações — por exemplo \"buscar este cliente\" ou \"criar um novo ticket\" — isso conta como uma tarefa. O número aqui mostra o total do período selecionado.",
+    "integrationsTitle": "Suas integrações",
+    "integrationsContent": "Cada integração conecta uma de suas APIs (CRM, sistema de tickets, banco de dados, etc.) ao seu assistente de IA. Uma vez conectada, a IA pode consultar e atualizar esse sistema em qualquer conversa.",
+    "actionsTitle": "Ações disponíveis para sua IA",
+    "actionsContent": "Cada \"ação\" é algo específico que sua IA pode fazer — como \"pesquisar um contato\", \"criar um pedido\" ou \"verificar o status do servidor\". Mais ações significam que sua IA pode ajudar com mais tarefas.",
+    "securityTitle": "Segurança",
+    "securityContent": "Integrações protegidas exigem uma chave secreta antes que um cliente de IA possa conectar. Isso previne acesso não autorizado. É recomendado proteger todas as integrações que conectam a dados reais de produção.",
+    "chartTitle": "Lendo o gráfico",
+    "chartHint": "Cada barra representa um intervalo de tempo. Passe o mouse sobre uma barra para ver os números exatos.",
+    "chartBlue": "Todas as requisições foram bem-sucedidas.",
+    "chartYellow": "Algumas requisições tiveram problemas.",
+    "chartRed": "Todas as requisições naquele intervalo falharam.",
+    "topActionsTitle": "Ações mais usadas",
+    "topActionsContent": "As ações que seu assistente de IA chamou com mais frequência no período selecionado. Ações de alto uso são as mais importantes para sua equipe — certifique-se de que estejam configuradas corretamente e que suas descrições sejam claras.",
+    "statusTitle": "Status em tempo real do servidor",
+    "statusHint": "Mostra a saúde atual de cada integração com base na última hora de atividade.",
+    "statusGreen": "Todas as requisições foram bem-sucedidas na última hora.",
+    "statusYellow": "Algumas requisições tiveram problemas (taxa de falha de 1–19%).",
+    "statusRed": "Muitas requisições estão falhando (taxa de falha acima de 20%). Requer atenção.",
+    "statusGrey": "Sem atividade na última hora, ou a integração está pausada."
+  },
+  "chart": {
+    "title": "Atividade ao longo do tempo",
+    "noActivity": "Sem atividade durante este período.",
+    "barTooltip_one": "{{label}}: {{calls}} requisição, {{errors}} com falha",
+    "barTooltip_other": "{{label}}: {{calls}} requisições, {{errors}} com falha"
+  },
+  "tasks": {
+    "title": "Como foram as tarefas?",
+    "noActivity": "Sem atividade ainda neste período.",
+    "completedSuccessfully": "Concluídas com sucesso",
+    "hadProblem": "Tiveram um problema",
+    "issueHint_one": "1 tarefa teve um problema. Abra o servidor relevante e verifique os logs para ver o que deu errado.",
+    "issueHint_other": "{{count}} tarefas tiveram problemas. Abra os servidores afetados e verifique os logs para descobrir o que deu errado."
+  },
+  "topTools": {
+    "title": "O que sua IA mais usou",
+    "noActivity": "Sem atividade ainda — sua IA não executou tarefas neste período."
+  },
+  "healthStatus": {
+    "title": "Status agora",
+    "noIntegrations": "Nenhuma integração ainda.",
+    "paused": "Pausado",
+    "noActivity": "Sem atividade na última hora",
+    "allSucceeded_one": "{{count}} requisição, todas bem-sucedidas",
+    "allSucceeded_other": "{{count}} requisições, todas bem-sucedidas",
+    "errorRate_one": "{{count}} requisição, {{rate}}% com falha",
+    "errorRate_other": "{{count}} requisições, {{rate}}% com falha",
+    "checkThis": "Verificar"
+  }
+}

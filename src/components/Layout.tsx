@@ -18,6 +18,8 @@ import {
   MenuItem,
   styled,
   Toolbar,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   Typography,
   useMediaQuery,
@@ -38,6 +40,7 @@ import {
   IconArrowLeft,
   IconChevronRight,
 } from '@tabler/icons-react'
+import { useTranslation } from 'react-i18next'
 import api from '../api'
 import { avatarLetter, avatarColor } from '../pages/Profile'
 import { useColorMode, ColorMode } from '../theme/ColorModeContext'
@@ -46,29 +49,39 @@ import { useServerNav } from '../context/ServerNavContext'
 
 const SIDEBAR_WIDTH = 248
 
-const NAV_SECTIONS: Array<{
-  subheader: string
-  items: Array<{ title: string; icon: React.ElementType; path: string; permission?: keyof UserPermissions; adminOnly?: boolean }>
-}> = [
+type NavItem = {
+  titleKey: string
+  icon: React.ElementType
+  path: string
+  permission?: keyof UserPermissions
+  adminOnly?: boolean
+}
+
+type NavSection = {
+  subheaderKey: string
+  items: NavItem[]
+}
+
+const NAV_SECTIONS: NavSection[] = [
   {
-    subheader: 'OVERVIEW',
+    subheaderKey: 'section.overview',
     items: [
-      { title: 'Dashboard', icon: IconLayoutDashboard, path: '/dashboard', permission: 'servers_view' },
+      { titleKey: 'nav.dashboard', icon: IconLayoutDashboard, path: '/dashboard', permission: 'servers_view' },
     ],
   },
   {
-    subheader: 'MAIN',
+    subheaderKey: 'section.main',
     items: [
-      { title: 'Servers', icon: IconFolder, path: '/', permission: 'servers_view' },
-      { title: 'Prompts', icon: IconMessage2, path: '/prompts', permission: 'prompts_view' },
-      { title: 'Secrets', icon: IconLock, path: '/secrets', permission: 'secrets_view_names' },
+      { titleKey: 'nav.servers', icon: IconFolder, path: '/', permission: 'servers_view' },
+      { titleKey: 'nav.prompts', icon: IconMessage2, path: '/prompts', permission: 'prompts_view' },
+      { titleKey: 'nav.secrets', icon: IconLock, path: '/secrets', permission: 'secrets_view_names' },
     ],
   },
   {
-    subheader: 'ADMINISTRATION',
+    subheaderKey: 'section.administration',
     items: [
-      { title: 'Settings', icon: IconSettings, path: '/settings', permission: 'settings_manage' },
-      { title: 'Audit Logs', icon: IconClipboardList, path: '/audit-logs', permission: 'audit_view' },
+      { titleKey: 'nav.settings', icon: IconSettings, path: '/settings', permission: 'settings_manage' },
+      { titleKey: 'nav.auditLogs', icon: IconClipboardList, path: '/audit-logs', permission: 'audit_view' },
     ],
   },
 ]
@@ -101,6 +114,7 @@ function SidebarContent() {
   const { can, isAdmin } = useAuth()
   const { mode } = useColorMode()
   const { serverDetail } = useServerNav()
+  const { t } = useTranslation('layout')
 
   const scrollbarStyles = {
     '&::-webkit-scrollbar': { width: '7px' },
@@ -140,10 +154,10 @@ function SidebarContent() {
         border: '1px solid', borderColor: 'rgba(93,135,255,0.15)',
       }}>
         <Typography fontWeight={700} fontSize="0.8rem" color="primary.dark" mb={0.25}>
-          Arthur MCP Adapter
+          {t('promo.title')}
         </Typography>
         <Typography fontSize="0.72rem" color="text.secondary" lineHeight={1.4}>
-          Connect your AI to your APIs
+          {t('promo.subtitle')}
         </Typography>
       </Box>
     </Box>
@@ -158,7 +172,7 @@ function SidebarContent() {
         {/* Back to Servers */}
         <Box
           display="flex" alignItems="center" gap={0.75} px={2} py={1.25}
-          onClick={() => navigate('/')}
+          onClick={() => navigate(serverDetail.backPath ?? '/')}
           sx={{
             cursor: 'pointer', borderBottom: `1px solid ${theme.palette.divider}`,
             color: 'text.secondary', flexShrink: 0,
@@ -166,7 +180,7 @@ function SidebarContent() {
           }}
         >
           <IconArrowLeft size={14} />
-          <Typography fontSize="0.75rem">Servers</Typography>
+          <Typography fontSize="0.75rem">{serverDetail.backLabel ?? t('sidebar.backToServers')}</Typography>
         </Box>
 
         {/* Server identity */}
@@ -248,14 +262,14 @@ function SidebarContent() {
           if (visibleItems.length === 0) return null
           return (
             <List
-              key={section.subheader}
+              key={section.subheaderKey}
               subheader={
                 <ListSubheader sx={{
                   fontSize: '0.6875rem', fontWeight: 700, color: 'text.disabled',
                   letterSpacing: '0.08em', lineHeight: 1, bgcolor: 'transparent',
                   px: 2.5, pt: 2, pb: 0.75, textTransform: 'uppercase',
                 }}>
-                  {section.subheader}
+                  {t(section.subheaderKey)}
                 </ListSubheader>
               }
               dense disablePadding
@@ -282,7 +296,7 @@ function SidebarContent() {
                         <Icon stroke={selected ? 2 : 1.5} size="1.1rem" />
                       </ListItemIcon>
                       <ListItemText
-                        primary={item.title}
+                        primary={t(item.titleKey)}
                         primaryTypographyProps={{
                           fontSize: '0.8375rem',
                           fontWeight: selected ? 600 : 400,
@@ -312,6 +326,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
   const { mode, toggle } = useColorMode()
   const { logout } = useAuth()
+  const { t, i18n } = useTranslation('layout')
+
+  const activeLang = i18n.language?.startsWith('pt') ? 'pt-BR' : 'en'
 
   useEffect(() => {
     api.get('/health')
@@ -407,8 +424,46 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
             <Box flexGrow={1} />
 
+            {/* Language toggle */}
+            <ToggleButtonGroup
+              exclusive
+              size="small"
+              value={activeLang}
+              onChange={(_e, val) => { if (val) i18n.changeLanguage(val) }}
+              sx={{
+                mr: 1.5,
+                '& .MuiToggleButtonGroup-grouped': {
+                  marginLeft: '0 !important',
+                  border: '1px solid !important',
+                  borderColor: 'divider !important',
+                  '&.Mui-selected': {
+                    borderColor: 'primary.main !important',
+                    zIndex: 1,
+                  },
+                },
+                '& .MuiToggleButton-root': {
+                  height: 24,
+                  px: '8px',
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
+                  lineHeight: 1,
+                  color: 'text.secondary',
+                  textTransform: 'none',
+                  '&.Mui-selected': {
+                    color: 'primary.main',
+                    bgcolor: 'rgba(26,115,232,0.08)',
+                    '&:hover': { bgcolor: 'rgba(26,115,232,0.12)' },
+                  },
+                  '&:hover': { bgcolor: 'action.hover' },
+                },
+              }}
+            >
+              <ToggleButton value="en" disableRipple>EN</ToggleButton>
+              <ToggleButton value="pt-BR" disableRipple>PT</ToggleButton>
+            </ToggleButtonGroup>
+
             {/* Dark mode toggle */}
-            <Tooltip title={mode === ColorMode.Dark ? 'Light mode' : 'Dark mode'}>
+            <Tooltip title={mode === ColorMode.Dark ? t('theme.lightMode') : t('theme.darkMode')}>
               <Box display="flex" alignItems="center" gap={0.5} mr={0.5}>
                 <IconSun size={15} style={{ opacity: mode === ColorMode.Light ? 1 : 0.4 }} />
                 <Switch
@@ -426,7 +481,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </Tooltip>
 
             {/* Profile */}
-            <Tooltip title="Account menu">
+            <Tooltip title={t('account.menu')}>
               <IconButton
                 size="small"
                 color="inherit"
@@ -457,14 +512,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             >
               <MenuItem onClick={() => { setProfileAnchor(null); navigate('/profile') }}>
                 <ListItemIcon><IconUser size={18} /></ListItemIcon>
-                <ListItemText>My Profile</ListItemText>
+                <ListItemText>{t('account.myProfile')}</ListItemText>
               </MenuItem>
               <MenuItem
                 onClick={() => { setProfileAnchor(null); handleLogout() }}
                 sx={{ color: 'error.main' }}
               >
                 <ListItemIcon sx={{ color: 'error.main' }}><IconLogout size={18} /></ListItemIcon>
-                <ListItemText>Logout</ListItemText>
+                <ListItemText>{t('account.logout')}</ListItemText>
               </MenuItem>
             </Menu>
           </ToolbarStyled>

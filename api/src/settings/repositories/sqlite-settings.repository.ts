@@ -20,6 +20,12 @@ export class SqliteSettingsRepository implements ISettingsRepository {
       smtpPass: e.smtpPass ?? '',
       smtpFrom: e.smtpFrom ?? '',
       globalRequestHeaders: e.globalRequestHeaders ?? [],
+      termServer: e.termServer ?? undefined,
+      termTool: e.termTool ?? undefined,
+      termResource: e.termResource ?? undefined,
+      termPrompt: e.termPrompt ?? undefined,
+      termChain: e.termChain ?? undefined,
+      termSecret: e.termSecret ?? undefined,
     };
   }
 

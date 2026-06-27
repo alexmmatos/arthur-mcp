@@ -4,6 +4,8 @@ import { SwaggerService } from './swagger.service';
 import { PROJECT_REPO } from '../database/database.tokens';
 import { DynamicMcpService } from '../dynamic-mcp/dynamic-mcp.service';
 import type { SwaggerProjectRecord } from './swagger-project.repository';
+import { SwaggerApiKeysService } from './swagger-api-keys.service';
+import { SwaggerImportService } from './swagger-import.service';
 
 const makeProject = (overrides: Partial<SwaggerProjectRecord> = {}): SwaggerProjectRecord => ({
   _id: 'proj-1',
@@ -39,6 +41,9 @@ const mockDynamicMcp = {
   invalidate: jest.fn(),
 };
 
+const mockImportService = {};
+const mockApiKeysService = {};
+
 describe('SwaggerService', () => {
   let service: SwaggerService;
 
@@ -48,6 +53,8 @@ describe('SwaggerService', () => {
         SwaggerService,
         { provide: PROJECT_REPO, useValue: mockProjectRepo },
         { provide: DynamicMcpService, useValue: mockDynamicMcp },
+        { provide: SwaggerImportService, useValue: mockImportService },
+        { provide: SwaggerApiKeysService, useValue: mockApiKeysService },
       ],
     }).compile();
 

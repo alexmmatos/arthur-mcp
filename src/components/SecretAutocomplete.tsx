@@ -13,7 +13,6 @@ import api from '../api'
 export interface SecretEntry {
   id: string
   name: string
-  value: string
   description?: string
 }
 

@@ -1,0 +1,106 @@
+{
+  "heading": {
+    "title": "Activity Overview"
+  },
+  "period": {
+    "24h": "Today",
+    "7d": "This week",
+    "30d": "This month",
+    "custom": "Custom",
+    "last24h": "in the last 24 hours",
+    "last7d": "in the last 7 days",
+    "last30d": "in the last 30 days",
+    "selected": "in the selected period",
+    "from": "From",
+    "to": "To",
+    "apply": "Apply"
+  },
+  "action": {
+    "refresh": "Refresh"
+  },
+  "error": {
+    "forbidden": "Access restricted",
+    "forbiddenDetail": "You don't have permission to view the dashboard.",
+    "loadFailed": "Failed to load the dashboard. Please refresh the page."
+  },
+  "banner": {
+    "noActivity": "Your AI assistant has not been used yet {{period}}. Once you connect an AI client to a server, its activity will appear here.",
+    "allGood_one": "Everything is running smoothly. Your AI completed all {{total}} task successfully {{period}}.",
+    "allGood_other": "Everything is running smoothly. Your AI completed all {{total}} tasks successfully {{period}}.",
+    "someErrors_one": "Your AI ran {{total}} task {{period}}. {{successes}} went well — {{errors}} had issues. Check the projects below for details.",
+    "someErrors_other": "Your AI ran {{total}} tasks {{period}}. {{successes}} went well — {{errors}} had issues. Check the projects below for details.",
+    "manyErrors_one": "Attention needed. {{errors}} out of {{total}} task had problems {{period}}. Please review your server settings.",
+    "manyErrors_other": "Attention needed. {{errors}} out of {{total}} tasks had problems {{period}}. Please review your server settings.",
+    "noServers": "You have no servers yet. Create your first server to start connecting your AI assistant to an API."
+  },
+  "stat": {
+    "tasksHeadline_one": "{{count}} task run",
+    "tasksHeadline_other": "{{count}} tasks run",
+    "noTasksYet": "No tasks yet",
+    "allSucceeded": "All succeeded",
+    "successRate": "{{rate}}% succeeded",
+    "nothingToReport": "Nothing to report",
+    "integrations_one": "{{count}} integration",
+    "integrations_other": "{{count}} integrations",
+    "runningNormally_one": "{{count}} running normally",
+    "runningNormally_other": "{{count}} running normally",
+    "noneYet": "None set up yet",
+    "actions_one": "{{count}} action",
+    "actions_other": "{{count}} actions",
+    "thingsAiCanDo": "things your AI can do",
+    "secured": "{{with}} of {{total}} secured",
+    "withAccessControl": "with access control"
+  },
+  "help": {
+    "tasksTitle": "How many tasks your AI ran",
+    "tasksContent": "Each time your AI assistant calls one of your integrations — for example \"look up this customer\" or \"create a new ticket\" — that counts as one task. The number here shows the total for the selected period.",
+    "integrationsTitle": "Your integrations",
+    "integrationsContent": "Each integration connects one of your APIs (CRM, ticketing system, database, etc.) to your AI assistant. Once connected, the AI can query and update that system in any conversation.",
+    "actionsTitle": "Actions available to your AI",
+    "actionsContent": "Each \"action\" is something specific your AI can do — like \"search for a contact\", \"create an order\", or \"check server status\". More actions means your AI can help with more tasks.",
+    "securityTitle": "Security",
+    "securityContent": "Secured integrations require a secret key before an AI client can connect. This prevents unauthorised access. It is recommended to protect all integrations that connect to real production data.",
+    "chartTitle": "Reading the chart",
+    "chartHint": "Each bar represents one time slot. Hover over a bar for exact numbers.",
+    "chartBlue": "All requests succeeded.",
+    "chartYellow": "Some requests had issues.",
+    "chartRed": "All requests in that slot failed.",
+    "topActionsTitle": "Most-used actions",
+    "topActionsContent": "The actions your AI assistant called most often in the selected period. High-use actions are the most important for your team — make sure they are configured correctly and their descriptions are clear.",
+    "statusTitle": "Live server status",
+    "statusHint": "Shows the current health of each integration based on the last hour of activity.",
+    "statusGreen": "All requests succeeded in the last hour.",
+    "statusYellow": "Some requests had issues (1–19% failure rate).",
+    "statusRed": "Many requests are failing (20%+ failure rate). Needs attention.",
+    "statusGrey": "No activity in the last hour, or the integration is paused."
+  },
+  "chart": {
+    "title": "Activity over time",
+    "noActivity": "No activity during this period.",
+    "barTooltip_one": "{{label}}: {{calls}} request, {{errors}} failed",
+    "barTooltip_other": "{{label}}: {{calls}} requests, {{errors}} failed"
+  },
+  "tasks": {
+    "title": "How did tasks go?",
+    "noActivity": "No activity yet in this period.",
+    "completedSuccessfully": "Completed successfully",
+    "hadProblem": "Had a problem",
+    "issueHint_one": "1 task had an issue. Open the relevant server and check its logs to see what went wrong.",
+    "issueHint_other": "{{count}} tasks had issues. Open the affected servers and check their logs to find out what went wrong."
+  },
+  "topTools": {
+    "title": "What your AI used most",
+    "noActivity": "No activity yet — your AI hasn't run any tasks in this period."
+  },
+  "healthStatus": {
+    "title": "Status right now",
+    "noIntegrations": "No integrations yet.",
+    "paused": "Paused",
+    "noActivity": "No activity in the last hour",
+    "allSucceeded_one": "{{count}} request, all succeeded",
+    "allSucceeded_other": "{{count}} requests, all succeeded",
+    "errorRate_one": "{{count}} request, {{rate}}% failed",
+    "errorRate_other": "{{count}} requests, {{rate}}% failed",
+    "checkThis": "Check this"
+  }
+}

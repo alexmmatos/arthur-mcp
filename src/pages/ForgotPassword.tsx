@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Alert,
   Box,
@@ -15,6 +16,7 @@ import {
 import api from '../api'
 
 export default function ForgotPassword() {
+  const { t } = useTranslation('auth')
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
@@ -28,7 +30,7 @@ export default function ForgotPassword() {
       await api.post('/auth/forgot-password', { email })
       setSent(true)
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Error sending email.')
+      setError(err?.response?.data?.message ?? t('error.sendFailed'))
     } finally {
       setLoading(false)
     }
@@ -74,13 +76,11 @@ export default function ForgotPassword() {
             </Box>
 
             <Typography variant="subtitle1" textAlign="center" color="text.secondary" mb={3}>
-              Recover password
+              {t('heading.forgotPassword')}
             </Typography>
 
             {sent ? (
-              <Alert severity="success">
-                Instructions sent! Check your email and follow the link to reset your password.
-              </Alert>
+              <Alert severity="success">{t('hint.checkEmail')}</Alert>
             ) : (
               <>
                 {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -88,13 +88,13 @@ export default function ForgotPassword() {
                   <Stack spacing={3}>
                     <Box>
                       <Typography variant="subtitle1" fontWeight={600} component="label" htmlFor="email" display="block" mb="5px">
-                        Email
+                        {t('label.email')}
                       </Typography>
                       <TextField id="email" type="email" variant="outlined" fullWidth required autoFocus
                         value={email} onChange={(e) => setEmail(e.target.value)} />
                     </Box>
                     <Button type="submit" color="primary" variant="contained" size="large" fullWidth disabled={loading} disableElevation sx={{ py: 1.2 }}>
-                      {loading ? <CircularProgress size={22} color="inherit" /> : 'Send instructions'}
+                      {loading ? <CircularProgress size={22} color="inherit" /> : t('action.sendInstructions')}
                     </Button>
                   </Stack>
                 </Box>
@@ -103,7 +103,7 @@ export default function ForgotPassword() {
 
             <Box textAlign="center" mt={2}>
               <Link component={RouterLink} to="/login" variant="body2">
-                Back to login
+                {t('link.backToLogin')}
               </Link>
             </Box>
           </Card>

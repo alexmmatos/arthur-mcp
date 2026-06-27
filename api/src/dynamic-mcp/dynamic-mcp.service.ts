@@ -207,7 +207,7 @@ export class DynamicMcpService {
     const chainMap = new Map(enabledChains.map((c) => [c.name, c]));
     const enabledResources = resources.filter((r) => r.enabled !== false);
 
-    this.logger.log(`MCP server para "${name}": ${tools.length} tools (${allTools.length} total, ${allTools.filter(t => t.enabled === false).length} disabled)`);
+    this.logger.log(`MCP server for "${name}": ${tools.length} tools (${allTools.length} total, ${allTools.filter(t => t.enabled === false).length} disabled)`);
 
     const server = new Server(
       { name: `arthur-mcp-adapter:${name}`, version },

@@ -9,6 +9,12 @@ export interface SettingsRecord {
   smtpPass: string;
   smtpFrom: string;
   globalRequestHeaders: { name: string; value: string }[];
+  termServer?: string;
+  termTool?: string;
+  termResource?: string;
+  termPrompt?: string;
+  termChain?: string;
+  termSecret?: string;
 }
 
 export interface ISettingsRepository {

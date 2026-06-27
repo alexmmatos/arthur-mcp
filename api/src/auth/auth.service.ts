@@ -89,7 +89,7 @@ export class AuthService {
           html: `<p>Click the link to reset your password (valid for 1 hour):</p><p><a href="${resetLink}">${resetLink}</a></p>`,
         });
       } catch (err: any) {
-        this.logger.error(`Falha ao enviar e-mail de reset: ${err?.message}`);
+        this.logger.error(`Failed to send password reset email: ${err?.message}`);
       }
     } else {
       this.logger.warn(`SMTP not configured. Reset link for ${email}: ${resetLink}`);
@@ -99,7 +99,7 @@ export class AuthService {
   async resetPassword(token: string, newPassword: string): Promise<void> {
     const record = await this.resetRepo.findByToken(token);
     if (!record) throw new BadRequestException('Invalid or already used token.');
-    if (record.expiresAt < new Date()) throw new BadRequestException('Token expirado.');
+    if (record.expiresAt < new Date()) throw new BadRequestException('Token expired.');
 
     const user = await this.users.findById(record.userId);
     if (!user) throw new NotFoundException('User not found.');
