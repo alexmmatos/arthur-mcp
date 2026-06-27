@@ -3,8 +3,6 @@ import { useTranslation } from 'react-i18next'
 import {
   Box,
   Chip,
-  IconButton,
-  Paper,
   Tooltip,
   Typography,
 } from '@mui/material'
@@ -14,6 +12,7 @@ import {
   IconTrash,
 } from '@tabler/icons-react'
 import { Permission, useAuth } from '../../context/AuthContext'
+import { BaseListCard, type BaseListCardAction } from '../../components/BaseListCard'
 import type { HealthEntry, Project } from './types'
 
 function TrafficLight({ health, isPaused }: { health?: HealthEntry; isPaused?: boolean }) {
@@ -58,137 +57,84 @@ export function ProjectCard({ p, health, onDelete, onDuplicate }: {
   const { can } = useAuth()
   const { t } = useTranslation('servers')
 
+  const actions: BaseListCardAction[] = []
+  if (can(Permission.ServersCreate)) {
+    actions.push({
+      icon: <IconCopy size={15} />,
+      tooltip: t('common:action.duplicate'),
+      onClick: () => onDuplicate(p._id),
+    })
+  }
+  if (can(Permission.ServersDelete)) {
+    actions.push({
+      icon: <IconTrash size={15} />,
+      tooltip: t('common:action.delete'),
+      onClick: () => onDelete(p._id),
+      color: 'error',
+    })
+  }
+
   return (
-    <Paper
-      variant="outlined"
+    <BaseListCard
+      icon={<TrafficLight health={health} isPaused={p.isPaused} />}
+      title={p.name}
+      description={p.description}
       onClick={() => navigate(`/servers/${p._id}`)}
-      sx={{
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'relative',
-        cursor: 'pointer',
-        opacity: p.isPaused ? 0.8 : 1,
-        transition: 'border-color 0.15s',
-        '&:hover': {
-          borderColor: 'primary.main',
-          '& .card-actions': { opacity: 1 },
-        },
-      }}
-    >
-      <Box
-        className="card-actions"
-        sx={{
-          position: 'absolute',
-          top: 8,
-          right: 8,
-          zIndex: 2,
-          display: 'flex',
-          gap: 0.25,
-          opacity: 0,
-          transition: 'opacity 0.15s',
-        }}
-      >
-        {can(Permission.ServersCreate) && (
-          <Tooltip title={t('common:action.duplicate')}>
-            <IconButton
-              size="small"
-              onClick={(e) => { e.stopPropagation(); onDuplicate(p._id) }}
-              sx={{ p: 0.5, bgcolor: 'background.paper', '&:hover': { bgcolor: 'action.hover' } }}
-            >
-              <IconCopy size={15} />
-            </IconButton>
-          </Tooltip>
-        )}
-        {can(Permission.ServersDelete) && (
-          <Tooltip title={t('common:action.delete')}>
-            <IconButton
-              size="small"
-              onClick={(e) => { e.stopPropagation(); onDelete(p._id) }}
-              sx={{ p: 0.5, bgcolor: 'background.paper', color: 'text.disabled', '&:hover': { bgcolor: 'action.hover', color: 'error.main' } }}
-            >
-              <IconTrash size={15} />
-            </IconButton>
-          </Tooltip>
-        )}
-      </Box>
-
-      <Box sx={{ flexGrow: 1, p: 2, pr: 5 }}>
-        <Box display="flex" alignItems="center" gap={1} mb={0.5} minWidth={0}>
-          <TrafficLight health={health} isPaused={p.isPaused} />
-          <Typography fontWeight={700} fontSize="0.9375rem" noWrap lineHeight={1.3}>
-            {p.name}
-          </Typography>
-        </Box>
-
-        {p.description && (
+      opacity={p.isPaused ? 0.8 : 1}
+      content={
+        <Box>
           <Typography
-            variant="body2"
-            color="text.secondary"
-            mt={0.5}
-            mb={0.75}
-            sx={{
-              lineHeight: 1.45,
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-            }}
+            variant="caption"
+            color="text.disabled"
+            display="block"
+            mb={1}
+            fontFamily="monospace"
+            fontSize="0.72rem"
+            sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
           >
-            {p.description}
+            {p.baseUrl}
           </Typography>
-        )}
 
-        <Typography
-          variant="caption"
-          color="text.disabled"
-          display="block"
-          mb={1}
-          fontFamily="monospace"
-          fontSize="0.72rem"
-          sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-        >
-          {p.baseUrl}
-        </Typography>
+          <Box display="flex" gap={0.75} flexWrap="wrap" alignItems="center" mb={1}>
+            {p.isPaused
+              ? <Chip label={t('status.paused')} size="small" color="default" sx={{ fontWeight: 600 }} />
+              : <Chip
+                  label={p.status === 'active' ? t('status.active') : t('common:status.error')}
+                  size="small"
+                  color={p.status === 'active' ? 'success' : 'error'}
+                  variant="outlined"
+                  sx={{ fontWeight: 600 }}
+                />
+            }
+            <Chip
+              label={t('label.toolCount', { count: p.tools?.length ?? 0 })}
+              size="small"
+              variant="outlined"
+              sx={{ fontWeight: 500 }}
+            />
+            {p.version && (
+              <Chip label={`v${p.version}`} size="small" variant="outlined" sx={{ fontWeight: 500 }} />
+            )}
+          </Box>
 
-        <Box display="flex" gap={0.75} flexWrap="wrap" alignItems="center">
-          {p.isPaused
-            ? <Chip label={t('status.paused')} size="small" color="default" sx={{ fontWeight: 600 }} />
-            : <Chip
-                label={p.status === 'active' ? t('status.active') : t('common:status.error')}
-                size="small"
-                color={p.status === 'active' ? 'success' : 'error'}
-                variant="outlined"
-                sx={{ fontWeight: 600 }}
-              />
-          }
-          <Chip
-            label={t('label.toolCount', { count: p.tools?.length ?? 0 })}
-            size="small"
-            variant="outlined"
-            sx={{ fontWeight: 500 }}
-          />
-          {p.version && (
-            <Chip label={`v${p.version}`} size="small" variant="outlined" sx={{ fontWeight: 500 }} />
+          {p.tags && p.tags.length > 0 && (
+            <Box display="flex" gap={0.5} flexWrap="wrap">
+              {p.tags.map((tag) => (
+                <Chip
+                  key={tag}
+                  icon={<IconLabel size={10} />}
+                  label={tag}
+                  size="small"
+                  variant="outlined"
+                  color="primary"
+                  sx={{ fontSize: '0.68rem', height: 18 }}
+                />
+              ))}
+            </Box>
           )}
         </Box>
-
-        {p.tags && p.tags.length > 0 && (
-          <Box display="flex" gap={0.5} flexWrap="wrap" mt={0.75}>
-            {p.tags.map((tag) => (
-              <Chip
-                key={tag}
-                icon={<IconLabel size={10} />}
-                label={tag}
-                size="small"
-                variant="outlined"
-                color="primary"
-                sx={{ fontSize: '0.68rem', height: 18 }}
-              />
-            ))}
-          </Box>
-        )}
-      </Box>
-    </Paper>
+      }
+      actions={actions}
+    />
   )
 }
