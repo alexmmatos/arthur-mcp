@@ -23,19 +23,10 @@ import {
 import { useTranslation } from 'react-i18next'
 import api from '../api'
 import { useDetailPageNav } from '../hooks/useDetailPageNav'
+import type { Prompt } from '../features/prompts/types'
 import Swal from 'sweetalert2'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-interface Prompt {
-  id: string
-  name: string
-  description?: string
-  content: string
-  tags: string[]
-  createdAt: string
-  updatedAt: string
-}
 
 interface SwaggerProject {
   id: string

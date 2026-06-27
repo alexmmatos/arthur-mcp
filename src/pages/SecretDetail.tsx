@@ -33,17 +33,11 @@ import { useTranslation } from 'react-i18next'
 import { useAuth, Permission } from '../context/AuthContext'
 import api from '../api'
 import { useDetailPageNav } from '../hooks/useDetailPageNav'
+import type { Project } from '../features/server/types'
+import type { Secret } from '../features/secrets/types'
 import Swal from 'sweetalert2'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-interface Secret {
-  id: string
-  name: string
-  description?: string
-  createdAt: string
-  updatedAt: string
-}
 
 interface AuditLog {
   id: string
@@ -51,11 +45,6 @@ interface AuditLog {
   resourceId?: string
   username?: string
   createdAt: string
-}
-
-interface Project {
-  _id: string
-  name: string
 }
 
 // ─── Tab 0 — Overview ─────────────────────────────────────────────────────────
