@@ -8,7 +8,7 @@ Codex
 
 ## Current State
 
-The shared context protocol now includes Claude Code specialist agents, backend entity documentation, backend/frontend design patterns, flow documentation, and a documentation gate. Recent Claude Code work added frontend i18n and configurable terminology. REST server templates now create tagged REST servers by sending `source:rest` during server creation. Prompt and secret creation now use dedicated page-based stepper flows. Server source cards now support double-click to select and continue. A Portuguese integration modeling document was added by explicit user request. Phase 1 of the operation-first migration renamed generic data-source execution UI from Queries to Operations. Data-source operations now support input/output schemas for MCP exposure, with input parameters presented before source-specific query/command editors. A `system-tutor` Claude Code specialist now owns tutorials, section guides, onboarding paths, and product education. A `compliance-counsel` specialist now owns software licensing, dependency obligations, attribution, distribution risk, and compliance/legal notes. A `developer-advocate` specialist now owns developer adoption materials, demos, examples, DX reviews, and community feedback loops. A `react-frontend-engineer` specialist now owns React/TypeScript frontend implementation. A `backend-test-engineer` specialist now owns backend Jest, NestJS, repository, guard, DTO, and API/e2e tests. Backend coverage now has an 80% global gate for focused testable units. `ServerDetail` refactoring has started by extracting focused server feature modules without replacing the current Operations implementation.
+The shared context protocol now includes Claude Code specialist agents, backend entity documentation, backend/frontend design patterns, flow documentation, and a documentation gate. Recent Claude Code work added frontend i18n and configurable terminology. REST server templates now create tagged REST servers by sending `source:rest` during server creation. Prompt and secret creation now use dedicated page-based stepper flows. Server source cards now support double-click to select and continue. A Portuguese integration modeling document was added by explicit user request. Phase 1 of the operation-first migration renamed generic data-source execution UI from Queries to Operations. Data-source operations now support input/output schemas for MCP exposure, with input parameters presented before source-specific query/command editors. A `system-tutor` Claude Code specialist now owns tutorials, section guides, onboarding paths, and product education. A `compliance-counsel` specialist now owns software licensing, dependency obligations, attribution, distribution risk, and compliance/legal notes. A `developer-advocate` specialist now owns developer adoption materials, demos, examples, DX reviews, and community feedback loops. A `react-frontend-engineer` specialist now owns React/TypeScript frontend implementation. A `backend-test-engineer` specialist now owns backend Jest, NestJS, repository, guard, DTO, and API/e2e tests. Backend coverage now has an 80% global gate for focused testable units. `ServerDetail` refactoring is continuing by extracting focused server feature modules without replacing the current Operations implementation.
 
 ## Latest Changes
 
@@ -49,6 +49,11 @@ The shared context protocol now includes Claude Code specialist agents, backend 
 - Configured `api/package.json` coverage collection and global thresholds: 80% statements, 70% branches, 80% functions, and 80% lines.
 - Found Claude Code worktree at `.claude/worktrees/agent-ab0722d25387f1c7f`. It compiles and contains a broad `ServerDetail` split, but it is based on an older state and does not include the current Operations/`DbQuery` UI, so do not copy it wholesale into the main worktree.
 - Extracted shared `SaveIndicator` and `RateLimitPanel` from `ServerDetail` into focused frontend modules.
+- Reviewed the frontend modularity problem with `react-frontend-engineer`, `software-engineer`, and `software-architect` guidance. `ServerDetail.tsx` remains the primary SOLID violation and should continue to be decomposed by route feature area.
+- Extracted `BaseUrlPanel` from `ServerDetail.tsx` into `src/features/server/settings/BaseUrlPanel.tsx`, keeping the route page as the caller and preserving existing API behavior.
+- Inspected Claude Code worktree `.claude/worktrees/agent-ab0722d25387f1c7f`; it contains a broad server feature split but should still be reused selectively because the main tree has newer Operations/i18n work.
+- Reused the worktree's project-controls extraction pattern and moved `ProjectControlsPanel` from inline `ServerDetail.tsx` code into `src/features/server/settings/ProjectControlsPanel.tsx`.
+- Extracted the Connect tab from `ServerDetail.tsx` into `src/features/server/connect/McpEndpointBar.tsx`, `ApiKeysPanel.tsx`, and `OAuthClientPanel.tsx`, preserving the current `serverDetail` i18n usage instead of copying the older hardcoded worktree versions.
 
 ## Files Changed In This Session
 
@@ -107,6 +112,11 @@ The shared context protocol now includes Claude Code specialist agents, backend 
 - `src/data/api-templates.ts`
 - `src/components/SaveIndicator.tsx`
 - `src/features/server/settings/RateLimitPanel.tsx`
+- `src/features/server/settings/BaseUrlPanel.tsx`
+- `src/features/server/settings/ProjectControlsPanel.tsx`
+- `src/features/server/connect/McpEndpointBar.tsx`
+- `src/features/server/connect/ApiKeysPanel.tsx`
+- `src/features/server/connect/OAuthClientPanel.tsx`
 - `src/features/server/types.ts`
 - `src/components/SecretAutocomplete.tsx`
 - `src/context/AuthContext.tsx`
@@ -142,13 +152,16 @@ The shared context protocol now includes Claude Code specialist agents, backend 
 - `npx tsc -p api/tsconfig.json --noEmit` passed.
 - `npm run type-check` passed.
 - `npm run type-check` passed after extracting `SaveIndicator` and `RateLimitPanel`.
+- `npm run type-check` passed after extracting `BaseUrlPanel`.
+- `npm run type-check` passed after extracting `ProjectControlsPanel`.
+- `npm run type-check` passed after extracting the Connect tab panels.
 - `npm test --prefix api -- secrets.service.spec.ts swagger.service.spec.ts permissions.guard.spec.ts` passed.
 - `npm run test:cov --prefix api -- --runInBand` passed with 83.85% statements, 71.72% branches, 87.34% functions, and 85.35% lines.
 - `npm run build --prefix api` could not complete because the local system hit the file watcher limit (`ENOSPC`), so backend validation used direct `tsc --noEmit` instead.
 
 ## Recommended Next Step
 
-Before the next task, ask the selected agent to read `AGENTS.md`, `docs/ROADMAP.md`, `docs/HANDOFF.md`, `.claude/agents/README.md`, `docs/DESIGN_PATTERNS.md`, `docs/FLOWS.md`, and `docs/ENTITIES.md` when backend domain data is relevant, run `git status --short`, continue from there, and update affected documentation before finishing.
+Continue the `ServerDetail` modular refactor in small behavior-preserving steps. Use the Claude Code worktree as a reference, but do not merge it wholesale. The next high-value extraction is likely API endpoint tools, activity, resources/prompts, or the Operations area.
 
 ## Points Of Attention
 

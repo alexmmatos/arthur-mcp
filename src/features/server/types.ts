@@ -15,3 +15,17 @@ export interface RateLimitPanelProps {
   initialRateLimit?: { enabled: boolean; requestsPerMinute: number }
   onChange: (rl: { enabled: boolean; requestsPerMinute: number }) => void
 }
+
+export interface ScheduleEntry {
+  id: string
+  day: number
+  startHour: number
+  endHour: number
+}
+
+export interface McpApiKeyEntry {
+  id: string
+  name: string
+  key: string
+  createdAt: string
+}

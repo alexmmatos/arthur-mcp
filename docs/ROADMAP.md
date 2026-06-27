@@ -41,6 +41,9 @@ This file should be updated when task state changes. It does not replace issues 
 - [x] Added input/output schema support to data-source operations and MCP Tool generation.
 - [x] Added backend tests and an 80% coverage gate for focused backend testable units.
 - [x] Started the `ServerDetail` SOLID refactor by extracting shared save status UI and the rate limit settings panel.
+- [x] Continued the `ServerDetail` modular refactor by extracting the API base URL settings panel into `src/features/server/settings/`.
+- [x] Reused the Claude Code worktree selectively to extract the server project controls panel into `src/features/server/settings/`.
+- [x] Extracted the server Connect tab panels into `src/features/server/connect/` while preserving current i18n copy.
 
 ## Decisions
 
@@ -64,4 +67,4 @@ This file should be updated when task state changes. It does not replace issues 
 - What is the immediate functional priority for the system?
 - Is there a primary deploy environment beyond the files already present in the repository?
 - Which excluded legacy backend facades should receive dedicated coverage next?
-- Which `ServerDetail` section should be extracted next: authentication settings, project controls, API endpoint tools, resources/prompts, or operations?
+- Which `ServerDetail` section should be extracted next: API endpoint tools, resources/prompts, activity, or operations?
