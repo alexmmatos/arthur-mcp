@@ -11,9 +11,14 @@ This file should be updated when task state changes. It does not replace issues 
 
 ## In Progress
 
-- [ ] Establish a shared context protocol between agents.
-- [ ] Refactor `ServerDetail` into focused `src/features/server/` modules while preserving current Operations behavior.
-- [ ] Apply the execution plan in `docs/FRONTEND_MODULARIZATION_PLAN.md`, starting with `ServerDetail` and then `Prompts`, `Secrets`, and `Settings`.
+- [ ] Apply frontend code duplication optimization plan (`docs/FRONTEND_OPTIMIZATION_PLAN.md`):
+  - [x] **Phase 1:** Create `BaseListCard` generic component and refactor `PromptCard`, `SecretCard`, `ProjectCard` (4–6 hours, ~60 lines saved per card).
+  - [ ] **Phase 2:** Extract `useListPageLogic` hook and refactor list pages (Prompts, Secrets, Servers).
+  - [ ] **Phase 3:** Extract `useCopyToClipboard` utility hook.
+  - [ ] **Phase 4:** Create `BaseDialogLayout` for dialog/drawer wrappers.
+  - [ ] **Phase 5:** Extract `useDetailPageNav` hook for detail page contextual navigation.
+  - [ ] **Phase 6:** Consolidate type definitions.
+  - [ ] **Phase 7:** Extract `useAsyncFeedback` hook.
 
 ## Later
 
@@ -48,6 +53,8 @@ This file should be updated when task state changes. It does not replace issues 
 - [x] Extracted the server Activity log panel into `src/features/server/activity/`.
 - [x] Started extracting API endpoint support by moving the endpoint picker dialog into `src/features/server/api-endpoints/`.
 - [x] Extracted tool notes/comments UI into `src/features/server/api-endpoints/`.
+- [x] Created comprehensive `docs/FRONTEND_OPTIMIZATION_PLAN.md` to reduce ~35-40% frontend code duplication across 7 phases.
+- [x] **Phase 1 Complete:** Implemented `BaseListCard` generic card component and migrated `PromptCard`, `SecretCard`, `ProjectCard` to use it.
 - [x] Extracted API endpoint curl/schema helper functions into `src/features/server/api-endpoints/`.
 - [x] Continued the Claude Code worktree refactor by extracting `EndpointAccordion` and shared schema field input into `src/features/server/api-endpoints/`.
 - [x] Completed the remaining `ServerDetail` settings extraction by moving alert and tenant panels into `src/features/server/settings/` and wiring the page to consume only feature modules.
