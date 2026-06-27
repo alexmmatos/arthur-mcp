@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import {
   Box,
   Button,
@@ -25,6 +25,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import AppSnackbar from '../components/AppSnackbar'
 import { PromptCard } from '../features/prompts/PromptCard'
 import { TagInput } from '../features/prompts/TagInput'
+import { useListPageLogic } from '../hooks/useListPageLogic'
 import type { Prompt } from '../features/prompts/types'
 
 // ─── Page ──────────────────────────────────────────────────────────────────────
@@ -32,31 +33,22 @@ import type { Prompt } from '../features/prompts/types'
 export default function Prompts() {
   const navigate = useNavigate()
   const { t } = useTranslation('prompts')
-  const { can, loading: authLoading } = useAuth()
-  const [prompts, setPrompts] = useState<Prompt[]>([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
+  const { can } = useAuth()
   const [tagFilter, setTagFilter] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<Prompt | null>(null)
-  const [deleting, setDeleting] = useState(false)
-  const [snack, setSnack] = useState<{ message: string; severity?: 'success' | 'error' } | null>(null)
 
-  useEffect(() => {
-    if (authLoading) return
-    if (!can(Permission.PromptsView)) { setLoading(false); return }
-    api.get<Prompt[]>('/prompts')
-      .then((r) => setPrompts(r.data))
-      .catch(() => setSnack({ message: t('error.loadFailed'), severity: 'error' }))
-      .finally(() => setLoading(false))
-  }, [authLoading])
+  const [state, handlers] = useListPageLogic({
+    loadItems: () => api.get<Prompt[]>('/prompts').then((r) => r.data),
+    deleteItem: (id) => api.delete(`/prompts/${id}`),
+    permission: Permission.PromptsView,
+  })
 
-  const allTags = [...new Set(prompts.flatMap((p) => p.tags))].sort()
+  const allTags = [...new Set(state.items.flatMap((p) => p.tags))].sort()
 
-  const visible = prompts.filter((p) => {
+  const visible = state.items.filter((p) => {
     if (tagFilter && !p.tags.includes(tagFilter)) return false
-    if (search) {
-      const q = search.toLowerCase()
+    if (state.search) {
+      const q = state.search.toLowerCase()
       return (
         p.name.toLowerCase().includes(q) ||
         (p.description ?? '').toLowerCase().includes(q) ||
@@ -75,24 +67,7 @@ export default function Prompts() {
       setCopiedId(p.id)
       setTimeout(() => setCopiedId(null), 1500)
     } catch {
-      setSnack({ message: t('error.copyFailed'), severity: 'error' })
-    }
-  }
-
-  const handleDeleteRequest = (p: Prompt) => setDeleteTarget(p)
-
-  const handleDeleteConfirm = async () => {
-    if (!deleteTarget) return
-    setDeleting(true)
-    try {
-      await api.delete(`/prompts/${deleteTarget.id}`)
-      setPrompts((prev) => prev.filter((p) => p.id !== deleteTarget.id))
-      setSnack({ message: t('toast.deleted'), severity: 'success' })
-      setDeleteTarget(null)
-    } catch {
-      setSnack({ message: t('error.deleteFailed'), severity: 'error' })
-    } finally {
-      setDeleting(false)
+      handlers.setSnack({ message: t('error.copyFailed'), severity: 'error' })
     }
   }
 
@@ -123,8 +98,8 @@ export default function Prompts() {
       {/* Search + tag filter */}
       <Box display="flex" alignItems="center" gap={1.5} mb={3} flexWrap="wrap">
         <TextField
-          size="small" placeholder={t('placeholder.searchPrompts')} value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          size="small" placeholder={t('placeholder.searchPrompts')} value={state.search}
+          onChange={(e) => handlers.setSearch(e.target.value)}
           sx={{ width: 280 }}
           InputProps={{
             startAdornment: <InputAdornment position="start"><IconSearch size={16} /></InputAdornment>,
@@ -150,15 +125,15 @@ export default function Prompts() {
             ))}
           </Box>
         )}
-        {(search || tagFilter) && (
+        {(state.search || tagFilter) && (
           <Typography variant="body2" color="text.secondary" ml="auto">
-            {visible.length} of {prompts.length}
+            {visible.length} of {state.items.length}
           </Typography>
         )}
       </Box>
 
       {/* Content */}
-      {loading ? (
+      {state.loading ? (
         <Grid container spacing={2}>
           {Array.from({ length: 4 }).map((_, i) => (
             <Grid item xs={12} sm={6} md={4} key={i}>
@@ -166,7 +141,7 @@ export default function Prompts() {
             </Grid>
           ))}
         </Grid>
-      ) : prompts.length === 0 ? (
+      ) : state.items.length === 0 ? (
         <Box py={6} textAlign="center">
           <Typography color="text.secondary" variant="body2">
             {t('empty.noPrompts', { defaultValue: 'No prompts yet. Click New prompt to create your first one.' })}
@@ -184,7 +159,7 @@ export default function Prompts() {
                 prompt={p}
                 onEdit={openEdit}
                 onCopy={handleCopy}
-                onDelete={handleDeleteRequest}
+                onDelete={handlers.handleDeleteRequest}
                 canEdit={can(Permission.PromptsEdit)}
                 canDelete={can(Permission.PromptsDelete)}
                 copied={copiedId === p.id}
@@ -194,19 +169,19 @@ export default function Prompts() {
         </Grid>
       )}
       <ConfirmDialog
-        open={deleteTarget !== null}
-        title={t('confirm.deleteTitle', { name: deleteTarget?.name })}
+        open={state.deleteTarget !== null}
+        title={t('confirm.deleteTitle', { name: state.deleteTarget?.name })}
         message={t('confirm.deleteMessage')}
-        confirmLabel={t('common:action.delete')} confirmColor="error" loading={deleting}
-        onConfirm={handleDeleteConfirm}
-        onClose={() => setDeleteTarget(null)}
+        confirmLabel={t('common:action.delete')} confirmColor="error" loading={state.deleting}
+        onConfirm={handlers.handleDeleteConfirm}
+        onClose={handlers.handleDeleteCancel}
       />
 
       <AppSnackbar
-        open={snack !== null}
-        message={snack?.message ?? ''}
-        severity={snack?.severity ?? 'success'}
-        onClose={() => setSnack(null)}
+        open={state.snack !== null}
+        message={state.snack?.message ?? ''}
+        severity={state.snack?.severity ?? 'success'}
+        onClose={() => handlers.setSnack(null)}
       />
     </Box>
   )

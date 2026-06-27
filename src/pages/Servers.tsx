@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
@@ -23,6 +23,7 @@ import HelpButton from '../components/HelpButton'
 import ConfirmDialog from '../components/ConfirmDialog'
 import AppSnackbar from '../components/AppSnackbar'
 import { ProjectCard } from '../features/server/ProjectCard'
+import { useListPageLogic } from '../hooks/useListPageLogic'
 import type { HealthEntry, HealthSummaryEntry, Project } from '../features/server/types'
 
 // ─── Skeleton grid ────────────────────────────────────────────────────────────
@@ -42,104 +43,64 @@ function ProjectsSkeleton() {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function Servers() {
-  const [projects, setProjects] = useState<Project[]>([])
   const [health, setHealth] = useState<Map<string, HealthEntry>>(new Map())
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
   const [tagFilter, setTagFilter] = useState('')
   const navigate = useNavigate()
   const { can, loading: authLoading } = useAuth()
   const { t } = useTranslation(['servers', 'common'])
 
-  // Confirm dialog state
-  const [confirmOpen, setConfirmOpen] = useState(false)
-  const [confirmTarget, setConfirmTarget] = useState<string | null>(null)
-  const [confirmLoading, setConfirmLoading] = useState(false)
-
-  // Snackbar state
-  const [snackOpen, setSnackOpen] = useState(false)
-  const [snackMsg, setSnackMsg] = useState('')
-  const [snackSeverity, setSnackSeverity] = useState<'success' | 'error'>('success')
-
-  const load = () => {
-    setLoading(true)
-    setError(null)
-    Promise.all([
-      api.get<Project[]>('/swagger/servers'),
-      api.get<HealthSummaryEntry[]>('/dashboard/health-summary').catch(() => ({ data: [] as HealthSummaryEntry[] })),
-    ])
-      .then(([projectsRes, healthRes]) => {
-        setProjects(projectsRes.data)
+  const [state, handlers] = useListPageLogic({
+    loadItems: async () => {
+      setError(null)
+      try {
+        const [projectsRes, healthRes] = await Promise.all([
+          api.get<Project[]>('/swagger/servers'),
+          api.get<HealthSummaryEntry[]>('/dashboard/health-summary').catch(() => ({ data: [] as HealthSummaryEntry[] })),
+        ])
         const map = new Map<string, HealthEntry>()
         for (const h of healthRes.data) {
           map.set(h.projectId, { projectId: h.projectId, errorRatePct: h.errorRatePct, totalCalls: h.totalCalls, isPaused: h.isPaused })
         }
         setHealth(map)
-      })
-      .catch((err) => {
+        return projectsRes.data
+      } catch (err: any) {
         if (err?.response?.status === 403) setError('forbidden')
         else setError(t('servers:error.loadFailed'))
-      })
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(() => {
-    if (authLoading) return
-    if (!can(Permission.ServersView)) { setLoading(false); return }
-    load()
-  }, [authLoading])
-
-  const handleDeleteRequest = (id: string) => {
-    setConfirmTarget(id)
-    setConfirmOpen(true)
-  }
-
-  const handleDeleteConfirm = async () => {
-    if (!confirmTarget) return
-    setConfirmLoading(true)
-    try {
-      await api.delete(`/swagger/servers/${confirmTarget}`)
-      setProjects((prev) => prev.filter((p) => p._id !== confirmTarget))
-      setSnackMsg(t('servers:toast.deleted'))
-      setSnackSeverity('success')
-      setSnackOpen(true)
-    } catch {
-      setSnackMsg(t('servers:toast.deleteFailed'))
-      setSnackSeverity('error')
-      setSnackOpen(true)
-    } finally {
-      setConfirmLoading(false)
-      setConfirmOpen(false)
-      setConfirmTarget(null)
-    }
-  }
+        throw err
+      }
+    },
+    deleteItem: (id) => api.delete(`/swagger/servers/${id}`),
+    permission: Permission.ServersView,
+    getItemId: (p: Project) => p._id,
+  })
 
   const handleDuplicate = async (id: string) => {
     try {
       const res = await api.post<Project>(`/swagger/servers/${id}/duplicate`)
-      setProjects((prev) => [res.data, ...prev])
-      setSnackMsg(t('servers:toast.duplicated', { name: res.data.name }))
-      setSnackSeverity('success')
-      setSnackOpen(true)
+      handlers.setItems([res.data, ...state.items])
+      handlers.setSnack({ message: t('servers:toast.duplicated', { name: res.data.name }), severity: 'success' })
     } catch {
-      setSnackMsg(t('servers:toast.duplicateFailed'))
-      setSnackSeverity('error')
-      setSnackOpen(true)
+      handlers.setSnack({ message: t('servers:toast.duplicateFailed'), severity: 'error' })
     }
   }
 
+  const handleDeleteProject = (id: string) => {
+    const project = state.items.find(p => p._id === id)
+    if (project) handlers.handleDeleteRequest(project)
+  }
+
   // All unique tags
-  const allTags = Array.from(new Set(projects.flatMap((p) => p.tags ?? [])))
+  const allTags = Array.from(new Set(state.items.flatMap((p) => p.tags ?? [])))
 
   // Client-side filter
-  const filtered = projects.filter((p) => {
-    const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.description?.toLowerCase().includes(search.toLowerCase())
+  const filtered = state.items.filter((p) => {
+    const matchSearch = !state.search || p.name.toLowerCase().includes(state.search.toLowerCase()) || p.description?.toLowerCase().includes(state.search.toLowerCase())
     const matchTag = !tagFilter || (p.tags ?? []).includes(tagFilter)
     return matchSearch && matchTag
   })
 
-  const confirmProjectName = projects.find((p) => p._id === confirmTarget)?.name ?? 'this server'
+  const confirmProjectName = state.items.find((p) => p._id === state.deleteTarget?._id)?.name ?? 'this server'
 
   return (
     <Box>
@@ -193,7 +154,7 @@ export default function Servers() {
       <Box display="flex" gap={1.5} mb={3} flexWrap="wrap" alignItems="center">
         <TextField
           size="small" placeholder={t('servers:placeholder.search')}
-          value={search} onChange={(e) => setSearch(e.target.value)}
+          value={state.search} onChange={(e) => handlers.setSearch(e.target.value)}
           sx={{ minWidth: 220 }}
           InputProps={{ startAdornment: <InputAdornment position="start"><IconSearch size={16} /></InputAdornment> }}
         />
@@ -209,7 +170,7 @@ export default function Servers() {
         )}
       </Box>
 
-      {loading ? (
+      {state.loading ? (
         <ProjectsSkeleton />
       ) : error === 'forbidden' || !can(Permission.ServersView) ? (
         <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={12}>
@@ -219,11 +180,11 @@ export default function Servers() {
       ) : error ? (
         <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={10}>
           <Alert severity="error" sx={{ width: '100%', maxWidth: 560 }}>{error}</Alert>
-          <Button variant="contained" onClick={load}>{t('common:action.reload')}</Button>
+          <Button variant="contained" onClick={() => { handlers.setItems([]); window.location.reload() }}>{t('common:action.reload')}</Button>
         </Box>
       ) : filtered.length === 0 ? (
         <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={10}>
-          {projects.length === 0 ? (
+          {state.items.length === 0 ? (
             <>
               <Typography color="text.secondary" variant="h6">{t('servers:empty.noServers')}</Typography>
               {can(Permission.ServersCreate) && (
@@ -240,28 +201,28 @@ export default function Servers() {
         <Grid container spacing={2}>
           {filtered.map((p) => (
             <Grid item xs={12} sm={6} md={4} key={p._id}>
-              <ProjectCard p={p} health={health.get(p._id)} onDelete={handleDeleteRequest} onDuplicate={handleDuplicate} />
+              <ProjectCard p={p} health={health.get(p._id)} onDelete={handleDeleteProject} onDuplicate={handleDuplicate} />
             </Grid>
           ))}
         </Grid>
       )}
 
       <ConfirmDialog
-        open={confirmOpen}
+        open={state.deleteTarget !== null}
         title={t('servers:confirm.deleteTitle')}
         message={t('servers:confirm.deleteMessage', { name: confirmProjectName })}
         confirmLabel={t('common:action.delete')}
         confirmColor="error"
-        loading={confirmLoading}
-        onConfirm={handleDeleteConfirm}
-        onClose={() => { setConfirmOpen(false); setConfirmTarget(null) }}
+        loading={state.deleting}
+        onConfirm={handlers.handleDeleteConfirm}
+        onClose={handlers.handleDeleteCancel}
       />
 
       <AppSnackbar
-        open={snackOpen}
-        message={snackMsg}
-        severity={snackSeverity}
-        onClose={() => setSnackOpen(false)}
+        open={state.snack !== null}
+        message={state.snack?.message ?? ''}
+        severity={state.snack?.severity ?? 'success'}
+        onClose={() => handlers.setSnack(null)}
       />
     </Box>
   )
