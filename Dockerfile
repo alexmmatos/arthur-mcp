@@ -2,7 +2,6 @@
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app
 COPY package*.json ./
-# The root frontend currently has no committed package-lock.json, so npm ci would fail.
 RUN npm install
 COPY . .
 RUN npm run build
@@ -12,7 +11,7 @@ FROM node:20-alpine AS backend-builder
 WORKDIR /app
 RUN apk add --no-cache python3 make g++
 COPY api/package*.json ./
-RUN npm ci
+RUN npm install
 COPY api/ .
 RUN npm run build
 

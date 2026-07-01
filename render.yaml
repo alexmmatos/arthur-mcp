@@ -29,9 +29,9 @@ services:
 
       # ── Database ─────────────────────────────────────────────────────────────
       - key: DATABASE
-        sync: false
+        value: sqlite
       - key: SQLITE_PATH
-        sync: false
+        value: /app/data/database.sqlite
 
       # To use MongoDB Atlas instead, replace the values above with:
       # - key: DATABASE
@@ -41,7 +41,7 @@ services:
 
       # ── Credenciais ──────────────────────────────────────────────────────────
       - key: DASHBOARD_USER
-        sync: false
+        value: admin
       - key: DASHBOARD_PASSWORD
         sync: false   # set in the Render dashboard
 
