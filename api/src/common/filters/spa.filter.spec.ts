@@ -71,6 +71,22 @@ describe('SpaFilter', () => {
     expect(res.status).toHaveBeenCalledWith(404);
   });
 
+  it('serves index.html for /mcp-swagger/:slug, which only shares a text prefix with /mcp', () => {
+    (existsSync as jest.Mock).mockReturnValue(true);
+    const { host, res } = makeHost('/mcp-swagger/dragonball-api-rest');
+    filter.catch(new NotFoundException(), host);
+    expect(res.sendFile).toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it('serves index.html for /mcp-docs-style routes that are not actually under /mcp-docs', () => {
+    (existsSync as jest.Mock).mockReturnValue(true);
+    const { host, res } = makeHost('/mcp-docs-preview');
+    filter.catch(new NotFoundException(), host);
+    expect(res.sendFile).toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
   it('serves index.html for /dashboard when file exists', () => {
     (existsSync as jest.Mock).mockReturnValue(true);
     const { host, res } = makeHost('/dashboard');

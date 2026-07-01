@@ -8,6 +8,11 @@ const INDEX_HTML = join(__dirname, '..', '..', 'public', 'index.html');
 
 const API_PREFIXES = ['/api', '/mcp', '/health', '/mcp-docs'];
 
+/** True only when `path` is exactly `prefix` or a sub-path of it, so `/mcp` doesn't also match `/mcp-swagger`. */
+function matchesApiPrefix(path: string, prefix: string): boolean {
+  return path === prefix || path.startsWith(`${prefix}/`);
+}
+
 @Catch(NotFoundException)
 export class SpaFilter implements ExceptionFilter {
   constructor(private readonly errorTracking?: ErrorTrackingService) {}
@@ -17,7 +22,7 @@ export class SpaFilter implements ExceptionFilter {
     const req  = ctx.getRequest<Request>();
     const res  = ctx.getResponse<Response>();
 
-    const isApiPath = API_PREFIXES.some((p) => req.path.startsWith(p));
+    const isApiPath = API_PREFIXES.some((p) => matchesApiPrefix(req.path, p));
     if (isApiPath) {
       this.errorTracking?.captureBackendError({
         error: exception,
