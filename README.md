@@ -220,7 +220,7 @@ Arthur MCP ships with English and Portuguese (pt-BR) translations out of the box
 <img width="1865" height="878" alt="image" src="https://github.com/user-attachments/assets/e239cc9c-d519-417a-b8bd-d8cf709661d9" />
 
 
-Harness is where you'll tune how Arthur behaves when a tool call to your upstream API is slow or unreliable. The configuration UI and persistence already exist and are wired to real endpoints what's still landing is the runtime enforcement inside tool execution itself. It's listed here, honestly labeled, so you know exactly what to expect today.
+Harness is where you'll tune how Arthur behaves when a tool call to your upstream API is slow or unreliable. The configuration UI and persistence already exist; what's still landing is the runtime enforcement inside tool execution itself. It's listed here, honestly labeled, so you know exactly what to expect today.
 
 - **Timeout Settings** — per-tool or server-wide timeout limits so a slow upstream API can't stall the AI's response indefinitely.
 - **Retry Policy** — how many times a failed call should be retried, with which backoff strategy, and for which HTTP error codes.
@@ -393,71 +393,14 @@ docker compose --profile postgres up --build
 
 See `api/.env.example` for database environment variables.
 
-## Observability
-
-Enable or tune observability with environment variables:
-
-```bash
-ENABLE_OBSERVABILITY=true
-ENABLE_STRUCTURED_LOGS=true
-ENABLE_METRICS=true
-ENABLE_TRACING=false
-LOG_LEVEL=info
-SERVICE_NAME=arthur-mcp-adapter
-SERVICE_VERSION=1.0.0
-PROMETHEUS_METRICS_PATH=/metrics
-OTEL_SERVICE_NAME=arthur-mcp-adapter
-OTEL_EXPORTER_OTLP_ENDPOINT=
-OTEL_EXPORTER_TYPE=console
-```
-
-Run the local observability stack:
-
-```bash
-docker compose -f observability/docker-compose.yml up
-```
-
-Local tools:
-
-- Prometheus: `http://localhost:9090`
-- Grafana: `http://localhost:3001`
-- Grafana login: `admin` / `admin`
-
-Import `observability/grafana-dashboard.json` in Grafana and configure a Prometheus datasource pointing at:
-
-```text
-http://prometheus:9090
-```
 
 ## Deployment
-
-### Vercel
-
-Vercel should deploy only the React/Vite frontend from the repository root.
-
-Use these project settings:
-
-```text
-Root Directory: .
-Framework Preset: Vite
-Install Command: npm install
-Build Command: npm run build
-Output Directory: dist
-```
-
-Do not set Root Directory to `client`; this repository does not have a `client/` folder.
-
-Set the backend API URL as an environment variable in Vercel:
-
-```text
-VITE_API_URL=https://your-backend.example.com/api
-```
-
-The frontend uses `VITE_API_URL` for authenticated API calls, MCP simulator requests, OAuth token exchange, and displayed backend MCP endpoints. If `VITE_API_URL` is not set, it falls back to `/api`, which is useful for local development with the Vite proxy.
 
 ### Render
 
 This repository includes `render.yaml`.
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/alexmmatos/arthur-mcp)
 
 The backend:
 
@@ -484,16 +427,6 @@ Arthur MCP treats permissions as part of feature design.
 - Public operational endpoints `/health`, `/ready`, `/live`, and `/metrics` are intentionally public.
 - Public MCP Swagger links are public because the slug is the access boundary. Change the slug to revoke a previously shared permanent link.
 - Credentials and secret values must not be exposed through public documentation payloads.
-
-## Documentation
-
-Important project references:
-
-- `docs/FLOWS.md` for user-facing flows and permission-sensitive behavior.
-- `docs/ENTITIES.md` for backend domain data and persistence fields.
-- `docs/DESIGN_PATTERNS.md` for backend and frontend architecture conventions.
-- `docs/ROADMAP.md` for current priorities and decisions.
-- `docs/HANDOFF.md` for continuity between agents and contributors.
 
 ## Contributing
 
