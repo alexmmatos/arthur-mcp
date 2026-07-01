@@ -2,7 +2,8 @@
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+# The root frontend currently has no committed package-lock.json, so npm ci would fail.
+RUN npm install
 COPY . .
 RUN npm run build
 
@@ -19,11 +20,11 @@ RUN npm run build
 FROM node:20-alpine
 WORKDIR /app
 RUN mkdir -p /app/data
-# native modules (sqlite3) já compilados para Alpine
+# Native modules (sqlite3) are compiled for Alpine in the backend builder stage.
 COPY --from=backend-builder /app/node_modules ./node_modules
-# NestJS compilado (inclui templates .hbs copiados pelo nest-cli assets)
+# Compiled NestJS app, including nest-cli copied assets such as .hbs templates.
 COPY --from=backend-builder /app/dist ./dist
-# React build servido pelo express.static em dist/public
+# React build served by the backend static middleware from dist/public.
 COPY --from=frontend-builder /app/dist ./dist/public
 
 EXPOSE 3000
