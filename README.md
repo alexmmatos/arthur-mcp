@@ -4,12 +4,6 @@ Arthur MCP is an open, self-hostable control plane for building and operating Mo
 
 It helps teams turn existing systems into AI-ready MCP endpoints without hiding the underlying contracts. Import an API, shape the exposed tools, protect credentials, manage prompts and resources, monitor execution, and publish clean MCP Swagger-style documentation for clients.
 
-Light Mode
-<img width="1867" height="878" alt="image" src="https://github.com/user-attachments/assets/a4fefc67-9dcc-4334-97b5-a87cf7662e4b" />
-<img width="1867" height="878" alt="image" src="https://github.com/user-attachments/assets/709216fa-e5fa-42cb-9e80-3126a02b748e" />
-<img width="1867" height="878" alt="image" src="https://github.com/user-attachments/assets/70f5ab48-f349-43cd-8f5d-aaf9cb01e815" />
-<img width="1867" height="878" alt="image" src="https://github.com/user-attachments/assets/0287e800-4e7d-45a6-a02e-26f57afb244d" />
-<img width="1867" height="878" alt="image" src="https://github.com/user-attachments/assets/bd24bf74-f3f0-465d-a235-67c2f4aa60a7" />
 
 
 
@@ -31,6 +25,10 @@ Arthur MCP is designed for that layer.
 
 ### MCP Server Management
 
+<img width="1865" height="878" alt="image" src="https://github.com/user-attachments/assets/3df5fda6-d975-4812-b5f7-d9d48c74054e" />
+<img width="1865" height="878" alt="image" src="https://github.com/user-attachments/assets/d7a1cb0a-0f8c-45b5-bef5-c1070e7e4bd8" />
+
+
 - Create and manage multiple MCP servers.
 - Import OpenAPI/Swagger specs.
 - Import Postman collections.
@@ -40,7 +38,7 @@ Arthur MCP is designed for that layer.
 
 ### Dynamic Tools
 
-- Generate MCP tools from imported API endpoints.
+- Generate MCP tools using your data sources.
 - Add or edit tools manually.
 - Define input and output schemas.
 - Test tools directly from the app.
@@ -64,34 +62,21 @@ Arthur MCP is designed for that layer.
 
 ### Public MCP Swagger Pages
 
+<img width="1865" height="878" alt="image" src="https://github.com/user-attachments/assets/c9d99b97-d1a3-44e9-8ef0-0197ecec1a8c" />
+<img width="1865" height="878" alt="image" src="https://github.com/user-attachments/assets/33167175-5681-40c2-8133-701b39b86a2c" />
+
+
 - Generate permanent public documentation links.
 - Prefer documentation URLs like:
+- Share a documentation of your MCP Server tools, resources and prompts.
 
-```text
-/mcp-swagger/:serverSlug
-```
-
-- Preserve legacy signed links:
-
-```text
-/mcp-swagger/:serverSlug/:token
-/share/:serverSlug/:token
-/share/:token
-```
-
-- Display the MCP runtime endpoint with the server slug when available:
-
-```text
-/api/mcp/server/:serverSlug
-```
-
-- Keep UUID runtime URLs working for compatibility:
-
-```text
-/api/mcp/server/:serverId
 ```
 
 ### Observability
+
+<img width="1865" height="878" alt="observability" src="https://github.com/user-attachments/assets/dfb91968-54ee-4e56-9a94-f4f89cf7d62d" />
+<img width="1865" height="878" alt="observability" src="https://github.com/user-attachments/assets/37f814c0-754f-4898-aca6-cf02a94d39eb" />
+
 
 The API exposes operational endpoints:
 
