@@ -8,6 +8,7 @@ import {
 import {
   IconChevronDown, IconEdit, IconPlayerPlay,
 } from '@tabler/icons-react'
+import { useTranslation } from 'react-i18next'
 import { useAuth, Permission } from '../../../../context/AuthContext'
 import api from '../../../../api'
 import type { EndpointRef, GeneratedTool } from '../../types'
@@ -33,6 +34,7 @@ export function EndpointAccordion({ endpoint, projectId, anyApiKey, canTest, onE
   onEdit?: () => void
   onToolChanged?: (oldName: string, newTool: GeneratedTool) => void
 }) {
+  const { t } = useTranslation('serverDetail')
   const method = endpoint.method.toUpperCase()
   const parameterMap = endpoint.parameterMap ?? []
   const [tool, setTool] = useState(endpoint.tool)
@@ -76,7 +78,7 @@ export function EndpointAccordion({ endpoint, projectId, anyApiKey, canTest, onE
       const text = content?.[0]?.text ?? JSON.stringify(rpc?.result ?? rpc, null, 2)
       try { setResponse(JSON.stringify(JSON.parse(text), null, 2)) } catch { setResponse(text) }
     } catch (err: any) {
-      setResponse(err?.response?.data?.message ?? err?.message ?? 'Unknown error')
+      setResponse(err?.response?.data?.message ?? err?.message ?? t('error.requestFailed'))
       setResponseIsError(true)
     } finally { setExecuting(false) }
   }
@@ -120,7 +122,7 @@ export function EndpointAccordion({ endpoint, projectId, anyApiKey, canTest, onE
           <Chip label={endpoint.tool.name} size="small"
             sx={{ fontFamily: 'monospace', fontSize: '0.68rem', height: 20, bgcolor: 'action.hover', flexShrink: 0, display: { xs: 'none', md: 'flex' } }} />
           {onEdit && (
-            <Tooltip title="Edit endpoint">
+            <Tooltip title={t('action.editEndpoint')}>
               <IconButton size="small" onClick={(e) => { e.stopPropagation(); onEdit() }}
                 sx={{ flexShrink: 0, ml: 0.5 }}>
                 <IconEdit size={15} />
@@ -145,7 +147,7 @@ export function EndpointAccordion({ endpoint, projectId, anyApiKey, canTest, onE
         {/* Parameters table */}
         {paramEntries.length > 0 && (
           <>
-            <Typography variant="subtitle2" fontWeight={700} mb={1}>Parameters</Typography>
+            <Typography variant="subtitle2" fontWeight={700} mb={1}>{t('heading.parameters')}</Typography>
             <Box sx={{ overflowX: 'auto', mb: 2.5 }}>
               <Table size="small" sx={{
                 minWidth: 460,
@@ -154,11 +156,11 @@ export function EndpointAccordion({ endpoint, projectId, anyApiKey, canTest, onE
               }}>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Name</TableCell>
-                    <TableCell>In</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Required</TableCell>
-                    <TableCell>Description</TableCell>
+                    <TableCell>{t('common:label.name')}</TableCell>
+                    <TableCell>{t('schema.column')}</TableCell>
+                    <TableCell>{t('schema.type')}</TableCell>
+                    <TableCell>{t('label.required')}</TableCell>
+                    <TableCell>{t('common:label.description')}</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -176,8 +178,8 @@ export function EndpointAccordion({ endpoint, projectId, anyApiKey, canTest, onE
                         <TableCell><Typography fontFamily="monospace" fontSize="0.75rem" color="text.secondary">{schema.type ?? 'string'}</Typography></TableCell>
                         <TableCell>
                           {isReq
-                            ? <Typography color="error.main" fontSize="0.72rem" fontWeight={700}>yes</Typography>
-                            : <Typography color="text.disabled" fontSize="0.72rem">no</Typography>}
+                            ? <Typography color="error.main" fontSize="0.72rem" fontWeight={700}>{t('label.required')}</Typography>
+                            : <Typography color="text.disabled" fontSize="0.72rem">{t('label.optional')}</Typography>}
                         </TableCell>
                         <TableCell><Typography color="text.secondary" fontSize="0.78rem">{schema.description ?? '—'}</Typography></TableCell>
                       </TableRow>
@@ -193,12 +195,12 @@ export function EndpointAccordion({ endpoint, projectId, anyApiKey, canTest, onE
 
         {/* Try it out */}
         <Box display="flex" alignItems="center" justifyContent="space-between" mb={tryMode && paramEntries.length ? 2 : 0}>
-          <Typography variant="subtitle2" fontWeight={700}>Try it out</Typography>
+          <Typography variant="subtitle2" fontWeight={700}>{t('heading.tryItOut')}</Typography>
           {canTest && (
             <Button size="small" variant={tryMode ? 'outlined' : 'contained'} color={tryMode ? 'error' : 'primary'}
               onClick={() => { setTryMode((v) => !v); setResponse(null) }}
               sx={{ fontWeight: 600, fontSize: '0.72rem', minWidth: 80 }}>
-              {tryMode ? 'Cancel' : 'Try'}
+              {tryMode ? t('common:action.cancel') : t('action.try')}
             </Button>
           )}
         </Box>
@@ -213,12 +215,12 @@ export function EndpointAccordion({ endpoint, projectId, anyApiKey, canTest, onE
                       onChange={(v) => setFormValues((prev) => ({ ...prev, [name]: v }))} />
                   ))}
                 </Box>
-              : <Typography variant="body2" color="text.secondary" mt={1} mb={2}>No parameters.</Typography>}
+              : <Typography variant="body2" color="text.secondary" mt={1} mb={2}>{t('label.noParameters')}</Typography>}
             <Button variant="contained" size="small"
               startIcon={executing ? <CircularProgress size={13} color="inherit" /> : <IconPlayerPlay size={18} />}
               onClick={handleExecute} disabled={executing}
               sx={{ mb: response !== null ? 2 : 0, fontWeight: 600 }}>
-              {executing ? 'Executing…' : 'Execute'}
+              {executing ? t('action.executing') : t('action.execute')}
             </Button>
             {response !== null && (
               <>
@@ -249,7 +251,7 @@ export function EndpointAccordion({ endpoint, projectId, anyApiKey, canTest, onE
                           onToolChanged?.(tool.name, updated)
                         } finally { setSavingSchema(false) }
                       }}>
-                      {savingSchema ? 'Saving…' : 'Use as output schema'}
+                      {savingSchema ? t('status.saving') : t('action.useAsOutputSchema')}
                     </Button>
                   ) : null
                 })()}
@@ -262,10 +264,10 @@ export function EndpointAccordion({ endpoint, projectId, anyApiKey, canTest, onE
         <Divider sx={{ my: 2 }} />
         <Box display="flex" alignItems="center" justifyContent="space-between" mb={schemaOpen ? 1.5 : 0}>
           <Box display="flex" alignItems="center" gap={1}>
-            <Typography variant="subtitle2" fontWeight={700}>Output Schema</Typography>
+            <Typography variant="subtitle2" fontWeight={700}>{t('heading.outputSchema')}</Typography>
             {tool.outputSchema
-              ? <Chip label="configured" size="small" color="success" sx={{ fontSize: '0.65rem', height: 18 }} />
-              : <Chip label="none" size="small" sx={{ fontSize: '0.65rem', height: 18, opacity: 0.5 }} />}
+              ? <Chip label={t('label.schemaConfigured')} size="small" color="success" sx={{ fontSize: '0.65rem', height: 18 }} />
+              : <Chip label={t('label.schemaNone')} size="small" sx={{ fontSize: '0.65rem', height: 18, opacity: 0.5 }} />}
           </Box>
           <Box display="flex" gap={0.5}>
             {tool.outputSchema && can(Permission.ToolsEdit) && (
@@ -280,12 +282,12 @@ export function EndpointAccordion({ endpoint, projectId, anyApiKey, canTest, onE
                     setSchemaOpen(false)
                   } finally { setSavingSchema(false) }
                 }}>
-                Clear
+                {t('common:action.clear')}
               </Button>
             )}
             {tool.outputSchema && (
               <Button size="small" onClick={() => setSchemaOpen((v) => !v)}>
-                {schemaOpen ? 'Hide' : 'View'}
+                {schemaOpen ? t('common:action.hide') : t('common:action.show')}
               </Button>
             )}
           </Box>

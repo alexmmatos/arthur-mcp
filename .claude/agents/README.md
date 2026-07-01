@@ -31,11 +31,11 @@ This directory contains specialist agent definitions for Claude Code. Keep this 
 | `software-architect` | `.claude/agents/software-architect.md` | Designing or reviewing architecture, module boundaries, data modeling, integration strategy, cross-cutting patterns, and technical roadmap decisions. |
 | `software-engineer` | `.claude/agents/software-engineer.md` | Implementing, debugging, refactoring, and testing full-stack features across frontend, backend, persistence, and documentation. |
 | `solid-expert` | `.claude/agents/solid-expert.md` | Reviewing responsibilities, interfaces, dependency direction, substitutability, extensibility, and maintainability against SOLID principles. |
-| `system-tutor` | `.claude/agents/system-tutor.md` | Creating user-facing tutorials, walkthroughs, section guides, onboarding paths, and product explanations for Arthur MCP Adapter. |
+| `system-tutor` | `.claude/agents/system-tutor.md` | Creating user-facing tutorials, walkthroughs, section guides, onboarding paths, and product explanations for Arthur MCP. |
 | `ui-expert` | `.claude/agents/ui-expert.md` | Creating, redesigning, or reviewing React, TypeScript, and MUI UI components/pages in the project's "openclaw" style while respecting Feature-Driven Architecture, Atomic Design, and barrel exports. |
 | `ux-analyst` | `.claude/agents/ux-analyst.md` | Auditing user journeys, usability, onboarding, friction points, empty/error/loading states, and user-facing flows while respecting frontend feature boundaries and shared UI conventions. |
 | `vercel-expert` | `.claude/agents/vercel-expert.md` | Configuring, optimizing, or debugging Vercel deployments, `vercel.json`, environment variables, domains, previews, and frontend hosting. |
-| `tool-instructor` | `.claude/agents/tool-instructor.md` | Writing user-facing copy: tooltips, helper text, empty states, error messages, onboarding guides, and in-app documentation for Arthur MCP Adapter. |
+| `tool-instructor` | `.claude/agents/tool-instructor.md` | Writing user-facing copy: tooltips, helper text, empty states, error messages, onboarding guides, and in-app documentation for Arthur MCP. |
 | `naming-expert` | `.claude/agents/naming-expert.md` | Naming variables, functions, components, routes, API endpoints, DB columns, MCP tools, prompts, and UI labels — consistently and clearly across the full stack. |
 
 ## Suggested Routing

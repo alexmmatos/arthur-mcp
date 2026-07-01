@@ -28,7 +28,9 @@ export class McpApiKeyGuard implements CanActivate {
       try {
         const payload = jwt.verify(token, await this.jwtSecretService.getSecret()) as { serverId?: string };
         const serverId = req.params['serverId'];
-        if (payload.serverId && serverId && payload.serverId !== serverId) {
+        const server = serverId ? await this.projectRepo.findByIdOrShareSlug(serverId) : null;
+        const allowedServerIds = new Set([serverId, server?._id, server?.shareSlug].filter(Boolean));
+        if (payload.serverId && serverId && !allowedServerIds.has(payload.serverId)) {
           throw new UnauthorizedException('Token not valid for this server');
         }
         return true;
@@ -39,7 +41,7 @@ export class McpApiKeyGuard implements CanActivate {
 
     const serverId = req.params['serverId'];
 
-    const server = await this.projectRepo.findById(serverId);
+    const server = await this.projectRepo.findByIdOrShareSlug(serverId);
     if (!server) return true;
 
     const hasNewKeys = server.mcpApiKeys && server.mcpApiKeys.length > 0;

@@ -8,6 +8,7 @@ import { parseSpec } from '../dynamic-mcp/openapi-parser';
 import type { AuthConfig } from '../dynamic-mcp/types';
 import { ISwaggerProjectRepository, SwaggerProjectRecord } from './swagger-project.repository';
 import { parsePostmanCollection } from './postman-parser';
+import { uniqueShareSlug } from './share-slug.util';
 
 const SPEC_PATHS = [
   '/openapi.json', '/openapi.yaml', '/openapi.yml',
@@ -80,8 +81,11 @@ export class SwaggerImportService {
 
     this.logger.log(`Project "${normalizedSpec.info.title}" imported: ${tools.length} tools generated`);
 
+    const name = normalizedSpec.info.title ?? filename.replace(/\.(ya?ml|json)$/i, '');
+
     return this.projectRepo.create({
-      name: normalizedSpec.info.title ?? filename.replace(/\.(ya?ml|json)$/i, ''),
+      name,
+      shareSlug: uniqueShareSlug(name, await this.projectRepo.findAll()),
       baseUrl,
       description: normalizedSpec.info.description,
       version: normalizedSpec.info.version,
@@ -142,8 +146,11 @@ export class SwaggerImportService {
     const normalizedSpec = await parseSpec(openApiSpec);
     const tools = generateTools(normalizedSpec, base);
 
+    const name = openApiSpec.info.title ?? 'Imported from Postman';
+
     return this.projectRepo.create({
-      name: openApiSpec.info.title ?? 'Imported from Postman',
+      name,
+      shareSlug: uniqueShareSlug(name, await this.projectRepo.findAll()),
       baseUrl: base,
       description: openApiSpec.info.description,
       tools,
@@ -254,4 +261,3 @@ export class SwaggerImportService {
     }
   }
 }
-

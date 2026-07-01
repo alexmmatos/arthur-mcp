@@ -3,6 +3,7 @@ import {
   Box, InputAdornment, Paper, TextField, Typography,
 } from '@mui/material'
 import { IconSearch } from '@tabler/icons-react'
+import { useTranslation } from 'react-i18next'
 import { BaseDialogLayout } from '../../../../components'
 import type { GeneratedTool } from '../../types'
 import { METHOD_COLOR } from '../../constants'
@@ -16,6 +17,7 @@ export function FromEndpointPickerDialog({ open, tools, onPick, onClose, onBlank
   title?: string
   description?: string
 }) {
+  const { t } = useTranslation('serverDetail')
   const [search, setSearch] = useState('')
   const filtered = tools.filter((t) => {
     const q = search.toLowerCase()
@@ -32,7 +34,7 @@ export function FromEndpointPickerDialog({ open, tools, onPick, onClose, onBlank
     >
       <Box>
         <TextField
-          size="small" fullWidth placeholder="Search by path or name…" value={search}
+          size="small" fullWidth placeholder={t('placeholder.searchPathOrName')} value={search}
           onChange={(e) => setSearch(e.target.value)}
           InputProps={{ startAdornment: <InputAdornment position="start"><IconSearch size={16} /></InputAdornment> }}
         />
@@ -41,11 +43,11 @@ export function FromEndpointPickerDialog({ open, tools, onPick, onClose, onBlank
         <Box display="flex" flexDirection="column" gap={0.75} pt={1}>
           {tools.length === 0 ? (
             <Box sx={{ textAlign: 'center', py: 6 }}>
-              <Typography variant="body2" color="text.disabled">No endpoints defined yet.</Typography>
+              <Typography variant="body2" color="text.disabled">{t('label.noEndpointsDefined')}</Typography>
             </Box>
           ) : filtered.length === 0 ? (
             <Box sx={{ textAlign: 'center', py: 4 }}>
-              <Typography variant="body2" color="text.disabled">No endpoints match your search.</Typography>
+              <Typography variant="body2" color="text.disabled">{t('label.noEndpointsMatch')}</Typography>
             </Box>
           ) : (
             filtered.map((t) => (
@@ -90,8 +92,8 @@ export function FromEndpointPickerDialog({ open, tools, onPick, onClose, onBlank
                   —
                 </Box>
                 <Box>
-                  <Typography fontSize="0.82rem" fontWeight={600}>Blank resource</Typography>
-                  <Typography variant="caption" color="text.secondary">Static content — write the HTML manually</Typography>
+                  <Typography fontSize="0.82rem" fontWeight={600}>{t('label.blankResource')}</Typography>
+                  <Typography variant="caption" color="text.secondary">{t('label.blankResourceDesc')}</Typography>
                 </Box>
               </Box>
             </Paper>

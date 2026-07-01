@@ -4,7 +4,7 @@
   "accessRestrictedMsg": "Only administrators can access system settings.",
   "help": {
     "title": "Settings",
-    "intro": "Global configuration for the entire Arthur MCP Adapter server. Changes saved here apply to all projects and all users — only administrators can access this page.",
+    "intro": "Global configuration for the entire Arthur MCP server. Changes saved here apply to all projects and all users — only administrators can access this page.",
     "sections": "This page includes server, security, request header, e-mail, and observability settings.",
     "sectionServer": "Server — the public URL of this instance and the default HTTP timeout for upstream API calls.",
     "sectionSecurity": "Security — JWT signing secret rotation for sessions, bearer tokens, and share links.",

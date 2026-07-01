@@ -126,6 +126,7 @@ Fields:
 | `baseUrl` | string | yes | Base URL for generated HTTP tools. |
 | `description` | string | no | Optional project description. |
 | `version` | string | no | API/project version. |
+| `shareSlug` | string | no | Unique human-readable slug used in generated public share URLs. It is generated automatically from the server name and can be edited while remaining unique. |
 | `rawSpec` | object/string | no | Original OpenAPI/Swagger spec. SQLite stores it as text; Mongo stores it as an object. |
 | `tools` | `GeneratedTool[]` | yes | Generated MCP tools. SQLite stores JSON text; Mongo stores objects. |
 | `auth` | `AuthConfig` | yes | Upstream API auth configuration. Defaults to `{ "type": "none" }`. |

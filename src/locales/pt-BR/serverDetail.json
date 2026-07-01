@@ -32,6 +32,7 @@
     "apiBaseUrl": "URL base da API",
     "apiCredentials": "Credenciais da API",
     "requestLimit": "Limite de requisições",
+    "responseLimit": "Limites de Resposta",
     "maintenanceMessage": "Mensagem de manutenção",
     "availabilityDays": "Dias de disponibilidade",
     "errorAlerts": "Alertas de erro",
@@ -81,6 +82,9 @@
     "authEndpoint": "Configure esta URL no seu cliente MCP e inclua o cabeçalho",
     "noKeys": "Sem chaves — qualquer cliente MCP pode conectar sem autenticação.",
     "scanQr": "Escaneie para abrir em um dispositivo móvel",
+    "shareValidityPermanent": "Este link permanece válido até que o slug de compartilhamento seja alterado. Ele fornece informações de configuração somente leitura — sem acesso a dados ou credenciais.",
+    "publicDocSlug": "Slug público da documentação",
+    "shareSlug": "Slug de compartilhamento",
     "shareValidity": "Este link é válido por 30 dias. Contém apenas informações de configuração — sem acesso a dados ou credenciais.",
     "createdAt": "Criado em {{date}}",
     "useInHeader": "Use no cabeçalho:",
@@ -199,7 +203,13 @@
     "contentType": "Content-Type",
     "constraint": "Restrição",
     "alertThreshold": "Alertar quando taxa de erro exceder (%)",
-    "alertEmail": "Enviar alerta para (email)"
+    "alertEmail": "Enviar alerta para (email)",
+    "responseLimit": {
+      "maxResponseLen": "Máx. resposta (chars)",
+      "maxDepth": "Profundidade máx. JSON",
+      "arraySlice": "Máx. itens por array",
+      "errorTruncateLen": "Corpo de erro (chars)"
+    }
   },
   "placeholder": {
     "searchPathOrName": "Buscar por caminho ou nome…",
@@ -230,6 +240,9 @@
   },
   "hint": {
     "baseUrl": "URL base usada para todas as chamadas HTTP neste servidor",
+    "publicDocSlugFormat": "Usado nos links de compartilhamento gerados como",
+    "publicDocSlugUnique": "Ele deve ser único entre os servidores.",
+    "shareSlugPattern": "Use letras minúsculas, números e hífens.",
     "baseUrlOverride": "Deixe em branco para usar a URL declarada no spec",
     "apiBaseUrlHelp": "O endereço raiz da API externa a qual este servidor se conecta.",
     "keyLabel": "Um rótulo para identificar qual cliente usa esta chave",
@@ -240,6 +253,8 @@
     "errorMessageHelp": "Exibido ao cliente MCP se a chamada de API falhar. Use {{error}} para incluir o erro original.",
     "rateLimitActive": "Limita as chamadas ao servidor MCP a {{rpm}} req/min. Exceder o limite retorna HTTP 429.",
     "rateLimitInactive": "Sem limite de requisições. Ative para restringir o uso por minuto.",
+    "responseLimitActive": "Truncamento de resposta ativo. A IA recebe respostas limitadas conforme os parâmetros configurados.",
+    "responseLimitInactive": "Sem limites de resposta. A IA recebe a resposta completa da API de origem.",
     "maintenancePlaceholder": "Estamos realizando manutenção programada. Voltamos às 14:00 UTC.",
     "maintenanceHint": "Quando ativado, todas as requisições recebem um 503 com esta mensagem. Útil para indisponibilidades planejadas.",
     "availabilityHint": "Restrinja o acesso da IA a dias e horários específicos. Requisições fora do horário retornam erro 503.",
@@ -289,6 +304,7 @@
     "noDbTools": "Nenhuma ferramenta ainda.",
     "noDbToolsWithQuery": "Nenhuma ferramenta ainda. Clique em \"Nova ferramenta\" para expor uma operação como ferramenta MCP.",
     "noPromptsAdded": "Nenhum prompt adicionado ainda. Clique em Adicionar prompt para incluir prompts da sua biblioteca, ou vá à Biblioteca de prompts para criar novos.",
+    "noPromptsSearch": "Nenhum prompt corresponde à sua busca.",
     "noNotes": "Nenhuma nota ainda.",
     "noCallsRecorded": "Nenhuma chamada registrada ainda.",
     "noTablesFound": "Nenhuma tabela encontrada. Verifique se sua conexão está correta e o banco de dados tem tabelas.",
@@ -357,7 +373,8 @@
     "selectEndpointFirst": "Selecione um endpoint primeiro.",
     "resourceLoadFailedTemplate": "Erro ao carregar recurso: {{error}}",
     "toolCallFailedTemplate": "Erro ao chamar ferramenta: {{error}}",
-    "pathRequired": "O caminho é obrigatório."
+    "pathRequired": "O caminho é obrigatório.",
+    "slugSaveFailed": "Não foi possível salvar o slug de compartilhamento."
   },
   "section": {
     "endpoint": "1. Endpoint",
@@ -375,7 +392,8 @@
     "failedToSave": "Falha ao salvar.",
     "connected": "Conectado · {{latencyMs}}ms",
     "connectionFailed": "Falhou: {{error}}",
-    "connecting": "Conectando…"
+    "connecting": "Conectando…",
+    "slugSaved": "Slug salvo. O link de compartilhamento agora usa este slug — qualquer link antigo com o slug anterior deixa de funcionar."
   },
   "action": {
     "testConnection": "Testar conexão",
@@ -386,6 +404,8 @@
     "creating": "Criando…",
     "copyUrl": "Copiar URL",
     "copyLink": "Copiar link",
+    "saveSlug": "Salvar slug",
+    "downloadQr": "Baixar QR code",
     "editBaseUrl": "Editar URL base",
     "autoGenerate": "Gerar automaticamente",
     "saveCredentials": "Salvar credenciais",
@@ -554,6 +574,19 @@
       "desc": "Este é o payload exato que seu cliente de IA recebe ao se conectar a este servidor pelo protocolo MCP — a lista completa de ferramentas, seus esquemas de parâmetros e as descrições que a IA lê para entender o que cada ação faz. O que você vê aqui é precisamente o que a IA utiliza, nem mais nem menos.",
       "howAiDecides": "Quando você envia uma mensagem à IA, ela verifica o nome e a descrição de cada ferramenta exibida aqui para decidir qual chamar e quais valores passar como parâmetros. Se duas ferramentas tiverem nomes semelhantes, a IA pode escolher a errada. Se uma descrição for vaga, a IA pode adivinhar os valores dos parâmetros — às vezes incorretamente. Esta visualização permite auditar exatamente o que a IA vê antes que um problema apareça em produção.",
       "improving": "Para melhorar a precisão da IA: torne os nomes das ferramentas únicos e específicos, adicione exemplos concretos nas descrições ('ex: customer_id: 123 para João Silva'), liste todos os valores aceitos para parâmetros do tipo enum e descreva o que cada ferramenta retorna e quais erros pode gerar. Após editar ferramentas, volte a esta visualização para verificar se as alterações estão exatamente como pretendido — a IA verá a versão atualizada imediatamente na próxima conexão."
+    },
+    "responseLimit": {
+      "intro": "Por padrão, o Arthur repassa a resposta completa da API de origem para a IA sem nenhuma restrição de tamanho. Ative este painel para habilitar limites de truncamento apenas para este servidor — útil quando as APIs retornam payloads muito grandes que excedem a janela de contexto do cliente de IA.",
+      "fieldsTitle": "O que cada limite controla:",
+      "maxLenTitle": "Máx. resposta (chars):",
+      "maxLenText": "Limite máximo de caracteres no corpo da resposta após serialização. Respostas mais longas são cortadas com um aviso de truncamento.",
+      "maxDepthTitle": "Profundidade máx. JSON:",
+      "maxDepthText": "Objetos aninhados além desse nível são colapsados em \"[...]\" para reduzir o uso de tokens em APIs muito aninhadas.",
+      "arraySliceTitle": "Máx. itens por array:",
+      "arraySliceText": "Arrays são cortados nos primeiros N itens. Uma nota é adicionada indicando quantos itens foram omitidos.",
+      "errorLenTitle": "Corpo de erro (chars):",
+      "errorLenText": "Tamanho máximo do corpo incluído em respostas de erro (HTTP 4xx/5xx). Mantenha curto para não inundar a IA com páginas de erro longas.",
+      "toggleText": "As alterações são salvas automaticamente. Desative o botão para remover todos os limites e restaurar as respostas brutas completas."
     },
     "rateLimit": {
       "intro": "Limita o número de requisições MCP que este servidor aceita por minuto. Quando o limite é excedido, o servidor responde com HTTP 429 (Too Many Requests) e um cabeçalho Retry-After — o cliente de IA deve aguardar antes de tentar novamente.",

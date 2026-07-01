@@ -28,7 +28,9 @@ import {
   MaintenanceModeDto,
   OAuthClientDto,
   RateLimitDto,
+  ResponseConfigDto,
   ResourceDto,
+  ShareSlugDto,
   TenantConfigDto,
   ToolEndpointDto,
   UpdateServerInfoDto,
@@ -243,12 +245,28 @@ export class SwaggerController {
     return this.swaggerService.updateOAuthClient(id, dto);
   }
 
+  @Patch('servers/:id/share-slug')
+  updateShareSlug(
+    @Param('id') id: string,
+    @Body() dto: ShareSlugDto,
+  ) {
+    return this.swaggerService.updateShareSlug(id, dto.shareSlug);
+  }
+
   @Patch('servers/:id/rate-limit')
   updateRateLimit(
     @Param('id') id: string,
     @Body() dto: RateLimitDto,
   ) {
     return this.swaggerService.updateRateLimit(id, dto);
+  }
+
+  @Patch('servers/:id/response-config')
+  updateResponseConfig(
+    @Param('id') id: string,
+    @Body() dto: ResponseConfigDto,
+  ) {
+    return this.swaggerService.updateResponseConfig(id, dto);
   }
 
   @Post('servers/:id/duplicate')
@@ -525,7 +543,6 @@ export class SwaggerController {
 
   @Post('servers/:id/share-link')
   async generateShareLink(@Param('id') id: string) {
-    const token = await this.swaggerService.generateShareToken(id);
-    return { token, url: `/share/${token}` };
+    return this.swaggerService.generateShareLink(id);
   }
 }

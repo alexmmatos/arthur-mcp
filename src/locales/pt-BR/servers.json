@@ -305,8 +305,30 @@
     "anyClientHint": "Aponte seu cliente para esta URL usando o transporte Streamable HTTP.",
     "anyClientAuthHint": " Inclua o cabeçalho auth: <sua-chave-de-api> em cada requisição.",
     "requiresKey": "Este servidor requer uma chave de API. Contate a pessoa que compartilhou este link para obter sua chave pessoal.",
-    "poweredBy": "Powered by MCP Convert · Esta página é acessível publicamente através do link de compartilhamento.",
+    "poweredBy": "Powered by Arthur MCP · Esta página é inspirada na OpenAPI / Swagger UI.",
     "copyLabel": "Copiar {{label}}",
+    "authorize": "Autorizar",
+    "authorized": "Autorizado",
+    "authorizeTitle": "Autorizar simulador",
+    "authorizeDescription": "Autorize as requisições do simulador com as mesmas credenciais que um cliente MCP usaria.",
+    "authorizing": "Autorizando…",
+    "logout": "Sair",
+    "apiKeyScheme": "Chave de API MCP",
+    "oauthClientCredentialsScheme": "Credenciais do cliente OAuth",
+    "oauthClientAvailable": "Cliente OAuth",
+    "noOauthClientAvailable": "Sem Cliente OAuth",
+    "apiKeyLabel": "Valor",
+    "apiKeyHelper": "A chave fica no seu navegador e é enviada como cabeçalho auth nas requisições do simulador.",
+    "oauthClientIdLabel": "Client ID",
+    "oauthClientSecretLabel": "Client Secret",
+    "oauthClientCredentialsHelper": "O simulador troca estas credenciais por um access token e envia Authorization: Bearer <token>.",
+    "oauthTokenMissing": "O endpoint de token não retornou um access token.",
+    "authRequiredToTest": "Informe a chave de API MCP antes de executar esta simulação.",
+    "simulatorTitle": "Simulador",
+    "noSimulatorInputs": "Esta operação não requer entrada.",
+    "requestPayload": "Payload da requisição",
+    "curlCommand": "Curl",
+    "responsePayload": "Resposta",
     "resourcesAvailable": "{{count}} recursos",
     "promptsAvailable": "{{count}} prompts",
     "referenceTitle": "Referência do servidor MCP",
@@ -331,7 +353,19 @@
     "uri": "URI",
     "arguments": "Argumentos",
     "noArguments": "Sem argumentos.",
-    "argumentsCount": "{{count}} argumentos"
+    "argumentsCount": "{{count}} argumentos",
+    "mcpProtocolTitle": "Protocolo MCP",
+    "mcpProtocolDescription": "Métodos JSON-RPC 2.0 padrão expostos por todos os servidores MCP. Use-os para inspecionar as capacidades do servidor programaticamente ou para testar a conectividade.",
+    "mcpInitialize": "initialize",
+    "mcpInitializeDesc": "Troca a versão do protocolo e as capacidades entre cliente e servidor. É sempre a primeira chamada em uma sessão MCP.",
+    "mcpToolsList": "tools/list",
+    "mcpToolsListDesc": "Retorna a lista completa de ferramentas disponíveis com seus nomes, descrições e definições de input em JSON Schema.",
+    "mcpResourcesList": "resources/list",
+    "mcpResourcesListDesc": "Retorna a lista de recursos estáticos e dinâmicos que este servidor expõe, cada um identificado por uma URI única.",
+    "mcpResourcesTemplatesList": "resources/templates/list",
+    "mcpResourcesTemplatesListDesc": "Retorna templates de URI para recursos parametrizados. Os clientes substituem as variáveis para construir URIs de recursos concretos.",
+    "mcpPromptsList": "prompts/list",
+    "mcpPromptsListDesc": "Retorna a lista de templates de prompt disponíveis neste servidor, com seus nomes, descrições e argumentos necessários."
   },
   "upload": {
     "dragHint": "Arraste seu arquivo Swagger / OpenAPI aqui",
@@ -376,8 +410,109 @@
       "tipBody": "Quanto mais rica for a descrição da sua spec, melhor a IA vai entender quando e como usar cada ferramenta. Após a importação, você pode editar cada ferramenta individualmente na aba Tools do servidor."
     }
   },
+  "newServer": {
+    "fields": {
+      "host": "Host",
+      "port": "Porta",
+      "databaseName": "Nome do banco",
+      "username": "Usuário",
+      "usernameOptional": "Usuário (opcional)",
+      "password": "Senha",
+      "passwordOptional": "Senha (opcional)",
+      "useTlsSecure": "Usar TLS (conexão segura)",
+      "enableSslTls": "Ativar SSL / TLS",
+      "enableTls": "Ativar TLS"
+    },
+    "graphql": {
+      "endpointTitle": "Endpoint GraphQL",
+      "endpointDescription": "A URL da sua API GraphQL. A descoberta do schema será feita via introspecção.",
+      "endpointUrlLabel": "URL do endpoint",
+      "schemaSourceTitle": "Fonte do schema",
+      "schemaSourceDescription": "Escolha como carregar o schema GraphQL.",
+      "autoIntrospectTitle": "Auto-introspecção",
+      "autoIntrospectDescription": "Consulta a API de introspecção do endpoint para descobrir automaticamente todas as operações.",
+      "uploadSdlTitle": "Enviar arquivo SDL",
+      "uploadSdlDescription": "Forneça manualmente um arquivo de schema SDL .graphql ou .gql.",
+      "uploadSdlButton": "Enviar schema SDL",
+      "sdlFormats": ".graphql · .gql · .sdl",
+      "operationsHint": "As operações descobertas no schema se tornarão ferramentas MCP com entradas tipadas."
+    },
+    "import": {
+      "openApiSwagger": "OpenAPI / Swagger",
+      "postmanCollection": "Coleção Postman"
+    },
+    "grpc": {
+      "serviceAddressTitle": "Endereço do serviço",
+      "serviceAddressDescription": "O host e a porta do servidor gRPC.",
+      "protoDefinitionTitle": "Definição Protocol Buffer",
+      "protoDefinitionDescription": "Envie seu arquivo .proto. Cada método RPC se tornará uma ferramenta MCP.",
+      "uploadProtoButton": "Enviar arquivo .proto",
+      "uploadProtoOptional": "Opcional — pode ser adicionado depois"
+    },
+    "database": {
+      "connectionTitle": "Conexão do banco"
+    },
+    "mongodb": {
+      "connectionTitle": "Conexão MongoDB",
+      "connectionDescription": "URI de conexão incluindo credenciais e nome do banco.",
+      "connectionUriLabel": "URI de conexão",
+      "connectionUriFormat": "formato mongodb:// ou mongodb+srv://"
+    },
+    "redis": {
+      "connectionTitle": "Conexão Redis",
+      "connectionDescription": "Detalhes de conexão da sua instância Redis."
+    },
+    "dynamodb": {
+      "connectionTitle": "Conexão DynamoDB",
+      "connectionDescription": "Credenciais AWS para acessar suas tabelas DynamoDB.",
+      "awsRegion": "Região AWS",
+      "accessKeyId": "Access Key ID",
+      "secretAccessKey": "Secret Access Key",
+      "customEndpointOptional": "Endpoint customizado (opcional)",
+      "customEndpointHint": "Deixe em branco para usar o endpoint padrão da AWS. Use para DynamoDB Local."
+    },
+    "elasticsearch": {
+      "connectionTitle": "Conexão Elasticsearch",
+      "connectionDescription": "URL e credenciais do seu cluster Elasticsearch.",
+      "clusterUrlLabel": "URL do cluster",
+      "clusterUrlHint": "URL completa incluindo protocolo e porta",
+      "apiKeyRecommended": "API Key (recomendado)",
+      "orBasicAuth": "Ou use Basic Auth — preencha usuário e senha abaixo."
+    },
+    "snowflake": {
+      "connectionTitle": "Conexão Snowflake",
+      "connectionDescription": "Conta e credenciais do seu data warehouse Snowflake.",
+      "accountIdentifier": "Identificador da conta",
+      "accountIdentifierHint": "Encontrado na sua URL Snowflake: <conta>.snowflakecomputing.com",
+      "warehouse": "Warehouse",
+      "database": "Banco de dados",
+      "schema": "Schema"
+    },
+    "firestore": {
+      "connectionTitle": "Conexão Firestore",
+      "connectionDescription": "Projeto Google Cloud e credenciais da conta de serviço.",
+      "projectId": "ID do projeto GCP",
+      "serviceAccountJson": "JSON da conta de serviço",
+      "serviceAccountHint": "Cole o conteúdo do arquivo de chave da conta de serviço"
+    },
+    "auth": {
+      "authenticationType": "Tipo de autenticação",
+      "bearerToken": "Bearer Token",
+      "headerName": "Nome do cabeçalho",
+      "value": "Valor",
+      "sendAs": "Enviar como",
+      "headerHttp": "Cabeçalho HTTP",
+      "queryParam": "Parâmetro de query (?{{keyName}}=…)",
+      "tokenUrl": "URL do token",
+      "clientId": "Client ID",
+      "clientSecret": "Client Secret",
+      "scopeOptional": "Escopo (opcional)",
+      "header": "Cabeçalho",
+      "toggleVisibility": "Alternar visibilidade"
+    }
+  },
   "help": {
-    "intro": "Um servidor é o conceito central do Arthur MCP Adapter. Cada servidor representa uma API externa — como seu CRM, provedor de pagamentos, microsserviço interno ou banco de dados — adaptada ao protocolo MCP para que clientes de IA (Claude, ChatGPT, agentes personalizados) possam consultá-la e interagir com ela naturalmente em qualquer conversa, sem que o usuário precise alternar entre ferramentas.",
+    "intro": "Um servidor é o conceito central do Arthur MCP. Cada servidor representa uma API externa — como seu CRM, provedor de pagamentos, microsserviço interno ou banco de dados — adaptada ao protocolo MCP para que clientes de IA (Claude, ChatGPT, agentes personalizados) possam consultá-la e interagir com ela naturalmente em qualquer conversa, sem que o usuário precise alternar entre ferramentas.",
     "howItWorks": "Como funciona, do início ao fim:",
     "step1": "Crie um servidor e dê a ele um nome e uma URL base — o endereço raiz da API que você deseja conectar (ex: https://api.meu-crm.com). A URL base é prefixada ao caminho de endpoint de cada ferramenta, então você só precisa defini-la uma vez.",
     "step2": "Adicione ferramentas — manualmente (um endpoint por vez) ou importando uma spec OpenAPI/Swagger para gerar todas as ferramentas automaticamente de uma vez. Cada ferramenta mapeia um endpoint da API para uma função chamável pela IA, com nomes e descrições de parâmetros.",

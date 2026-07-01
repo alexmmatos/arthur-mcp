@@ -39,9 +39,21 @@ export class OAuthClientDto {
   oauthClientSecret: string | null;
 }
 
+export class ShareSlugDto {
+  shareSlug: string;
+}
+
 export class RateLimitDto {
   enabled: boolean;
   requestsPerMinute: number;
+}
+
+export class ResponseConfigDto {
+  enabled: boolean;
+  maxResponseLen?: number;
+  maxDepth?: number;
+  arraySlice?: number;
+  errorTruncateLen?: number;
 }
 
 export class MaintenanceModeDto {

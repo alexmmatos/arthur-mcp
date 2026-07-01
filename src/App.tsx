@@ -49,6 +49,9 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/mcp-swagger/:slug" element={<SharePage />} />
+        <Route path="/mcp-swagger/:slug/:token" element={<SharePage />} />
+        <Route path="/share/:slug/:token" element={<SharePage />} />
         <Route path="/share/:token" element={<SharePage />} />
 
         {/* Setup wizard — shown once after first login */}

@@ -654,3 +654,13 @@ The following are excluded from audit tracking (generated, config, or non-archit
 - `src/components/index.tsx`, `src/features/*/index.tsx` (barrel-only) — already noted per feature
 - `api/.env`, `api/.env.example`, `api/nest-cli.json`, `api/package.json` — config artifacts
 - `vite.config.ts`, `tsconfig*.json`, `.eslintrc*`, `Dockerfile*`, `docker-compose*.yml` — tooling config
+
+---
+
+## New Files — Pending Classification
+
+> Files added after the initial audit. Classify and move to the appropriate section after review.
+
+| File | Role | Last Arch Audit | Last SOLID Audit |
+|------|------|:-:|:-:|
+| `src/features/server/settings/ResponseLimitPanel/index.tsx` | — | — | — |

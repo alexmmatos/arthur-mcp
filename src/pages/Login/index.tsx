@@ -106,7 +106,7 @@ export default function Login() {
               <Box
                 component="img"
                 src={mode === ColorMode.Dark ? '/images/logos/arthur_mcp_logo_dark_mode.svg' : '/images/logos/arthur_mcp_logo_light_mode.svg'}
-                alt="Arthur MCP Adapter"
+                alt="Arthur MCP"
                 sx={{ height: '100%', maxWidth: '100%' }}
                 onError={(e) => {
                   const img = e.currentTarget as HTMLImageElement
@@ -120,7 +120,7 @@ export default function Login() {
                 color="primary.main"
                 sx={{ display: 'none', letterSpacing: '-0.3px' }}
               >
-                Arthur MCP Adapter
+                Arthur MCP
               </Typography>
             </Box>
 

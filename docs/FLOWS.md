@@ -103,33 +103,40 @@ Goal: let someone with a share link understand and connect to an MCP server with
 Entry points:
 
 - `POST /api/swagger/servers/:id/share-link` from the authenticated server Connect tab.
-- Public `/share/:token` route.
-- Public `GET /api/share/:token` endpoint.
+- Public `/mcp-swagger/:serverSlug` route for newly generated links (permanent, no token), with legacy `/mcp-swagger/:serverSlug/:token`, `/share/:serverSlug/:token`, and `/share/:token` links still supported.
+- Public `GET /api/share/by-slug/:slug` endpoint for the current link format; legacy `GET /api/share/:token` endpoint for old token-based links.
 
 Permissions:
 
 - Generating a share link requires `servers_share`.
-- Viewing `/share/:token` is public because the signed token is the access boundary.
+- Viewing `/mcp-swagger/:serverSlug` (or any legacy token-based variant) is public. The share slug itself is now the access boundary — anyone who knows or guesses the slug can view the page.
 
 Backend behavior:
 
-- Share tokens are signed JWTs with a 30-day expiration and contain only the server id and share type.
-- `GET /api/share/:token` validates the token and returns public, read-only MCP server documentation.
+- Servers receive a unique human-readable share slug automatically from the server name when created or first shared. Users with server settings permission can edit the slug, but it must remain unique across servers. Editing the slug is also how a previously shared link is revoked: the old slug stops resolving once changed.
+- The MCP runtime endpoint accepts both `/api/mcp/server/:serverId` and `/api/mcp/server/:shareSlug`. Server Detail and the public Share page show the slug URL when `shareSlug` exists and fall back to the UUID URL for older or unslugged servers.
+- New share links are `/mcp-swagger/:shareSlug` with no token — the link never expires and stays valid until the slug is changed. `GET /api/share/by-slug/:slug` looks the server up directly by slug via `findByIdOrShareSlug`, with no signature or expiry check.
+- Links generated before this change embedded a signed JWT (30-day expiration, server id + share type) after the slug. `GET /api/share/:token` still validates those tokens so old links keep working; no new tokens are minted.
 - The public payload includes only the MCP-facing contract for exposed items: server metadata, MCP URL, auth-required flag, counts, tools, public tool parameters, resources, resolved prompts, descriptions, prompt arguments/content, resource URIs, MIME types, and output schemas.
 - The public payload must not include MCP API key values, upstream auth credentials, OAuth client secrets, connection credentials, Error Tracking DSNs, secret values, raw request bodies, raw input schemas, endpoint methods/paths, HTTP method markers in descriptions, operations, API base URLs, source/data-source types, source tags, prompt tags, internal enabled/disabled flags, resource implementation type, runtime settings, or other origin details.
 
 Frontend behavior:
 
 - The share page keeps the existing MCP URL, QR code, and setup instructions for Claude Desktop, Cursor, and generic MCP clients.
-- The page also renders an MCP server reference with overview metadata and expandable sections for Tools, Resources, and Prompts.
+- The page presents a Swagger UI-like public documentation layout: a dark product bar, server info header, copy-ready MCP endpoint band with QR code, and colored expandable operation rows for Tools, Resources, Prompts, and setup instructions.
+- When the shared server requires MCP authentication, the page follows the Swagger UI pattern: a global Authorize action opens a dialog for the MCP API key, shows an authorized state after saving, and sends the value as the `auth` header only when running simulator requests.
+- When an OAuth Client is configured, the public share payload exposes only a `hasOAuthClient` boolean. The Authorize dialog accepts client credentials, exchanges them through `/oauth/server/:serverId/token` with `grant_type=client_credentials`, stores only the resulting access token in page state, and sends it as `Authorization: Bearer <token>` for simulator requests.
+- Tools, Resources, and Prompts include a simulator mode that sends JSON-RPC requests to the MCP endpoint, matching how an AI client would call `tools/call`, `resources/read`, and `prompts/get`.
 - Tools show public parameters and output schema JSON when declared; resources show output schema JSON when declared.
 - Prompts show resolved prompt content and template arguments.
 - Resources show URI, MIME type, and output schema where available.
 
 Risk to preserve:
 
-- Do not require login on `/share/:token`.
+- Do not require login on `/mcp-swagger/:serverSlug` or any legacy token-based variant.
 - Treat the share page as public documentation; never expose credentials or secret values there.
+- Changing a server's share slug is the only revocation mechanism for the current link format — there is no expiry to fall back on.
+- Treat simulator execution as MCP client behavior: share-link access lets the user see the public contract, while protected servers still require the visitor to provide a valid API key or valid OAuth client credentials before calls succeed.
 - Add fields to the share payload rather than removing existing setup fields, so older clients/pages remain compatible.
 
 ## REST Server Templates

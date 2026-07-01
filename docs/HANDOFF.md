@@ -14,6 +14,51 @@ Frontend duplication optimization is progressing through a phased extraction pla
 
 ## Latest Changes
 
+- Rewrote `README.md` in English as a polished project landing document:
+  - Added product positioning for Arthur MCP as an open, self-hostable MCP control plane.
+  - Documented core features, architecture, quick start, Docker, observability, Render deployment, security model, contribution workflow, and project status.
+  - Documented the current permanent `/mcp-swagger/:serverSlug` public documentation model with legacy signed-route compatibility.
+  - Added license guidance that preserves the intended commercial hosting/resale restriction while noting that this is not plain OSI-approved MIT.
+- Continued the frontend i18n remediation from `docs/FRONTEND_I18N_HARDCODED_AUDIT_2026-07-01.md` by replacing additional hardcoded copy in server modules and `ErrorTracking`-related UI dependencies.
+- Added missing locale keys introduced by the i18n refactor in `serverDetail` and `errorTracking` for both English and Portuguese, including new connect/share slug copy, prompt empty-search text, status/action/help labels, and confirmation/error states.
+- Reworked `NewServer` connection/auth sections to use i18n keys for GraphQL, gRPC, SQL/NoSQL/cloud connection blocks, auth forms, and import tab labels, with new `servers.newServer.*` locale sections in EN/PT-BR.
+- Removed brittle prompt empty-state string manipulation in `PromptsTab` and replaced it with direct locale-driven rendering.
+- Ran frontend validation with `npm run type-check` after the i18n changes (passed).
+
+- Added `docs/FRONTEND_I18N_HARDCODED_AUDIT_2026-07-01.md` with a frontend hardcoded-term i18n audit, including scan methodology, quantified scope, hotspot ranking, representative findings by module, and prioritized remediation order.
+- Changed generated MCP Swagger share links to be permanent slug-only URLs instead of slug+token:
+  - `POST /api/swagger/servers/:id/share-link` now returns `/mcp-swagger/:shareSlug` with no token; the response no longer includes a `token` field.
+  - Added public `GET /api/share/by-slug/:slug` which resolves the server directly via `findByIdOrShareSlug` (the same lookup already used by the MCP runtime endpoint) with no signature or expiry check. The share slug is now the access boundary — editing the slug is the only way to revoke a previously shared link.
+  - The frontend route `/mcp-swagger/:token` (single segment) was repurposed to `/mcp-swagger/:slug` for this permanent format. `/mcp-swagger/:slug/:token`, `/share/:slug/:token`, and `/share/:token` remain as legacy routes so links generated before this change keep working via the existing signed-JWT `GET /api/share/:token` endpoint.
+  - `SwaggerService.generateShareToken` was removed (no longer called); `getProjectForShare`/`getProjectForShareBySlug` now share a `buildShareInfo` helper to avoid duplicating the public payload mapping.
+  - Updated the Connect tab copy: the share slug helper text no longer shows a trailing token placeholder, and the share drawer/slug-saved messages now describe the permanent, slug-revocable model instead of a 30-day expiry.
+- Added automatic unique share slug generation for MCP servers:
+  - New empty, OpenAPI, Postman, and duplicated servers now persist a unique `shareSlug` derived from the server name.
+  - Existing servers without `shareSlug` receive and persist one the first time a share link is generated.
+  - Manual slug editing through `PATCH /api/swagger/servers/:id/share-slug` remains supported, normalizes input, and rejects slugs already used by another server.
+  - `POST /api/swagger/servers/:id/share-link` now returns the resolved `shareSlug` so the Server Detail Connect panel can sync automatically generated slugs.
+  - The MCP runtime endpoint now resolves `/api/mcp/server/:shareSlug` when a slug exists, while `/api/mcp/server/:serverId` remains valid for backward compatibility.
+  - Server Detail shows the slug-based MCP connection URL when `shareSlug` exists and falls back to the UUID URL otherwise.
+  - The public Share page payload now returns `mcpUrl` with `/api/mcp/server/:shareSlug` when the server has a slug, so copied setup/simulator URLs use the slug identifier.
+  - OAuth client credential exchange resolves slug-based `/oauth/server/:shareSlug/token` URLs and signs bearer tokens with the canonical server id.
+  - Generated public documentation links now use `/mcp-swagger/:serverSlug/:token`; `/share/:serverSlug/:token` and `/share/:token` remain legacy frontend routes.
+- Updated generated public MCP Swagger links to look more like documentation URLs:
+  - `POST /api/swagger/servers/:id/share-link` now returns `/mcp-swagger/:serverSlug/:token` using a human-readable slug derived from the server name.
+  - The signed token remains the access boundary and still contains only server id and share type; the slug is cosmetic and not trusted.
+  - Legacy `/share/:serverSlug/:token` and `/share/:token` frontend routes remain supported.
+- Added a Swagger-like simulator to the public `/share/:token` page:
+  - Visitors can run exposed Tools, Resources, and Prompts from the share page using MCP JSON-RPC methods `tools/call`, `resources/read`, and `prompts/get`.
+  - When the shared server requires MCP auth or has OAuth Client configured, the page uses a Swagger UI-style global Authorize button and dialog. It sends `auth` for MCP API keys, or exchanges OAuth client credentials through `/oauth/server/:serverId/token` with `grant_type=client_credentials` before sending `Authorization: Bearer`.
+  - Tool simulations coerce number, integer, boolean, object, and array inputs before sending the request payload; Resources and Prompts use their URI/name contracts.
+  - Simulator panels show the exact request payload, copy-ready curl command, and formatted response/error output while preserving the existing public contract and setup documentation.
+  - No backend payload fields, route permissions, login requirements, or share-token semantics were changed; simulator execution follows the existing MCP endpoint and key guard behavior.
+- Fixed the OAuth Client setup panel URLs to use the backend's actual `/oauth/server/:serverId/authorize` and `/oauth/server/:serverId/token` routes instead of the broken `/oauth/project/:id` paths.
+- The `/share` setup section now uses distinct colors for Claude Desktop, Cursor, and generic MCP client setup rows.
+- Reworked the public `/share/:token` page layout to feel closer to Swagger UI while preserving all existing public information:
+  - The page now uses a dark product bar, server info header, version/status chips, and tool/resource/prompt/auth chips.
+  - The MCP URL and QR code are grouped in a copy-ready endpoint band with a green MCP badge, similar to Swagger's server/operation affordances.
+  - Tools, Resources, Prompts, and setup instructions now render as colored expandable operation rows, including parameters, notes, URIs, MIME types, prompt arguments/content, setup snippets, and output schemas where available.
+  - No payload fields, permissions, authentication behavior, or share-token semantics were changed.
 - Expanded and privacy-scoped the public `/share/:token` MCP documentation page without removing the existing setup flow:
   - `GET /api/share/:token` now returns only MCP-facing reference data for exposed items: server metadata, MCP URL, auth-required flag, counts, tools, public tool parameters, resources, resolved prompts, descriptions, prompt arguments/content, resource URIs, MIME types, and output schemas.
   - The public share payload intentionally omits credentials and private origin details such as MCP API key values, upstream auth secrets, OAuth client secrets, connection credentials, DSNs, secret values, raw input schemas, endpoint methods/paths, HTTP method markers in descriptions, operations, API base URLs, source/data-source types, source tags, prompt tags, internal enabled/disabled flags, resource implementation type, and runtime settings.
@@ -290,6 +335,18 @@ Frontend duplication optimization is progressing through a phased extraction pla
 
 ## Validation
 
+- Not run for the README rewrite because it only changed documentation.
+- `npm test --prefix api -- swagger.service --runInBand` passed with 1 suite and 12 tests after changing generated public documentation links to `/mcp-swagger/:serverSlug/:token`.
+- `npx tsc -p api/tsconfig.json --noEmit` passed after the `/mcp-swagger` route/link change.
+- `npm run type-check` passed after adding `/mcp-swagger` frontend routes.
+- `npm test --prefix api -- swagger.service oauth.service mcp-api-key.guard --runInBand` passed with 3 suites and 27 tests after making the public Share page MCP URL prefer `shareSlug` and enabling slug-based OAuth token exchange.
+- `npx tsc -p api/tsconfig.json --noEmit` passed after the Share/OAuth slug changes.
+- `npm run type-check` passed after adding `shareSlug` to the public Share page frontend type.
+- `npm test --prefix api -- mcp-api-key.guard rate-limit.guard project-state.guard swagger.service --runInBand` passed with 4 suites and 24 tests after adding redundant MCP endpoint slug resolution.
+- `npx tsc -p api/tsconfig.json --noEmit` passed after adding repository id-or-slug lookup and MCP guard/service changes.
+- `npm run type-check` passed after switching the Server Detail MCP URL display to prefer `shareSlug`.
+- `npm test --prefix api -- swagger.service --runInBand` passed with 1 suite and 12 tests after adding automatic share slug generation and uniqueness coverage.
+- `npm run type-check` passed after syncing the Server Detail Connect panel with generated share slugs.
 - `npm run type-check` passed after expanding the public Share page reference UI.
 - `npm run build --prefix api` passed after expanding the public share payload.
 - `npm test --prefix api -- swagger.service --runInBand` passed with 1 suite and 7 tests, including share payload coverage that checks prompt resolution and credential omission.

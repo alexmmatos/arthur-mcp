@@ -92,6 +92,7 @@ import { useTranslation } from 'react-i18next'
 import { useColorMode } from '../../theme/ColorModeContext'
 import { useAuth, Permission } from '../../context/AuthContext'
 import { useDetailPageNav } from '../../hooks/useDetailPageNav'
+import { getSourceType } from '../../utils/sourceType'
 import api from '../../api'
 import { ConfirmDialog, HelpButton } from '../../components'
 import { McpDocsContent } from '../McpDocs'
@@ -112,6 +113,7 @@ import {
   PromptsTab,
   ReimportSpecDialog,
   ResourcesTab,
+  ResponseLimitPanel,
   StatCard,
   TenantConfigPanel,
   ToolAccordion,
@@ -297,7 +299,7 @@ export default function ServerDetail() {
                 />
             }
             {project.version && <Chip label={`v${project.version}`} variant="outlined" sx={{ fontWeight: 500 }} />}
-            {can(Permission.ServersCreate) && (
+            {can(Permission.ServersCreate) && getSourceType(project) === 'rest' && (
               <Tooltip title={t('tooltip.updateFromSpec')}>
                 <Button size="small" variant="outlined" startIcon={<IconRefresh size={18} />}
                   onClick={() => { setReimportOpen(true); setReimportSuccess(null) }}>
@@ -318,7 +320,12 @@ export default function ServerDetail() {
       {/* ── Tab 0: Connect ─────────────────────────────────────────────────────── */}
       {tab === 0 && (
         <>
-          <McpEndpointBar projectId={id!} hasKeys={(project.mcpApiKeys ?? []).length > 0} />
+          <McpEndpointBar
+            projectId={id!}
+            hasKeys={(project.mcpApiKeys ?? []).length > 0}
+            shareSlug={project.shareSlug}
+            onShareSlugChange={(shareSlug) => setProject((prev) => prev ? { ...prev, shareSlug } : prev)}
+          />
           {can(Permission.ApiKeysView) && (
             <ApiKeysPanel
               projectId={id!}
@@ -481,6 +488,11 @@ export default function ServerDetail() {
             onPausedChange={setIsPaused}
           />
           <AlertConfigPanel projectId={id!} initialConfig={project.alertConfig} />
+          <ResponseLimitPanel
+            projectId={id!}
+            initialConfig={project.responseConfig}
+            onChange={(cfg) => setProject((prev) => prev ? { ...prev, responseConfig: cfg } : prev)}
+          />
           <TenantConfigPanel
             projectId={id!}
             initialConfig={(project as any).tenantConfig}

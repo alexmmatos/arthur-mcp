@@ -114,6 +114,7 @@ export interface Project {
   description?: string
   tags?: string[]
   version?: string
+  shareSlug?: string | null
   status: string
   isPaused?: boolean
   maintenanceMode?: { enabled: boolean; message: string }
@@ -128,6 +129,13 @@ export interface Project {
   oauthClientId?: string
   oauthClientSecret?: string
   rateLimit?: { enabled: boolean; requestsPerMinute: number }
+  responseConfig?: {
+    enabled: boolean
+    maxResponseLen?: number
+    maxDepth?: number
+    arraySlice?: number
+    errorTruncateLen?: number
+  }
   auth?: AuthConfig
   createdAt: string
   updatedAt: string
@@ -192,6 +200,20 @@ export interface RateLimitPanelProps {
   projectId: string
   initialRateLimit?: { enabled: boolean; requestsPerMinute: number }
   onChange: (rl: { enabled: boolean; requestsPerMinute: number }) => void
+}
+
+export interface ResponseConfig {
+  enabled: boolean
+  maxResponseLen?: number
+  maxDepth?: number
+  arraySlice?: number
+  errorTruncateLen?: number
+}
+
+export interface ResponseLimitPanelProps {
+  projectId: string
+  initialConfig?: ResponseConfig
+  onChange: (cfg: ResponseConfig) => void
 }
 
 export interface ScheduleEntry {

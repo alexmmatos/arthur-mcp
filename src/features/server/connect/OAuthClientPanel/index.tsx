@@ -30,8 +30,8 @@ export function OAuthClientPanel({ projectId, initialClientId, initialClientSecr
   const [confirmRemove, setConfirmRemove] = useState(false)
   const hasCredentials = !!initialClientId
 
-  const authUrl = `${serverBase}/oauth/project/${projectId}/authorize`
-  const tokenUrl = `${serverBase}/oauth/project/${projectId}/token`
+  const authUrl = `${serverBase}/oauth/server/${projectId}/authorize`
+  const tokenUrl = `${serverBase}/oauth/server/${projectId}/token`
 
   const copy = (text: string, key: 'id' | 'secret' | 'auth' | 'token') => {
     navigator.clipboard.writeText(text)

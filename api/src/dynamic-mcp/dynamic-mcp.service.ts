@@ -12,7 +12,7 @@ import {
 import type { AuthConfig, ChainInputSource, GeneratedTool, JsonSchema, McpResource, ToolChain } from './types';
 import { buildRequest } from './request-builder';
 import { executeRequest } from './http-client';
-import { mapResponse, McpToolResult } from './response-mapper';
+import { mapResponse, McpToolResult, ResponseMapperConfig } from './response-mapper';
 import { applyAuth, resolveSecretRefs } from './auth-provider';
 import { ExecutionLogsService } from '../execution-logs/execution-logs.service';
 import { ErrorTrackingService } from '../error-tracking/error-tracking.service';
@@ -46,6 +46,7 @@ interface CachedProject {
   secrets: Map<string, string>;
   tenantConfig: { enabled: boolean; params: TenantParamDef[] };
   globalRequestHeaders: Record<string, string>;
+  responseConfig: ResponseMapperConfig;
   expiresAt: number;
 }
 
@@ -114,12 +115,13 @@ export class DynamicMcpService {
     this.projectCache.delete(serverId);
   }
 
-  private async getProjectData(serverId: string): Promise<CachedProject> {
-    const cached = this.projectCache.get(serverId);
-    if (cached && cached.expiresAt > Date.now()) return cached;
-
-    const server = await this.projectRepo.findById(serverId);
+  private async getProjectData(serverId: string): Promise<CachedProject & { serverId: string }> {
+    const server = await this.projectRepo.findByIdOrShareSlug(serverId);
     if (!server) throw new NotFoundException(`Server ${serverId} not found.`);
+
+    const canonicalServerId = server._id;
+    const cached = this.projectCache.get(canonicalServerId);
+    if (cached && cached.expiresAt > Date.now()) return { ...cached, serverId: canonicalServerId };
 
     const promptRefs = (server.prompts ?? []) as Array<{ promptId?: string; enabled?: boolean }>;
     const resolvedPrompts: PromptRecord[] = [];
@@ -148,10 +150,11 @@ export class DynamicMcpService {
       secrets: secretsMap,
       tenantConfig: (server as any).tenantConfig ?? { enabled: false, params: [] },
       globalRequestHeaders,
+      responseConfig: (server as any).responseConfig ?? { enabled: false },
       expiresAt: Date.now() + this.CACHE_TTL_MS,
     };
-    this.projectCache.set(serverId, entry);
-    return entry;
+    this.projectCache.set(canonicalServerId, entry);
+    return { ...entry, serverId: canonicalServerId };
   }
 
   private coerceTenantValue(value: string, type: TenantParamDef['type']): unknown {
@@ -182,7 +185,9 @@ export class DynamicMcpService {
   }
 
   async createMcpServer(serverId: string, queryParams: Record<string, string> = {}): Promise<Server> {
-    const { tools: allTools, chains: allChains, auth: rawAuth, name, version, resources, prompts, secrets, tenantConfig, globalRequestHeaders } = await this.getProjectData(serverId);
+    const project = await this.getProjectData(serverId);
+    const { tools: allTools, chains: allChains, auth: rawAuth, name, version, resources, prompts, secrets, tenantConfig, globalRequestHeaders, responseConfig } = project;
+    serverId = project.serverId;
     const auth = resolveSecretRefs(rawAuth, secrets);
 
     // Resolve endpointRef/inputSchema from source endpoint for linked tools/resources
@@ -386,7 +391,7 @@ export class DynamicMcpService {
           }
         }
 
-        const result = mapResponse(httpRes);
+        const result = mapResponse(httpRes, responseConfig);
         const durationMs = Date.now() - t0;
         this.executionLogs.log({ serverId, serverName: name, toolName, source: 'mcp', statusCode: httpRes.status, responseTimeMs: durationMs, isError: result.isError ?? false, requestPayload: effectiveArgs, responsePayload: tryParseJson(httpRes.body) });
         if (result.isError) {
@@ -581,7 +586,9 @@ export class DynamicMcpService {
     toolName: string,
     args: Record<string, unknown>,
   ): Promise<McpToolResult> {
-    const { tools: allTools, auth: rawAuth, name, secrets, globalRequestHeaders } = await this.getProjectData(serverId);
+    const project = await this.getProjectData(serverId);
+    const { tools: allTools, auth: rawAuth, name, secrets, globalRequestHeaders, responseConfig } = project;
+    serverId = project.serverId;
     const auth = resolveSecretRefs(rawAuth, secrets);
 
     const rawTool = allTools.find((t) => t.name === toolName);
@@ -612,7 +619,7 @@ export class DynamicMcpService {
       let httpReq = buildRequest(args, tool.endpointRef, globalRequestHeaders);
       httpReq = await applyAuth(httpReq, auth);
       const httpRes = await this.executeObservedRequest(httpReq);
-      const result = mapResponse(httpRes);
+      const result = mapResponse(httpRes, responseConfig);
       const durationMs = Date.now() - t0;
       this.executionLogs.log({ serverId, serverName: name, toolName, source: 'direct', statusCode: httpRes.status, responseTimeMs: durationMs, isError: result.isError ?? false });
       if (result.isError) {

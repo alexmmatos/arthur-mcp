@@ -20,5 +20,6 @@ export {
   InlineEdit,
   ProjectControlsPanel,
   RateLimitPanel,
+  ResponseLimitPanel,
   TenantConfigPanel,
 } from './settings'

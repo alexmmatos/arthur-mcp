@@ -18,8 +18,8 @@ const makeContext = (serverId = 'server-1') => {
 };
 
 describe('ProjectStateGuard', () => {
-  const repo: jest.Mocked<Pick<ISwaggerProjectRepository, 'findById'>> = {
-    findById: jest.fn(),
+  const repo: jest.Mocked<Pick<ISwaggerProjectRepository, 'findByIdOrShareSlug'>> = {
+    findByIdOrShareSlug: jest.fn(),
   };
 
   let guard: ProjectStateGuard;
@@ -30,10 +30,10 @@ describe('ProjectStateGuard', () => {
   });
 
   it('allows missing servers and active servers', async () => {
-    repo.findById.mockResolvedValueOnce(null);
+    repo.findByIdOrShareSlug.mockResolvedValueOnce(null);
     await expect(guard.canActivate(makeContext().ctx)).resolves.toBe(true);
 
-    repo.findById.mockResolvedValueOnce({
+    repo.findByIdOrShareSlug.mockResolvedValueOnce({
       name: 'Payments',
       isPaused: false,
       maintenanceMode: { enabled: false },
@@ -43,7 +43,7 @@ describe('ProjectStateGuard', () => {
   });
 
   it('blocks paused servers', async () => {
-    repo.findById.mockResolvedValue({ name: 'Payments', isPaused: true } as any);
+    repo.findByIdOrShareSlug.mockResolvedValue({ name: 'Payments', isPaused: true } as any);
     const { ctx, res } = makeContext();
 
     await expect(guard.canActivate(ctx)).resolves.toBe(false);
@@ -53,7 +53,7 @@ describe('ProjectStateGuard', () => {
   });
 
   it('blocks servers in maintenance mode with custom or fallback message', async () => {
-    repo.findById.mockResolvedValueOnce({
+    repo.findByIdOrShareSlug.mockResolvedValueOnce({
       name: 'Payments',
       maintenanceMode: { enabled: true, message: 'Back soon' },
     } as any);
@@ -61,7 +61,7 @@ describe('ProjectStateGuard', () => {
     await expect(guard.canActivate(first.ctx)).resolves.toBe(false);
     expect(first.res.json).toHaveBeenCalledWith({ error: 'Maintenance mode', message: 'Back soon' });
 
-    repo.findById.mockResolvedValueOnce({
+    repo.findByIdOrShareSlug.mockResolvedValueOnce({
       name: 'Payments',
       maintenanceMode: { enabled: true, message: ' ' },
     } as any);
@@ -73,7 +73,7 @@ describe('ProjectStateGuard', () => {
   it('allows requests inside the availability window and blocks outside it', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-01-05T10:00:00.000Z'));
 
-    repo.findById.mockResolvedValueOnce({
+    repo.findByIdOrShareSlug.mockResolvedValueOnce({
       name: 'Payments',
       availabilityWindow: {
         enabled: true,
@@ -83,7 +83,7 @@ describe('ProjectStateGuard', () => {
     } as any);
     await expect(guard.canActivate(makeContext().ctx)).resolves.toBe(true);
 
-    repo.findById.mockResolvedValueOnce({
+    repo.findByIdOrShareSlug.mockResolvedValueOnce({
       name: 'Payments',
       availabilityWindow: {
         enabled: true,

@@ -36,7 +36,7 @@
   },
   "help": {
     "title": "Audit Logs",
-    "intro": "The Audit Log is a complete, tamper-proof record of every administrative change made on this Arthur MCP Adapter server. It is intended for security monitoring, compliance auditing, and debugging unexpected behaviour.",
+    "intro": "The Audit Log is a complete, tamper-proof record of every administrative change made on this Arthur MCP server. It is intended for security monitoring, compliance auditing, and debugging unexpected behaviour.",
     "body": "Every time a user creates, modifies, or deletes a server, tool, API key, or system setting, an entry is automatically written here. Login events are also recorded. Entries cannot be edited or deleted by any user.",
     "howToUse": "How to use it:",
     "tipInvestigate": "Investigate a change: Look at the Date/Time and Item columns to find when and what was changed.",

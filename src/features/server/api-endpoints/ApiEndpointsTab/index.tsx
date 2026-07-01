@@ -4,6 +4,7 @@ import {
   InputAdornment, TextField, Typography,
 } from '@mui/material'
 import { IconPlus, IconSearch } from '@tabler/icons-react'
+import { useTranslation } from 'react-i18next'
 import { useAuth, Permission } from '../../../../context/AuthContext'
 import type { GeneratedTool } from '../../types'
 import { METHOD_COLOR } from '../../constants'
@@ -20,6 +21,7 @@ export function ApiEndpointsTab({ tools, projectId, projectBaseUrl, anyApiKey, o
   onToolChanged: (oldName: string, newTool: GeneratedTool) => void
   onToolDeleted: (toolName: string) => void
 }) {
+  const { t } = useTranslation('serverDetail')
   const { can } = useAuth()
   const [search, setSearch] = useState('')
   const [methodFilter, setMethodFilter] = useState<string | null>(null)
@@ -53,7 +55,7 @@ export function ApiEndpointsTab({ tools, projectId, projectBaseUrl, anyApiKey, o
       {/* Stats row */}
       <Grid container spacing={2} mb={3}>
         <Grid item xs={6} sm={3}>
-          <StatCard label="Total endpoints" value={endpoints.length} color="#5D87FF" />
+          <StatCard label={t('label.totalEndpoints')} value={endpoints.length} color="#5D87FF" />
         </Grid>
         {methods.map((m) => (
           <Grid item xs={6} sm={3} key={m}>
@@ -65,13 +67,13 @@ export function ApiEndpointsTab({ tools, projectId, projectBaseUrl, anyApiKey, o
       {/* Search + filter + add button */}
       <Box display="flex" alignItems="center" gap={1} mb={2} flexWrap="wrap">
         <TextField
-          size="small" placeholder="Search by path, name or description…" value={search}
+          size="small" placeholder={t('placeholder.searchByPathNameDesc')} value={search}
           onChange={(e) => setSearch(e.target.value)} sx={{ width: 300 }}
           InputProps={{ startAdornment: <InputAdornment position="start"><IconSearch size={16} /></InputAdornment> }}
         />
         {methods.length > 1 && (
           <Box display="flex" gap={0.5} flexWrap="wrap">
-            <Chip label="All" size="small" clickable onClick={() => setMethodFilter(null)}
+            <Chip label={t('label.filterAll')} size="small" clickable onClick={() => setMethodFilter(null)}
               color={methodFilter === null ? 'primary' : 'default'}
               variant={methodFilter === null ? 'filled' : 'outlined'} />
             {methods.map((m) => (
@@ -89,23 +91,23 @@ export function ApiEndpointsTab({ tools, projectId, projectBaseUrl, anyApiKey, o
         )}
         {(search || methodFilter) && (
           <Typography variant="body2" color="text.secondary">
-            {visible.length} of {endpoints.length}
+            {t('label.visible', { visible: visible.length, total: endpoints.length })}
           </Typography>
         )}
         <Box flexGrow={1} />
         {can(Permission.EndpointsCreate) && (
           <Button variant="contained" size="small" startIcon={<IconPlus size={16} />}
             onClick={() => setCreateOpen(true)}>
-            Add endpoint
+            {t('action.addEndpoint')}
           </Button>
         )}
       </Box>
 
       {/* Endpoint list */}
       {endpoints.length === 0 ? (
-        <Alert severity="info">No endpoints — upload an OpenAPI spec or click "Add endpoint" to create one manually.</Alert>
+        <Alert severity="info">{t('empty.noEndpoints')}</Alert>
       ) : visible.length === 0 ? (
-        <Alert severity="info">No endpoints match your search.</Alert>
+        <Alert severity="info">{t('empty.noEndpointsSearch')}</Alert>
       ) : (
         <Box display="flex" flexDirection="column" gap={'6px'}>
           {visible.map((e, i) => (

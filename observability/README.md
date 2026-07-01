@@ -1,6 +1,6 @@
 # Observability Stack
 
-This folder contains local Prometheus, Grafana, and Tempo helpers for Arthur MCP Adapter.
+This folder contains local Prometheus, Grafana, and Tempo helpers for Arthur MCP.
 
 ## Run Locally
 

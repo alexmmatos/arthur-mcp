@@ -32,6 +32,7 @@
     "apiBaseUrl": "API Base URL",
     "apiCredentials": "API Credentials",
     "requestLimit": "Request Limit",
+    "responseLimit": "Response Limits",
     "maintenanceMessage": "Maintenance message",
     "availabilityDays": "Availability days",
     "errorAlerts": "Error alerts",
@@ -81,6 +82,9 @@
     "authEndpoint": "Configure this URL in your MCP client and include the header",
     "noKeys": "No keys — any MCP client can connect without authentication.",
     "scanQr": "Scan to open on a mobile device",
+    "shareValidityPermanent": "This link stays valid until the share slug changes. It gives read-only setup information — no access to data or credentials.",
+    "publicDocSlug": "Public documentation slug",
+    "shareSlug": "Share slug",
     "shareValidity": "This link is valid for 30 days. It gives read-only setup information — no access to data or credentials.",
     "createdAt": "Created {{date}}",
     "useInHeader": "Use in the header:",
@@ -199,7 +203,13 @@
     "contentType": "Content-Type",
     "constraint": "Constraint",
     "alertThreshold": "Alert when error rate exceeds (%)",
-    "alertEmail": "Send alert to (email)"
+    "alertEmail": "Send alert to (email)",
+    "responseLimit": {
+      "maxResponseLen": "Max response (chars)",
+      "maxDepth": "Max JSON depth",
+      "arraySlice": "Max array items",
+      "errorTruncateLen": "Error body (chars)"
+    }
   },
   "placeholder": {
     "searchPathOrName": "Search by path or name…",
@@ -230,6 +240,9 @@
   },
   "hint": {
     "baseUrl": "Base URL used for all HTTP calls in this server",
+    "publicDocSlugFormat": "Used in generated share links as",
+    "publicDocSlugUnique": "It must be unique across servers.",
+    "shareSlugPattern": "Use lowercase letters, numbers, and hyphens.",
     "baseUrlOverride": "Leave blank to use the URL declared in the spec",
     "apiBaseUrlHelp": "The root address of the external API this server connects to.",
     "keyLabel": "A label to identify which client uses this key",
@@ -240,6 +253,8 @@
     "errorMessageHelp": "Shown to the MCP client if the API call fails. Use {{error}} to include the original error.",
     "rateLimitActive": "Limits MCP server calls to {{rpm}} req/min. Exceeding the limit returns HTTP 429.",
     "rateLimitInactive": "No request limit. Enable to restrict usage per minute.",
+    "responseLimitActive": "Response truncation active. The AI receives capped responses according to the configured limits.",
+    "responseLimitInactive": "No response limits. The AI receives the full raw response from the upstream API.",
     "maintenancePlaceholder": "We are performing scheduled maintenance. Back online at 14:00 UTC.",
     "maintenanceHint": "When enabled, all requests get a 503 with this message. Useful for planned downtime.",
     "availabilityHint": "Restrict AI access to specific days and hours. Requests outside the schedule return a 503 error.",
@@ -289,6 +304,7 @@
     "noDbTools": "No tools yet.",
     "noDbToolsWithQuery": "No tools yet. Click \"New tool\" to expose an operation as an MCP tool.",
     "noPromptsAdded": "No prompts added yet. Click Add prompt to include prompts from your library, or go to Prompt library to create new ones.",
+    "noPromptsSearch": "No prompts match your search.",
     "noNotes": "No notes yet.",
     "noCallsRecorded": "No calls recorded yet.",
     "noTablesFound": "No tables found. Make sure your connection is correct and the database has tables.",
@@ -357,7 +373,8 @@
     "selectEndpointFirst": "Select an endpoint first.",
     "resourceLoadFailedTemplate": "Error loading resource: {{error}}",
     "toolCallFailedTemplate": "Error calling tool: {{error}}",
-    "pathRequired": "Path is required."
+    "pathRequired": "Path is required.",
+    "slugSaveFailed": "Could not save share slug."
   },
   "section": {
     "endpoint": "1. Endpoint",
@@ -375,17 +392,20 @@
     "failedToSave": "Failed to save.",
     "connected": "Connected · {{latencyMs}}ms",
     "connectionFailed": "Failed: {{error}}",
-    "connecting": "Connecting…"
+    "connecting": "Connecting…",
+    "slugSaved": "Slug saved. The share link now uses it — any previously shared link with the old slug stops working."
   },
   "action": {
     "testConnection": "Test connection",
     "testing": "Testing…",
-    "shareWithClient": "Share with client",
+    "shareWithClient": "Share the web documentation with client",
     "addKey": "Add key",
     "createKey": "Create key",
     "creating": "Creating…",
     "copyUrl": "Copy URL",
     "copyLink": "Copy link",
+    "saveSlug": "Save slug",
+    "downloadQr": "Download QR code",
     "editBaseUrl": "Edit Base URL",
     "autoGenerate": "Auto-generate",
     "saveCredentials": "Save credentials",
@@ -490,8 +510,8 @@
     "success_other": "Done — {{count}} tools added, {{updated}} updated."
   },
   "connect": {
-    "shareTitle": "Share with client",
-    "shareDrawerTitle": "Share with client"
+    "shareTitle": "Share the MCP swagger documentation",
+    "shareDrawerTitle": "Share the MCP swagger documentation"
   },
   "promptLibrary": {
     "title": "Add prompt from library"
@@ -554,6 +574,19 @@
       "desc": "This is the exact payload your AI client receives when it connects to this server over the MCP protocol — the full list of tools, their parameter schemas, and the descriptions the AI reads to understand what each action does. What you see here is precisely what the AI works from, nothing more and nothing less.",
       "howAiDecides": "When you send a message to the AI, it scans every tool name and description shown here to decide which tool to call and what values to pass as parameters. If two tools have similar names the AI may pick the wrong one. If a description is vague the AI may guess at parameter values — sometimes incorrectly. This view lets you audit exactly what the AI sees before a problem surfaces in production.",
       "improving": "To improve AI accuracy: make tool names unique and specific, add concrete examples in descriptions ('e.g. customer_id: 123 for John Smith'), list all accepted values for enum-style parameters, and describe what each tool returns and what errors it can raise. After editing tools, return to this view to verify the changes look exactly as intended — the AI sees the updated version immediately on its next connection."
+    },
+    "responseLimit": {
+      "intro": "By default, Arthur passes the full upstream API response to the AI without any size restrictions. Enable this panel to activate truncation limits for this server only — useful when APIs return very large payloads that exceed your AI client's context window.",
+      "fieldsTitle": "What each limit controls:",
+      "maxLenTitle": "Max response (chars):",
+      "maxLenText": "Hard character cap on the entire response body after serialisation. Responses longer than this are cut off with a truncation notice.",
+      "maxDepthTitle": "Max JSON depth:",
+      "maxDepthText": "Objects nested deeper than this level are collapsed to \"[...]\" to reduce token usage for deeply nested APIs.",
+      "arraySliceTitle": "Max array items:",
+      "arraySliceText": "Arrays are sliced to the first N items. A note is appended showing how many items were omitted.",
+      "errorLenTitle": "Error body (chars):",
+      "errorLenText": "Maximum length of the body included in error responses (HTTP 4xx/5xx). Keep it short to avoid flooding the AI with long error pages.",
+      "toggleText": "Changes save automatically. Disable the toggle to turn off all limits and restore full raw responses."
     },
     "rateLimit": {
       "intro": "Caps the number of MCP requests this server accepts per minute. When the limit is exceeded, the server responds with HTTP 429 (Too Many Requests) and a Retry-After header — the AI client should wait before retrying.",

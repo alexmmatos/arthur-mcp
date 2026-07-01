@@ -29,7 +29,8 @@ This file should be updated when task state changes. It does not replace issues 
   - [x] **Atomic Design first slice:** Organized shared components into `atoms`, `organisms`, and `templates`, moved components into `ComponentName/index.tsx` folders, and moved `SecretAutocomplete` into the `secrets` feature.
   - [x] **Pages structure slice:** Moved route pages into `PageName/index.tsx` folders and colocated page tests.
   - [ ] **Phase 2:** Thin the largest route pages, starting with `NewServer.tsx`.
-  - [ ] Continue the server feature i18n sweep through the remaining credential help copy and `AuthConfigPanel` text.
+  - [x] Continue the server feature i18n sweep through the remaining credential help copy and `AuthConfigPanel` text.
+  - [ ] Continue i18n remediation for remaining hardcoded copy in `NewServer` (non-connection steps) and adjacent pages identified in the audit.
 - [ ] Verify observability behavior in a deployed Render free instance after the next deployment:
   - [ ] Confirm `/health`, `/ready`, `/live`, and `/metrics` respond without the `/api` prefix.
   - [ ] Confirm Render log output is structured JSON with request IDs.
@@ -43,6 +44,9 @@ This file should be updated when task state changes. It does not replace issues 
 
 ## Done
 
+- [x] Audited frontend hardcoded user-facing terms that bypass i18n and documented findings/remediation priorities in `docs/FRONTEND_I18N_HARDCODED_AUDIT_2026-07-01.md`.
+- [x] Added missing `serverDetail` and `errorTracking` locale keys introduced by the recent i18n sweep in EN/PT-BR and stabilized translated UI references.
+- [x] Internationalized core `NewServer` connection/auth flows (GraphQL, gRPC, SQL/NoSQL/cloud connection blocks, auth forms, and import tab labels) using `servers:newServer.*` keys in EN/PT-BR.
 - [x] Identified the main project structure: React/Vite frontend at the repository root and NestJS backend in `api/`.
 - [x] Created the base files for shared memory between agents.
 - [x] Documented backend entities and persistence shapes in `docs/ENTITIES.md`.
@@ -104,6 +108,16 @@ This file should be updated when task state changes. It does not replace issues 
 - [x] Repaired the AI Providers CRUD surface by aligning common namespace usage, active/inactive labels, list snackbar translation, and frontend/backend validation checks.
 - [x] Expanded AI Providers from CRUD into an adoption accelerator with default provider selection, connection testing, execution permission, and AI-assisted REST tool improvement during server creation.
 - [x] Expanded and documented the public MCP Share page as a privacy-scoped MCP server reference while preserving the existing connection setup flow.
+- [x] Reworked the public MCP Share page layout into a Swagger UI-like documentation view with a dark header, endpoint band, and colored expandable operation rows while preserving the existing URL, QR code, setup instructions, metadata, and Tools/Resources/Prompts reference information.
+- [x] Added a public MCP Share simulator so visitors can test exposed Tools, Resources, and Prompts through JSON-RPC calls, with a Swagger UI-style Authorize dialog for protected servers.
+- [x] Fixed OAuth Client setup URLs to use `/oauth/server/:serverId`, added client-credentials token exchange support, and expanded the public Share simulator authorization flow to support OAuth client credentials without exposing configured OAuth client secrets.
+- [x] Split the public Share setup rows into distinct Claude Desktop, Cursor, and generic MCP client colors.
+- [x] Updated generated public MCP Swagger links to use `/mcp-swagger/:serverSlug/:token` while preserving legacy `/share/:serverSlug/:token` and `/share/:token` support.
+- [x] Added automatic unique share slug generation for MCP servers while preserving manual slug editing with uniqueness validation.
+- [x] Added redundant MCP runtime addressing so `/api/mcp/server/:shareSlug` works when a slug exists while `/api/mcp/server/:serverId` remains valid.
+- [x] Updated the public Share page payload to use `/api/mcp/server/:shareSlug` as the displayed/copyable MCP endpoint when `shareSlug` exists.
+- [x] Rewrote `README.md` in English with product positioning, setup, architecture, observability, deployment, contribution, and license guidance.
+- [x] Changed generated MCP Swagger share links to permanent slug-only URLs (`/mcp-swagger/:shareSlug`, no token), with `GET /api/share/by-slug/:slug` as the new public lookup and legacy token-based links (`/mcp-swagger/:slug/:token`, `/share/:slug/:token`, `/share/:token`) still supported.
 
 ## Decisions
 

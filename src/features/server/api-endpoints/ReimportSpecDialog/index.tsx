@@ -5,6 +5,7 @@ import {
 import {
   IconCloudUpload, IconFile, IconRefresh, IconX,
 } from '@tabler/icons-react'
+import { useTranslation } from 'react-i18next'
 import api from '../../../../api'
 import { BaseDialogLayout } from '../../../../components'
 
@@ -14,6 +15,7 @@ export function ReimportSpecDialog({ projectId, open, onClose, onSuccess }: {
   onClose: () => void
   onSuccess: (result: { added: number; updated: number; baseUrl: string }) => void
 }) {
+  const { t } = useTranslation('serverDetail')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -28,7 +30,7 @@ export function ReimportSpecDialog({ projectId, open, onClose, onSuccess }: {
   const acceptFile = (f: File) => {
     const n = f.name.toLowerCase()
     if (!n.endsWith('.yaml') && !n.endsWith('.yml') && !n.endsWith('.json')) {
-      setError('Unsupported format — use .yaml, .yml or .json')
+      setError(t('error.specFormat'))
       return
     }
     setFile(f)
@@ -50,7 +52,7 @@ export function ReimportSpecDialog({ projectId, open, onClose, onSuccess }: {
       reset()
       onSuccess(data)
     } catch (err: any) {
-      const msg = err?.response?.data?.message ?? 'Error importing spec.'
+      const msg = err?.response?.data?.message ?? t('error.requestFailed')
       setError(Array.isArray(msg) ? msg.join(', ') : msg)
     } finally { setLoading(false) }
   }
@@ -59,21 +61,20 @@ export function ReimportSpecDialog({ projectId, open, onClose, onSuccess }: {
     <BaseDialogLayout
       open={open}
       onClose={handleClose}
-      title="Re-import API spec"
+      title={t('reimport.title')}
       width={480}
       titleIcon={<IconRefresh size={18} />}
       description={(
         <>
-          Upload a new version of the spec. Tools with the same name will be updated (schema + endpoint);
-          new tools will be added. Existing tools not in the new spec are kept — delete them manually if needed.
+          {t('reimport.description')}
         </>
       )}
       footer={(
         <>
-          <Button onClick={handleClose}>Cancel</Button>
+          <Button onClick={handleClose}>{t('common:action.cancel')}</Button>
           <Button variant="contained" onClick={handleImport} disabled={!file || loading}
             startIcon={loading ? <CircularProgress size={14} color="inherit" /> : <IconRefresh size={18} />}>
-            {loading ? 'Importing…' : 'Import'}
+            {loading ? t('action.importing') : t('action.import')}
           </Button>
         </>
       )}
@@ -103,21 +104,21 @@ export function ReimportSpecDialog({ projectId, open, onClose, onSuccess }: {
               <Typography fontWeight={700} color="success.main">{file.name}</Typography>
               <Button size="small" startIcon={<IconX size={18} />}
                 onClick={(e) => { e.stopPropagation(); setFile(null) }}>
-                Remove
+                {t('common:action.remove')}
               </Button>
             </Box>
           ) : (
             <Box display="flex" flexDirection="column" alignItems="center" gap={0.5}>
               <IconCloudUpload size={36} style={{ opacity: 0.5 }} />
-              <Typography variant="body2" fontWeight={500}>Drag spec here or click to browse</Typography>
-              <Typography variant="caption" color="text.disabled">.yaml · .yml · .json</Typography>
+              <Typography variant="body2" fontWeight={500}>{t('placeholder.dragOrBrowse')}</Typography>
+              <Typography variant="caption" color="text.disabled">{t('label.specFormat')}</Typography>
             </Box>
           )}
         </Paper>
 
-        <TextField size="small" fullWidth label="Base URL override" placeholder="https://api.example.com"
+        <TextField size="small" fullWidth label={t('reimport.baseUrlLabel')} placeholder="https://api.example.com"
           value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)}
-          helperText="Leave blank to use the URL declared in the spec" />
+          helperText={t('hint.baseUrlOverride')} />
       </Box>
     </BaseDialogLayout>
   )

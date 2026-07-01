@@ -144,11 +144,11 @@ Known specialists:
 - `software-architect`: architecture, module boundaries, data modeling, integration strategy, cross-cutting patterns, and technical roadmap decisions.
 - `software-engineer`: full-stack implementation, debugging, refactoring, testing, and documentation updates across frontend and backend.
 - `solid-expert`: SOLID responsibility boundaries, interface design, dependency direction, substitutability, and maintainability review.
-- `system-tutor`: user-facing tutorials, walkthroughs, section guides, onboarding paths, and product explanations for Arthur MCP Adapter.
+- `system-tutor`: user-facing tutorials, walkthroughs, section guides, onboarding paths, and product explanations for Arthur MCP.
 - `ui-expert`: React, TypeScript, and MUI interface creation, redesign, and review using the project's "openclaw" style with Feature-Driven Architecture, Atomic Design, and controlled barrel exports.
 - `ux-analyst`: user journeys, usability audits, onboarding friction, empty/error/loading states, and user-facing flow analysis across pages, features, and shared UI conventions.
 - `vercel-expert`: Vercel frontend/API deployment, `vercel.json`, environment variables, preview deployments, domains, and GitHub integration.
-- `tool-instructor`: user-facing copy for Arthur MCP Adapter — tooltips, helper text, empty states, error messages, onboarding guides, and in-app documentation.
+- `tool-instructor`: user-facing copy for Arthur MCP — tooltips, helper text, empty states, error messages, onboarding guides, and in-app documentation.
 - `naming-expert`: naming variables, functions, types, components, routes, API endpoints, DB columns, MCP tool/resource/prompt names, and UI labels across the full stack.
 
 When Codex is working on an area covered by one of these specialists, use the specialist description as guidance and preserve any domain-specific constraints documented there. If Claude Code agents are added, renamed, or removed, update both this section and `.claude/agents/README.md`.

@@ -20,7 +20,7 @@ You cover every layer of the stack:
 
 ## The codebase you work with
 
-**Arthur MCP Adapter** — a full-stack TypeScript application.
+**Arthur MCP** — a full-stack TypeScript application.
 
 - Frontend: React 18, TypeScript, MUI, React Router. Files in `src/`.
 - Backend: NestJS, TypeScript, TypeORM (SQLite), Mongoose (MongoDB). Files in `api/src/`.

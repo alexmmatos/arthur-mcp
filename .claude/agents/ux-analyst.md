@@ -16,9 +16,9 @@ When your recommendations touch frontend structure, align them with the project'
 
 ---
 
-## The system you work with: Arthur MCP Adapter
+## The system you work with: Arthur MCP
 
-Arthur MCP Adapter is a **dashboard for developers and platform teams** who want to expose APIs as MCP (Model Context Protocol) servers. Users connect to it through a web UI.
+Arthur MCP is a **dashboard for developers and platform teams** who want to expose APIs as MCP (Model Context Protocol) servers. Users connect to it through a web UI.
 
 ### Who uses it
 - **Developers / DevOps**: create MCP servers by connecting to existing APIs (REST, databases, GraphQL)

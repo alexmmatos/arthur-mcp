@@ -34,8 +34,8 @@ describe('OAuthService', () => {
     findByUsername: jest.fn(),
     validatePassword: jest.fn(),
   };
-  const projectRepo: jest.Mocked<Pick<ISwaggerProjectRepository, 'findById'>> = {
-    findById: jest.fn(),
+  const projectRepo: jest.Mocked<Pick<ISwaggerProjectRepository, 'findByIdOrShareSlug'>> = {
+    findByIdOrShareSlug: jest.fn(),
   };
   const jwtSecretService: jest.Mocked<Pick<JwtSecretService, 'getSecret'>> = {
     getSecret: jest.fn(),
@@ -54,22 +54,32 @@ describe('OAuthService', () => {
   });
 
   it('validates OAuth clients and optional secrets', async () => {
-    projectRepo.findById.mockResolvedValue(server());
+    projectRepo.findByIdOrShareSlug.mockResolvedValue(server());
 
-    await expect(service.validateClient('server-1', 'client-id', 'client-secret')).resolves.toBeUndefined();
+    await expect(service.validateClient('server-1', 'client-id', 'client-secret')).resolves.toMatchObject({ _id: 'server-1' });
+  });
+
+  it('validates OAuth clients by share slug', async () => {
+    projectRepo.findByIdOrShareSlug.mockResolvedValue(server({ shareSlug: 'payments-api' }));
+
+    await expect(service.validateClient('payments-api', 'client-id', 'client-secret')).resolves.toMatchObject({
+      _id: 'server-1',
+      shareSlug: 'payments-api',
+    });
+    expect(projectRepo.findByIdOrShareSlug).toHaveBeenCalledWith('payments-api');
   });
 
   it('rejects missing or invalid OAuth clients', async () => {
-    projectRepo.findById.mockResolvedValueOnce(null);
+    projectRepo.findByIdOrShareSlug.mockResolvedValueOnce(null);
     await expect(service.validateClient('missing', 'client-id')).rejects.toThrow(UnauthorizedException);
 
-    projectRepo.findById.mockResolvedValueOnce(server({ oauthClientId: undefined }));
+    projectRepo.findByIdOrShareSlug.mockResolvedValueOnce(server({ oauthClientId: undefined }));
     await expect(service.validateClient('server-1', 'client-id')).rejects.toThrow(UnauthorizedException);
 
-    projectRepo.findById.mockResolvedValueOnce(server());
+    projectRepo.findByIdOrShareSlug.mockResolvedValueOnce(server());
     await expect(service.validateClient('server-1', 'bad-client')).rejects.toThrow(UnauthorizedException);
 
-    projectRepo.findById.mockResolvedValueOnce(server());
+    projectRepo.findByIdOrShareSlug.mockResolvedValueOnce(server());
     await expect(service.validateClient('server-1', 'client-id', 'bad-secret')).rejects.toThrow(UnauthorizedException);
   });
 
@@ -128,6 +138,14 @@ describe('OAuthService', () => {
 
     expect(decoded).toMatchObject({ sub: 'user-1', username: 'alex', role: 'admin', serverId: 'server-1' });
     expect(jwt.decode(token)).toMatchObject({ sub: 'user-1' });
+  });
+
+  it('issues client credentials JWT access tokens', async () => {
+    const token = await service.issueClientCredentialsToken('client-id', 'server-1');
+    const decoded = await service.verifyToken(token);
+
+    expect(decoded).toMatchObject({ sub: 'client-id', role: 'oauth-client', serverId: 'server-1' });
+    expect(jwt.decode(token)).toMatchObject({ clientId: 'client-id' });
   });
 
   it('returns null for invalid JWT access tokens', async () => {

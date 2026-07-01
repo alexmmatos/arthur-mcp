@@ -19,6 +19,7 @@ import { SwaggerImportService } from './swagger-import.service';
 import { JwtSecretService } from '../settings/jwt-secret.service';
 import { ErrorTrackingService } from '../error-tracking/error-tracking.service';
 import type { IPromptRepository } from '../prompts/prompt.repository';
+import { baseShareSlug, normalizeShareSlug, uniqueShareSlug } from './share-slug.util';
 
 const SPEC_PATHS = [
   '/openapi.json', '/openapi.yaml', '/openapi.yml',
@@ -64,7 +65,9 @@ interface SharePromptDoc {
 export interface ShareProjectInfo {
   name: string;
   mcpUrl: string;
+  shareSlug?: string | null;
   hasKey: boolean;
+  hasOAuthClient: boolean;
   description?: string;
   version?: string;
   status: string;
@@ -189,14 +192,27 @@ export class SwaggerService {
     return server;
   }
 
+  async updateResponseConfig(
+    id: string,
+    dto: { enabled: boolean; maxResponseLen?: number; maxDepth?: number; arraySlice?: number; errorTruncateLen?: number },
+  ): Promise<SwaggerProjectRecord> {
+    const server = await this.projectRepo.update(id, { responseConfig: dto } as any);
+    if (!server) throw new NotFoundException('Project not found.');
+    this.dynamicMcp.invalidate(id);
+    return server;
+  }
+
   async duplicate(id: string): Promise<SwaggerProjectRecord> {
     const source = await this.projectRepo.findById(id);
     if (!source) throw new NotFoundException('Project not found.');
 
     const { _id, createdAt, updatedAt, mcpApiKey, mcpApiKeys, ...rest } = source;
+    const name = `${source.name} (copy)`;
+    const shareSlug = uniqueShareSlug(name, await this.projectRepo.findAll(), id);
     return this.projectRepo.create({
       ...rest,
-      name: `${source.name} (copy)`,
+      name,
+      shareSlug,
       mcpApiKeys: [],
     });
   }
@@ -239,8 +255,11 @@ export class SwaggerService {
   }
 
   async createEmpty(dto: { name: string; description?: string; baseUrl: string; tags?: string[] }): Promise<SwaggerProjectRecord> {
+    const name = dto.name.trim();
+    const shareSlug = uniqueShareSlug(name, await this.projectRepo.findAll());
     return this.projectRepo.create({
-      name: dto.name.trim(),
+      name,
+      shareSlug,
       description: dto.description?.trim() || undefined,
       baseUrl: dto.baseUrl.trim(),
       tools: [],
@@ -267,6 +286,24 @@ export class SwaggerService {
       oauthClientId: dto.oauthClientId,
       oauthClientSecret: dto.oauthClientSecret,
     });
+    if (!server) throw new NotFoundException('Project not found.');
+    return server;
+  }
+
+  async updateShareSlug(id: string, value: string): Promise<SwaggerProjectRecord> {
+    const normalized = normalizeShareSlug(value);
+    if (normalized.length < 3 || normalized.length > 80) {
+      throw new BadRequestException('Share slug must be between 3 and 80 characters.');
+    }
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(normalized)) {
+      throw new BadRequestException('Share slug may contain only lowercase letters, numbers, and hyphens.');
+    }
+
+    const allServers = await this.projectRepo.findAll();
+    const conflict = allServers.find((server) => server._id !== id && server.shareSlug === normalized);
+    if (conflict) throw new BadRequestException('Share slug is already used by another server.');
+
+    const server = await this.projectRepo.update(id, { shareSlug: normalized });
     if (!server) throw new NotFoundException('Project not found.');
     return server;
   }
@@ -646,10 +683,18 @@ export class SwaggerService {
     return ids.map((id) => ({ serverId: id, errorRatePct: 0, totalCalls: 0 }));
   }
 
-  async generateShareToken(serverId: string): Promise<string> {
-    return jwt.sign({ serverId, type: 'share' }, await this.jwtSecretService.getSecret(), { expiresIn: '30d' });
+  async generateShareLink(serverId: string): Promise<{ url: string; shareSlug: string }> {
+    let server = await this.projectRepo.findById(serverId);
+    if (!server) throw new NotFoundException('Project not found.');
+    if (!server.shareSlug) {
+      const generated = uniqueShareSlug(server.name, await this.projectRepo.findAll(), serverId);
+      server = await this.projectRepo.update(serverId, { shareSlug: generated }) ?? { ...server, shareSlug: generated };
+    }
+    const slug = server.shareSlug || baseShareSlug(server.name);
+    return { url: `/mcp-swagger/${slug}`, shareSlug: slug };
   }
 
+  /** Legacy: verifies a previously issued share token. Kept so links generated before the permanent slug link existed keep working. */
   async getProjectForShare(
     token: string,
   ): Promise<ShareProjectInfo> {
@@ -662,6 +707,17 @@ export class SwaggerService {
 
     const server = await this.projectRepo.findById(payload.serverId);
     if (!server) throw new NotFoundException('Project not found.');
+    return this.buildShareInfo(server);
+  }
+
+  /** Permanent public lookup by share slug — the current share-link format. Access is revoked by changing the slug. */
+  async getProjectForShareBySlug(slug: string): Promise<ShareProjectInfo> {
+    const server = await this.projectRepo.findByIdOrShareSlug(slug);
+    if (!server) throw new NotFoundException('Project not found.');
+    return this.buildShareInfo(server);
+  }
+
+  private async buildShareInfo(server: SwaggerProjectRecord): Promise<ShareProjectInfo> {
     const dbQueries = server.dbQueries ?? [];
     const dbQueryById = new Map(dbQueries.map((query) => [query.id, query]));
 
@@ -705,8 +761,10 @@ export class SwaggerService {
       description: server.description,
       version: server.version,
       status: server.status,
-      mcpUrl: `/api/mcp/project/${server._id}`,
+      shareSlug: server.shareSlug ?? null,
+      mcpUrl: `/api/mcp/server/${server.shareSlug || server._id}`,
       hasKey: (server.mcpApiKeys?.length ?? 0) > 0 || !!server.mcpApiKey,
+      hasOAuthClient: !!server.oauthClientId,
       toolCount: tools.length,
       resourceCount: resources.length,
       promptCount: prompts.length,

@@ -13,6 +13,7 @@ export interface SwaggerProjectRecord {
   baseUrl: string;
   description?: string;
   version?: string;
+  shareSlug?: string | null;
   rawSpec?: Record<string, any>;
   tools: GeneratedTool[];
   auth: AuthConfig;
@@ -32,6 +33,13 @@ export interface SwaggerProjectRecord {
   availabilityWindow: { enabled: boolean; timezone: string; schedule: Array<{ day: number; startHour: number; endHour: number }> };
   alertConfig: { enabled: boolean; errorThresholdPct: number; notifyEmail: string };
   tenantConfig?: { enabled: boolean; params: Array<{ name: string; type: 'string' | 'integer' | 'number' | 'boolean' | 'uuid' | 'hash'; description?: string }> };
+  responseConfig?: {
+    enabled: boolean;
+    maxResponseLen?: number;
+    maxDepth?: number;
+    arraySlice?: number;
+    errorTruncateLen?: number;
+  };
   connectionConfig?: DbConnectionConfig;
   dbQueries?: DbQuery[];
   createdAt?: Date;
@@ -40,6 +48,7 @@ export interface SwaggerProjectRecord {
 
 export interface ISwaggerProjectRepository {
   findById(id: string): Promise<SwaggerProjectRecord | null>;
+  findByIdOrShareSlug(identifier: string): Promise<SwaggerProjectRecord | null>;
   findAll(filter?: { tags?: string[] }): Promise<SwaggerProjectRecord[]>;
   findAllIds(): Promise<string[]>;
   create(data: Omit<SwaggerProjectRecord, '_id' | 'createdAt' | 'updatedAt'>): Promise<SwaggerProjectRecord>;

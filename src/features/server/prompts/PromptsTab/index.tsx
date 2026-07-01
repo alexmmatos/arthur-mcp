@@ -8,6 +8,7 @@ import {
 import {
   IconBulb, IconEdit, IconPlus, IconSearch, IconTrash, IconX,
 } from '@tabler/icons-react'
+import { useTranslation } from 'react-i18next'
 import { useAuth, Permission } from '../../../../context/AuthContext'
 import api from '../../../../api'
 import { ConfirmDialog } from '../../../../components'
@@ -20,6 +21,7 @@ export function PromptsTab({ projectId, initialPrompts, onChange, anyApiKey }: {
   onChange: (prompts: McpPrompt[]) => void
   anyApiKey?: string
 }) {
+  const { t } = useTranslation('serverDetail')
   const navigate = useNavigate()
   const { can } = useAuth()
   const [refs, setRefs] = useState<McpPrompt[]>(initialPrompts)
@@ -91,20 +93,20 @@ export function PromptsTab({ projectId, initialPrompts, onChange, anyApiKey }: {
       {/* Header */}
       <Box display="flex" alignItems="flex-start" justifyContent="space-between" mb={2.5} flexWrap="wrap" gap={1}>
         <Box>
-          <Typography variant="h6" fontWeight={700} mb={0.25}>Prompts</Typography>
+          <Typography variant="h6" fontWeight={700} mb={0.25}>{t('tab.prompts')}</Typography>
           <Typography variant="body2" color="text.secondary">
-            Prompts from your library that are active in this project.
+            {t('hint.promptsDesc')}
           </Typography>
         </Box>
         <Box display="flex" gap={1}>
           <Button size="small" variant="outlined" startIcon={<IconBulb size={16} />}
             onClick={() => navigate('/prompts')}>
-            Prompt library
+            {t('action.promptLibrary')}
           </Button>
           {can(Permission.PromptsCreate) && (
             <Button size="small" variant="contained" startIcon={<IconPlus size={16} />}
               onClick={openPicker}>
-              Add prompt
+              {t('action.addPrompt')}
             </Button>
           )}
         </Box>
@@ -113,9 +115,7 @@ export function PromptsTab({ projectId, initialPrompts, onChange, anyApiKey }: {
       {/* Attached list */}
       {attachedPrompts.length === 0 ? (
         <Alert severity="info">
-          No prompts added yet. Click <strong>Add prompt</strong> to include prompts from your library,
-          or go to <Box component="span" sx={{ cursor: 'pointer', textDecoration: 'underline' }}
-            onClick={() => navigate('/prompts')}>Prompt library</Box> to create new ones.
+          {t('empty.noPromptsAdded')}
         </Alert>
       ) : (
         <Box display="flex" flexDirection="column" gap={1}>
@@ -134,7 +134,7 @@ export function PromptsTab({ projectId, initialPrompts, onChange, anyApiKey }: {
                     <Box display="flex" alignItems="center" gap={1} flexWrap="wrap" mb={0.25}>
                       <Typography fontWeight={700} fontSize="0.925rem">{p.name}</Typography>
                       {isDisabledPrompt && (
-                        <Chip label="disabled" size="small" color="default" sx={{ fontSize: '0.68rem', height: 18 }} />
+                        <Chip label={t('label.disabled')} size="small" color="default" sx={{ fontSize: '0.68rem', height: 18 }} />
                       )}
                       {argNames.map((v) => (
                         <Chip key={v} label={`{{${v}}}`} size="small"
@@ -161,10 +161,10 @@ export function PromptsTab({ projectId, initialPrompts, onChange, anyApiKey }: {
                     </Box>
                   </Box>
                   <Box display="flex" alignItems="center" gap={0.5} flexShrink={0}>
-                  <Tooltip title={isDisabledPrompt ? 'Enable — make this prompt available to the AI' : 'Disable — hide this prompt from the AI'}>
+                  <Tooltip title={isDisabledPrompt ? t('tooltip.enablePrompt') : t('tooltip.disablePrompt')}>
                     <Switch size="small" checked={!isDisabledPrompt} onChange={() => handleTogglePrompt(p.id)} />
                   </Tooltip>
-                  {can(Permission.PromptsDelete) && <Tooltip title="Edit / Remove">
+                  {can(Permission.PromptsDelete) && <Tooltip title={t('action.editEntity', { entity: t('tab.prompts'), name: p.name })}>
                     <IconButton size="small" onClick={() => { setEditPromptTarget(p); setPromptEditOpen(true) }}>
                       <IconEdit size={16} />
                     </IconButton>
@@ -182,12 +182,12 @@ export function PromptsTab({ projectId, initialPrompts, onChange, anyApiKey }: {
       <Drawer anchor="right" open={pickerOpen} onClose={() => setPickerOpen(false)}
         PaperProps={{ sx: { width: { xs: '100vw', sm: 480 }, display: 'flex', flexDirection: 'column' } }}>
         <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
-          <Typography variant="h6" fontWeight={700} flexGrow={1}>Add prompt from library</Typography>
+          <Typography variant="h6" fontWeight={700} flexGrow={1}>{t('promptLibrary.title')}</Typography>
           <IconButton size="small" onClick={() => setPickerOpen(false)}><IconX size={18} /></IconButton>
         </Box>
         <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', flexShrink: 0 }}>
           <TextField
-            size="small" fullWidth autoFocus placeholder="Search prompts…"
+            size="small" fullWidth autoFocus placeholder={t('placeholder.searchPrompts')}
             value={pickerSearch} onChange={(e) => setPickerSearch(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start"><IconSearch size={16} /></InputAdornment> }}
           />
@@ -200,17 +200,17 @@ export function PromptsTab({ projectId, initialPrompts, onChange, anyApiKey }: {
           ) : globals.length === 0 ? (
             <Box p={3}>
               <Alert severity="info">
-                No prompts in your library yet.{' '}
+                {t('hint.noPromptInLibrary')}{' '}
                 <Box component="span" sx={{ cursor: 'pointer', textDecoration: 'underline' }}
                   onClick={() => { setPickerOpen(false); navigate('/prompts') }}>
-                  Create one now
+                  {t('action.createNow')}
                 </Box>
               </Alert>
             </Box>
           ) : pickerVisible.length === 0 ? (
             <Box p={3}>
               <Alert severity="info">
-                {pickerSearch ? 'No prompts match your search.' : 'All prompts are already added to this server.'}
+                {pickerSearch ? t('empty.noPromptsSearch') : t('hint.allPromptsAdded')}
               </Alert>
             </Box>
           ) : (
@@ -245,7 +245,7 @@ export function PromptsTab({ projectId, initialPrompts, onChange, anyApiKey }: {
                     startIcon={isAdding ? <CircularProgress size={12} color="inherit" /> : <IconPlus size={14} />}
                     onClick={() => handleAdd(p.id)}
                     sx={{ flexShrink: 0 }}>
-                    Add
+                    {t('common:action.add')}
                   </Button>
                 </Box>
               )
@@ -253,7 +253,7 @@ export function PromptsTab({ projectId, initialPrompts, onChange, anyApiKey }: {
           )}
         </Box>
         <Box sx={{ px: 2.5, py: 1.5, borderTop: 1, borderColor: 'divider', flexShrink: 0 }}>
-          <Button onClick={() => setPickerOpen(false)}>Done</Button>
+          <Button onClick={() => setPickerOpen(false)}>{t('action.done')}</Button>
         </Box>
       </Drawer>
 
@@ -262,7 +262,7 @@ export function PromptsTab({ projectId, initialPrompts, onChange, anyApiKey }: {
         PaperProps={{ sx: { width: { xs: '100vw', sm: 520 }, display: 'flex', flexDirection: 'column' } }}>
         <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
           <Typography variant="h6" fontWeight={700} flexGrow={1}>
-            {editPromptTarget ? `Prompt — ${editPromptTarget.name}` : 'Prompt'}
+            {editPromptTarget ? t('promptDetail.promptTitle', { name: editPromptTarget.name }) : t('tab.prompts')}
           </Typography>
           <IconButton size="small" onClick={() => setPromptEditOpen(false)}><IconX size={18} /></IconButton>
         </Box>
@@ -283,7 +283,7 @@ export function PromptsTab({ projectId, initialPrompts, onChange, anyApiKey }: {
                 const args = [...new Set([...editPromptTarget.content.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]))]
                 return args.length > 0 ? (
                   <Box>
-                    <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" mb={0.75} sx={{ letterSpacing: '0.06em' }}>ARGUMENTS</Typography>
+                    <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" mb={0.75} sx={{ letterSpacing: '0.06em' }}>{t('promptDetail.arguments')}</Typography>
                     <Box display="flex" gap={0.5} flexWrap="wrap">
                       {args.map((v) => (
                         <Chip key={v} label={`{{${v}}}`} size="small" sx={{ fontFamily: 'monospace', fontSize: '0.65rem', height: 17 }} />
@@ -293,7 +293,7 @@ export function PromptsTab({ projectId, initialPrompts, onChange, anyApiKey }: {
                 ) : null
               })()}
               <Box>
-                <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" mb={0.75} sx={{ letterSpacing: '0.06em' }}>CONTENT</Typography>
+                <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" mb={0.75} sx={{ letterSpacing: '0.06em' }}>{t('promptDetail.content')}</Typography>
                 <Box component="pre" sx={{
                   m: 0, p: 1.5, bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider',
                   borderRadius: '6px', fontSize: '0.78rem', fontFamily: 'monospace',
@@ -303,9 +303,9 @@ export function PromptsTab({ projectId, initialPrompts, onChange, anyApiKey }: {
                 </Box>
               </Box>
               <Typography variant="caption" color="text.disabled" display="block">
-                To edit the prompt content, go to the{' '}
+                {t('hint.editPromptInLibrary')}{' '}
                 <Box component="span" sx={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => navigate('/prompts')}>
-                  Prompt library
+                  {t('action.promptLibrary')}
                 </Box>.
               </Typography>
             </>
@@ -315,18 +315,18 @@ export function PromptsTab({ projectId, initialPrompts, onChange, anyApiKey }: {
           {editPromptTarget && can(Permission.PromptsDelete) && (
             <Button color="error" onClick={() => setPromptDeleteOpen(true)} disabled={removing === editPromptTarget.id}
               startIcon={<IconTrash size={18} />} sx={{ mr: 'auto' }}>
-              Remove from server
+              {t('action.removeFromServer')}
             </Button>
           )}
-          <Button onClick={() => setPromptEditOpen(false)}>Close</Button>
+          <Button onClick={() => setPromptEditOpen(false)}>{t('common:action.close')}</Button>
         </Box>
       </Drawer>
 
       <ConfirmDialog
         open={promptDeleteOpen}
-        title="Remove prompt?"
-        message={`"${editPromptTarget?.name}" will be removed from this server. The prompt will remain in your library.`}
-        confirmLabel="Remove" confirmColor="error" loading={removing === editPromptTarget?.id}
+        title={t('confirm.removePrompt')}
+        message={t('confirm.removePromptMessage', { name: editPromptTarget?.name ?? '' })}
+        confirmLabel={t('confirm.removePromptLabel')} confirmColor="error" loading={removing === editPromptTarget?.id}
         onConfirm={async () => {
           if (!editPromptTarget) return
           await handleRemove(editPromptTarget.id)

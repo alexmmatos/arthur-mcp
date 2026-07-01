@@ -182,7 +182,7 @@ export class ErrorTrackingService {
       return { ok: false, error: 'Provider is not active. Activate it before sending a test event.' }
     }
     try {
-      const message = dto?.message?.trim() || 'Test error from Arthur MCP Adapter'
+      const message = dto?.message?.trim() || 'Test error from Arthur MCP'
       const testError = new Error(message)
       testError.name = 'SentryTestError'
       const level = (dto?.level as Sentry.SeverityLevel | undefined) ?? 'error'
@@ -213,7 +213,7 @@ export class ErrorTrackingService {
         tracesSampleRate: 0,
         defaultIntegrations: false,
       })
-      Sentry.captureMessage('Arthur MCP Adapter — connection test', 'info')
+      Sentry.captureMessage('Arthur MCP — connection test', 'info')
       await Sentry.flush(3000)
       // Restore from active record
       await this.reinitialize()

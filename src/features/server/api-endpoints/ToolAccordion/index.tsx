@@ -8,6 +8,7 @@ import {
 import {
   IconChevronDown, IconCopy, IconEdit, IconPlayerPlay,
 } from '@tabler/icons-react'
+import { useTranslation } from 'react-i18next'
 import { useAuth, Permission } from '../../../../context/AuthContext'
 import api from '../../../../api'
 import type { GeneratedTool } from '../../types'
@@ -34,6 +35,7 @@ export function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolC
   onToolChanged: (oldName: string, newTool: GeneratedTool) => void
   onEditEndpoint: (tool: GeneratedTool) => void
 }) {
+  const { t } = useTranslation('serverDetail')
   const [tool, setTool] = useState(initialTool)
   const [curlCopied, setCurlCopied] = useState(false)
   const [mcpCurlCopied, setMcpCurlCopied] = useState(false)
@@ -99,7 +101,7 @@ export function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolC
       const text = content?.[0]?.text ?? JSON.stringify(rpc?.result ?? rpc, null, 2)
       try { setResponse(JSON.stringify(JSON.parse(text), null, 2)) } catch { setResponse(text) }
     } catch (err: any) {
-      setResponse(err?.response?.data?.message ?? err?.message ?? 'Unknown error')
+      setResponse(err?.response?.data?.message ?? err?.message ?? t('error.requestFailed'))
       setResponseIsError(true)
     } finally { setExecuting(false) }
   }
@@ -132,18 +134,18 @@ export function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolC
           {/* Tool name — editable */}
           <Box onClick={(e) => e.stopPropagation()} sx={{ flexShrink: 0 }}>
             <InlineEdit value={tool.name} onSave={(v) => saveToolMeta('name', v)}
-              readOnly={!can(Permission.ToolsEdit)} placeholder="Tool name" fontSize="0.875rem" fontWeight={700} />
+              readOnly={!can(Permission.ToolsEdit)} placeholder={t('placeholder.toolName')} fontSize="0.875rem" fontWeight={700} />
           </Box>
 
           {/* Disabled chip */}
           {isDisabled && (
-            <Chip label="Disabled" size="small"
+            <Chip label={t('label.disabled')} size="small"
               sx={{ fontSize: '0.65rem', height: 18, bgcolor: '#9e9e9e', color: '#fff', flexShrink: 0 }} />
           )}
 
           {/* HTML template chip */}
           {tool.outputTemplate && !isDisabled && (
-            <Chip label="HTML" size="small"
+            <Chip label={t('label.htmlChip')} size="small"
               sx={{ fontSize: '0.65rem', height: 18, bgcolor: 'warning.main', color: '#fff', flexShrink: 0 }} />
           )}
 
@@ -152,7 +154,7 @@ export function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolC
 
           {/* Toggle enable/disable */}
           {can(Permission.ToolsEdit) && (
-            <Tooltip title={isDisabled ? 'Enable — make this tool available to the AI' : 'Disable — hide this tool from the AI'}>
+            <Tooltip title={isDisabled ? t('tooltip.enableTool') : t('tooltip.disableTool')}>
               <Switch
                 size="small"
                 checked={!isDisabled}
@@ -164,7 +166,7 @@ export function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolC
 
           {/* Edit endpoint button */}
           {can(Permission.ToolsEdit) && (
-            <Tooltip title="Edit endpoint">
+            <Tooltip title={t('action.editEndpoint')}>
               <IconButton size="small" onClick={(e) => { e.stopPropagation(); onEditEndpoint(tool) }}
                 sx={{ flexShrink: 0, color: 'text.secondary', '&:hover': { color: 'primary.main' } }}>
                 <IconEdit size={18} />
@@ -179,23 +181,23 @@ export function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolC
         {/* Description — editable */}
         <Box mb={2}>
           <InlineEdit value={tool.description ?? ''} onSave={(v) => saveToolMeta('description', v)}
-            readOnly={!can(Permission.ToolsEdit)} multiline placeholder="Describe what this tool does…"
-            emptyLabel="Add description…" fontSize="0.875rem" color="text.secondary" />
+            readOnly={!can(Permission.ToolsEdit)} multiline placeholder={t('placeholder.addDescription')}
+            emptyLabel={t('placeholder.addDescription')} fontSize="0.875rem" color="text.secondary" />
         </Box>
 
         {/* Parameters table */}
         {allParams.length > 0 && (
           <>
-            <Typography variant="subtitle2" fontWeight={700} mb={1}>Parameters</Typography>
+            <Typography variant="subtitle2" fontWeight={700} mb={1}>{t('heading.parameters')}</Typography>
             <Box sx={{ overflowX: 'auto', mb: 2 }}>
               <Table size="small" sx={{ minWidth: 480, '& td': { fontSize: '0.8rem' } }}>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Name</TableCell>
-                    <TableCell>In</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Required</TableCell>
-                    <TableCell>Description</TableCell>
+                    <TableCell>{t('common:label.name')}</TableCell>
+                    <TableCell>{t('schema.column')}</TableCell>
+                    <TableCell>{t('schema.type')}</TableCell>
+                    <TableCell>{t('label.required')}</TableCell>
+                    <TableCell>{t('common:label.description')}</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -212,8 +214,8 @@ export function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolC
                         <TableCell><Typography fontFamily="monospace" fontSize="0.75rem" color="text.secondary">{schema.type ?? 'string'}</Typography></TableCell>
                         <TableCell>
                           {isReq
-                            ? <Typography color="error.main" fontSize="0.72rem" fontWeight={700}>yes</Typography>
-                            : <Typography color="text.disabled" fontSize="0.72rem">no</Typography>}
+                            ? <Typography color="error.main" fontSize="0.72rem" fontWeight={700}>{t('label.required')}</Typography>
+                            : <Typography color="text.disabled" fontSize="0.72rem">{t('label.optional')}</Typography>}
                         </TableCell>
                         <TableCell><Typography color="text.secondary" fontSize="0.78rem">{schema.description ?? '—'}</Typography></TableCell>
                       </TableRow>
@@ -229,12 +231,12 @@ export function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolC
 
         {/* Try it out */}
         <Box display="flex" alignItems="center" justifyContent="space-between" mb={tryMode ? 2 : 0}>
-          <Typography variant="subtitle2" fontWeight={700}>Try</Typography>
+          <Typography variant="subtitle2" fontWeight={700}>{t('action.try')}</Typography>
           {can(Permission.ToolsTest) && (
             <Button size="small" variant={tryMode ? 'outlined' : 'contained'} color={tryMode ? 'error' : 'primary'}
               onClick={() => { setTryMode((v) => !v); setResponse(null) }}
               sx={{ fontWeight: 600, fontSize: '0.72rem', minWidth: 80 }}>
-              {tryMode ? 'Cancel' : 'Try'}
+              {tryMode ? t('common:action.cancel') : t('action.try')}
             </Button>
           )}
         </Box>
@@ -249,13 +251,13 @@ export function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolC
                       onChange={(v) => setFormValues((prev) => ({ ...prev, [name]: v }))} />
                   ))}
                 </Box>
-              : <Typography variant="body2" color="text.secondary" mt={1} mb={2}>No parameters.</Typography>}
+              : <Typography variant="body2" color="text.secondary" mt={1} mb={2}>{t('label.noParameters')}</Typography>}
 
             <Button variant="contained" size="small"
               startIcon={executing ? <CircularProgress size={13} color="inherit" /> : <IconPlayerPlay size={18} />}
               onClick={handleExecute} disabled={executing}
               sx={{ mb: response !== null ? 2 : 0, fontWeight: 600 }}>
-              {executing ? 'Executing…' : 'Execute'}
+              {executing ? t('action.executing') : t('action.execute')}
             </Button>
 
             {response !== null && (
@@ -284,12 +286,12 @@ export function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolC
           <Box mt={2} display="flex" flexDirection="column" gap={2}>
             {/* Direct curl */}
             <Box>
-              <Typography variant="subtitle2" fontWeight={700} mb={1}>Direct API curl</Typography>
+              <Typography variant="subtitle2" fontWeight={700} mb={1}>{t('heading.directApiCurl')}</Typography>
               <Box component="pre" sx={{
                 bgcolor: '#1e1e1e', color: '#d4d4d4', p: 2, borderRadius: 1,
                 fontSize: '0.78rem', overflowX: 'auto', position: 'relative', m: 0,
               }}>
-                <Tooltip title={curlCopied ? 'Copied!' : 'Copy'}>
+                <Tooltip title={curlCopied ? t('tooltip.copiedBang') : t('common:action.copy')}>
                   <IconButton size="small"
                     onClick={() => { navigator.clipboard.writeText(curl); setCurlCopied(true); setTimeout(() => setCurlCopied(false), 2000) }}
                     sx={{ position: 'absolute', top: 8, right: 8, color: curlCopied ? 'primary.light' : '#abb2bf', '&:hover': { color: '#fff' } }}>
@@ -302,12 +304,12 @@ export function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolC
 
             {/* MCP via POST */}
             <Box>
-              <Typography variant="subtitle2" fontWeight={700} mb={1}>MCP call (POST /mcp/server)</Typography>
+              <Typography variant="subtitle2" fontWeight={700} mb={1}>{t('heading.mcpCallPost')}</Typography>
               <Box component="pre" sx={{
                 bgcolor: '#282c34', color: '#abb2bf', p: 2, borderRadius: 1,
                 fontSize: '0.78rem', overflowX: 'auto', position: 'relative', m: 0,
               }}>
-                <Tooltip title={mcpCurlCopied ? 'Copied!' : 'Copy'}>
+                <Tooltip title={mcpCurlCopied ? t('tooltip.copiedBang') : t('common:action.copy')}>
                   <IconButton size="small"
                     onClick={() => { navigator.clipboard.writeText(mcpCurl); setMcpCurlCopied(true); setTimeout(() => setMcpCurlCopied(false), 2000) }}
                     sx={{ position: 'absolute', top: 8, right: 8, color: mcpCurlCopied ? 'primary.light' : '#abb2bf', '&:hover': { color: '#fff' } }}>

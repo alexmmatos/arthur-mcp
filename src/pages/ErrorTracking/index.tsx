@@ -55,10 +55,10 @@ const EMPTY_FORM: SentryForm = { dsn: '', environment: '', projectName: '', isAc
 
 function formatTestedAt(date: Date): string {
   const diffMin = Math.floor((Date.now() - date.getTime()) / 60000)
-  if (diffMin < 1) return 'just now'
-  if (diffMin < 60) return `${diffMin}m ago`
+  if (diffMin < 1) return '0m'
+  if (diffMin < 60) return `${diffMin}m`
   const diffHr = Math.floor(diffMin / 60)
-  if (diffHr < 24) return `${diffHr}h ago`
+  if (diffHr < 24) return `${diffHr}h`
   return date.toLocaleDateString()
 }
 
@@ -151,7 +151,7 @@ export default function ErrorTracking() {
       const msg = err && typeof err === 'object' && 'response' in err
         ? ((err as { response?: { data?: { message?: string } } }).response?.data?.message)
         : undefined
-      const result = { ok: false, latencyMs: 0, error: msg ?? 'Connection test failed.' }
+      const result = { ok: false, latencyMs: 0, error: msg ?? t('error.connectionTestFailed') }
       setTestResult(result)
       setLastTestResult({ ...result, testedAt: new Date() })
       scheduleTestDismiss()
@@ -168,7 +168,7 @@ export default function ErrorTracking() {
       setForm((f) => ({ ...f, dsn: data.dsn }))
       setShowDsn(true)
     } catch {
-      setSnack({ msg: 'Failed to reveal DSN.', severity: 'error' })
+      setSnack({ msg: t('error.revealFailed'), severity: 'error' })
     } finally {
       setRevealing(false)
     }
@@ -177,11 +177,11 @@ export default function ErrorTracking() {
   const handleDisconnect = async () => {
     if (!provider) return
     const result = await Swal.fire({
-      title: 'Disconnect Sentry?',
-      text: 'This will remove the DSN and stop forwarding errors. You can reconnect at any time.',
+      title: t('confirm.disconnectTitle'),
+      text: t('confirm.disconnectMessage'),
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonText: 'Disconnect',
+      confirmButtonText: t('action.disconnect'),
       confirmButtonColor: '#d32f2f',
     })
     if (!result.isConfirmed) return
@@ -237,15 +237,15 @@ export default function ErrorTracking() {
       <Box display="flex" alignItems="center" gap={1} mb={0.5}>
         <Box sx={{ color: SENTRY_COLOR, display: 'flex' }}><IconBug size={20} /></Box>
         <Typography variant="h5" fontWeight={700} letterSpacing="-0.2px">{t('heading.title')}</Typography>
-        <HelpButton title="Sentry Error Tracking">
+        <HelpButton title={t('help.title')}>
           <Typography variant="body2" gutterBottom>
-            Sentry captures unhandled exceptions and tool execution errors from this platform, groups them by stack trace, and sends alerts when error rates spike.
+            {t('help.summary')}
           </Typography>
           <Typography variant="body2" gutterBottom>
-            Find your DSN in Sentry under <strong>Settings → Projects → [your project] → Client Keys (DSN)</strong>.
+            {t('help.findDsnPath')}
           </Typography>
           <Typography variant="body2">
-            The DSN is stored encrypted and never returned in API responses. Use the <strong>Reveal</strong> button to load it for editing.
+            {t('help.revealHint')}
           </Typography>
         </HelpButton>
       </Box>
@@ -255,10 +255,10 @@ export default function ErrorTracking() {
       <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
         <Box display="flex" alignItems="center" gap={1} mb={2.5}>
           <Box sx={{ color: SENTRY_COLOR, display: 'flex' }}><IconBug size={18} /></Box>
-          <Typography variant="subtitle1" fontWeight={700}>Sentry</Typography>
+          <Typography variant="subtitle1" fontWeight={700}>{t('tool.sentry')}</Typography>
           <Box flexGrow={1} />
           <Chip
-            label={isConnected ? 'Connected' : 'Not configured'}
+            label={isConnected ? t('status.connected') : t('status.notConfigured')}
             size="small"
             color={isConnected ? 'success' : 'default'}
             sx={{ fontWeight: 600, fontSize: '0.7rem' }}
@@ -279,11 +279,11 @@ export default function ErrorTracking() {
                 variant="body2"
                 sx={{ color: 'inherit', whiteSpace: 'nowrap', fontWeight: 600 }}
               >
-                Open Sentry →
+                {t('action.openSentry')}
               </Link>
             }
           >
-            Find your DSN in Sentry under <strong>Settings → Projects → [your project] → Client Keys</strong>.
+            {t('help.findClientKeys')}
           </Alert>
         )}
 
@@ -298,13 +298,13 @@ export default function ErrorTracking() {
             }}
           >
             <Chip
-              label={lastTestResult.ok ? 'OK' : 'Failed'}
+              label={lastTestResult.ok ? t('status.ok') : t('status.failed')}
               size="small"
               color={lastTestResult.ok ? 'success' : 'error'}
               sx={{ fontWeight: 600, fontSize: '0.68rem', height: 20 }}
             />
             <Typography variant="body2" color="text.secondary" fontSize="0.8rem">
-              Last tested {formatTestedAt(lastTestResult.testedAt)}
+              {t('status.lastTested')} {formatTestedAt(lastTestResult.testedAt)}
               {lastTestResult.ok && lastTestResult.latencyMs > 0 && ` · ${lastTestResult.latencyMs}ms`}
             </Typography>
             {!lastTestResult.ok && lastTestResult.error && (
@@ -318,7 +318,7 @@ export default function ErrorTracking() {
         {/* Ephemeral test result alert */}
         {testResult && (
           <Alert severity={testResult.ok ? 'success' : 'error'} sx={{ mb: 2 }} onClose={() => setTestResult(null)}>
-            {testResult.ok ? `Connected · ${testResult.latencyMs}ms` : (testResult.error ?? 'Connection test failed.')}
+            {testResult.ok ? t('status.connectedWithLatency', { latency: testResult.latencyMs }) : (testResult.error ?? t('error.connectionTestFailed'))}
           </Alert>
         )}
 
@@ -331,7 +331,7 @@ export default function ErrorTracking() {
             <TextField
               size="small" fullWidth
               label={t('label.dsn')}
-              placeholder={isConnected ? 'Leave empty to keep saved DSN' : t('placeholder.dsn')}
+              placeholder={isConnected ? t('placeholder.keepDsn') : t('placeholder.dsn')}
               value={form.dsn}
               type={showDsn ? 'text' : 'password'}
               disabled={!canEdit}
@@ -341,13 +341,13 @@ export default function ErrorTracking() {
                 endAdornment: canEdit ? (
                   <InputAdornment position="end">
                     {form.dsn ? (
-                      <Tooltip title={showDsn ? 'Hide' : 'Show'}>
+                      <Tooltip title={showDsn ? t('common:action.hide') : t('common:action.show')}>
                         <IconButton size="small" onClick={() => setShowDsn((v) => !v)} edge="end">
                           {showDsn ? <IconEyeOff size={16} /> : <IconEye size={16} />}
                         </IconButton>
                       </Tooltip>
                     ) : isConnected ? (
-                      <Tooltip title="Reveal saved DSN">
+                      <Tooltip title={t('action.revealSavedDsn')}>
                         <IconButton size="small" onClick={handleRevealDsn} edge="end" disabled={revealing}>
                           {revealing ? <CircularProgress size={14} /> : <IconEye size={16} />}
                         </IconButton>
@@ -393,8 +393,8 @@ export default function ErrorTracking() {
               label={
                 <Typography variant="body2">
                   {form.isActive
-                    ? 'Active — forwarding error events to Sentry'
-                    : 'Inactive — error forwarding paused'}
+                    ? t('status.activeForwarding')
+                    : t('status.inactivePaused')}
                 </Typography>
               }
             />
@@ -412,7 +412,7 @@ export default function ErrorTracking() {
               onClick={handleTestConnection}
               disabled={testing || saving}
             >
-              {testing ? 'Testing…' : 'Test connection'}
+              {testing ? t('action.testing') : t('action.testConnection')}
             </Button>
           )}
           <Button
@@ -421,7 +421,7 @@ export default function ErrorTracking() {
             disabled={saving || (!isDirty && isConnected)}
             startIcon={saving ? <CircularProgress size={14} color="inherit" /> : <IconDeviceFloppy size={18} />}
           >
-            {saving ? 'Saving…' : isConnected ? t('action.saveChanges') : 'Connect Sentry'}
+            {saving ? t('common:action.saving') : isConnected ? t('action.saveChanges') : t('action.connectSentry')}
           </Button>
         </Box>
       )}
@@ -440,8 +440,8 @@ export default function ErrorTracking() {
             <Grid item xs={12} sm>
               <TextField
                 size="small" fullWidth
-                label="Error message"
-                placeholder="Test error from Arthur MCP Adapter"
+                label={t('label.errorMessage')}
+                placeholder={t('placeholder.errorMessage')}
                 value={simulateMessage}
                 onChange={(e) => setSimulateMessage(e.target.value)}
                 disabled={simulating}
@@ -455,10 +455,10 @@ export default function ErrorTracking() {
                 disabled={simulating}
                 sx={{ minWidth: 120 }}
               >
-                <MenuItem value="error">Error</MenuItem>
-                <MenuItem value="warning">Warning</MenuItem>
-                <MenuItem value="info">Info</MenuItem>
-                <MenuItem value="debug">Debug</MenuItem>
+                <MenuItem value="error">{t('level.error')}</MenuItem>
+                <MenuItem value="warning">{t('level.warning')}</MenuItem>
+                <MenuItem value="info">{t('level.info')}</MenuItem>
+                <MenuItem value="debug">{t('level.debug')}</MenuItem>
               </Select>
             </Grid>
             <Grid item xs={12} sm="auto">
@@ -480,11 +480,11 @@ export default function ErrorTracking() {
       {isConnected && can(Permission.ErrorTrackingDelete) && (
         <Paper variant="outlined" sx={{ p: 3, mb: 3, borderColor: 'error.light' }}>
           <Typography variant="subtitle1" fontWeight={700} color="error.main" gutterBottom>
-            Danger zone
+            {t('label.dangerZone')}
           </Typography>
           <Box display="flex" alignItems="center" justifyContent="space-between" gap={2}>
             <Box>
-              <Typography variant="body2" fontWeight={600}>Disconnect Sentry</Typography>
+              <Typography variant="body2" fontWeight={600}>{t('action.disconnectSentry')}</Typography>
               <Typography variant="body2" color="text.secondary">{t('hint.deleteWarning')}</Typography>
             </Box>
             <Button
@@ -493,7 +493,7 @@ export default function ErrorTracking() {
               onClick={handleDisconnect}
               disabled={disconnecting}
             >
-              {disconnecting ? 'Removing…' : 'Disconnect'}
+              {disconnecting ? t('action.removing') : t('action.disconnect')}
             </Button>
           </Box>
         </Paper>

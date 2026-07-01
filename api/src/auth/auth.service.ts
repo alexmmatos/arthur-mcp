@@ -87,7 +87,7 @@ export class AuthService {
         await transporter.sendMail({
           from: settings.smtpFrom || settings.smtpUser,
           to: email,
-          subject: 'Password reset — Arthur MCP Adapter',
+          subject: 'Password reset — Arthur MCP',
           text: `Click the link to reset your password (valid for 1 hour):\n\n${resetLink}`,
           html: `<p>Click the link to reset your password (valid for 1 hour):</p><p><a href="${resetLink}">${resetLink}</a></p>`,
         });

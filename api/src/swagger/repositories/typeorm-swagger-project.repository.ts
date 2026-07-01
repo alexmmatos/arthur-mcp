@@ -4,6 +4,8 @@ import { Repository } from 'typeorm';
 import { SwaggerProjectEntity } from '../swagger-project.entity';
 import { ISwaggerProjectRepository, SwaggerProjectRecord } from '../swagger-project.repository';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 @Injectable()
 export class TypeOrmSwaggerProjectRepository implements ISwaggerProjectRepository {
   constructor(
@@ -17,6 +19,7 @@ export class TypeOrmSwaggerProjectRepository implements ISwaggerProjectRepositor
       baseUrl: e.baseUrl,
       description: e.description,
       version: e.version,
+      shareSlug: (e as any).shareSlug,
       rawSpec: includeRawSpec && e.rawSpec ? JSON.parse(e.rawSpec) : undefined,
       tools: e.tools ? JSON.parse(e.tools) : [],
       auth: e.auth ? JSON.parse(e.auth) : { type: 'none' },
@@ -42,6 +45,7 @@ export class TypeOrmSwaggerProjectRepository implements ISwaggerProjectRepositor
       tenantConfig: (e as any).tenantConfig
         ? JSON.parse((e as any).tenantConfig)
         : { enabled: false, params: [] },
+      responseConfig: e.responseConfig ? JSON.parse(e.responseConfig) : { enabled: false },
       connectionConfig: e.connectionConfig ? JSON.parse(e.connectionConfig) : undefined,
       dbQueries: e.dbQueries ? JSON.parse(e.dbQueries) : [],
       createdAt: e.createdAt,
@@ -55,6 +59,7 @@ export class TypeOrmSwaggerProjectRepository implements ISwaggerProjectRepositor
     if (data.baseUrl !== undefined) e.baseUrl = data.baseUrl;
     if (data.description !== undefined) e.description = data.description;
     if (data.version !== undefined) e.version = data.version;
+    if ('shareSlug' in data) (e as any).shareSlug = data.shareSlug ?? undefined;
     if (data.rawSpec !== undefined) e.rawSpec = data.rawSpec ? JSON.stringify(data.rawSpec) : undefined;
     if (data.tools !== undefined) e.tools = JSON.stringify(data.tools);
     if (data.auth !== undefined) e.auth = JSON.stringify(data.auth);
@@ -74,6 +79,7 @@ export class TypeOrmSwaggerProjectRepository implements ISwaggerProjectRepositor
     if (data.availabilityWindow !== undefined) e.availabilityWindow = JSON.stringify(data.availabilityWindow);
     if (data.alertConfig !== undefined) e.alertConfig = JSON.stringify(data.alertConfig);
     if ((data as any).tenantConfig !== undefined) (e as any).tenantConfig = JSON.stringify((data as any).tenantConfig);
+    if (data.responseConfig !== undefined) (e as any).responseConfig = JSON.stringify(data.responseConfig);
     if (data.connectionConfig !== undefined) e.connectionConfig = data.connectionConfig ? JSON.stringify(data.connectionConfig) : undefined;
     if (data.dbQueries !== undefined) e.dbQueries = JSON.stringify(data.dbQueries);
     return e;
@@ -84,10 +90,21 @@ export class TypeOrmSwaggerProjectRepository implements ISwaggerProjectRepositor
     return e ? this.toRecord(e, true) : null;
   }
 
+  async findByIdOrShareSlug(identifier: string): Promise<SwaggerProjectRecord | null> {
+    const where = UUID_RE.test(identifier)
+      ? [{ id: identifier }, { shareSlug: identifier }]
+      : [{ shareSlug: identifier }];
+    const e = await this.repo.findOne({
+      where,
+    });
+    return e ? this.toRecord(e, true) : null;
+  }
+
   async findAll(filter?: { tags?: string[] }): Promise<SwaggerProjectRecord[]> {
     let entities = await this.repo.find({
       select: {
         id: true, name: true, baseUrl: true, description: true, version: true,
+        shareSlug: true,
         tools: true, auth: true, status: true, errorMessage: true,
         mcpApiKeys: true, tags: true, rateLimit: true, isPaused: true,
         maintenanceMode: true, availabilityWindow: true, alertConfig: true,

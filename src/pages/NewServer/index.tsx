@@ -726,8 +726,8 @@ export default function NewServer() {
           <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
             <Tabs value={importTab} onChange={(_, v) => { setImportTab(v); setError('') }}
               sx={{ borderBottom: 1, borderColor: 'divider', px: 1 }}>
-              <Tab label="OpenAPI / Swagger" icon={<IconCloudUpload size={15} />} iconPosition="start" sx={{ minHeight: 44, fontSize: '0.82rem', gap: 0.5 }} />
-              <Tab label="Postman collection" icon={<IconPackage size={15} />} iconPosition="start" sx={{ minHeight: 44, fontSize: '0.82rem', gap: 0.5 }} />
+              <Tab label={t('servers:newServer.import.openApiSwagger')} icon={<IconCloudUpload size={15} />} iconPosition="start" sx={{ minHeight: 44, fontSize: '0.82rem', gap: 0.5 }} />
+              <Tab label={t('servers:newServer.import.postmanCollection')} icon={<IconPackage size={15} />} iconPosition="start" sx={{ minHeight: 44, fontSize: '0.82rem', gap: 0.5 }} />
             </Tabs>
 
             {importTab === 0 && (
@@ -952,12 +952,12 @@ export default function NewServer() {
       {sourceType === 'graphql' && activeStep === 2 && (
         <Box display="flex" flexDirection="column" gap={2.5}>
           <Paper variant="outlined" sx={{ p: 3 }}>
-            <Typography variant="subtitle2" fontWeight={700} mb={0.5}>GraphQL endpoint</Typography>
+            <Typography variant="subtitle2" fontWeight={700} mb={0.5}>{t('servers:newServer.graphql.endpointTitle')}</Typography>
             <Typography variant="body2" color="text.secondary" mb={2}>
-              The URL of your GraphQL API. Schema discovery will be performed via introspection.
+              {t('servers:newServer.graphql.endpointDescription')}
             </Typography>
             <TextField fullWidth size="small" required autoFocus placeholder="https://api.example.com/graphql"
-              label="Endpoint URL" value={gqlEndpoint}
+              label={t('servers:newServer.graphql.endpointUrlLabel')} value={gqlEndpoint}
               onChange={(e) => { setGqlEndpoint(e.target.value); setError('') }}
               error={gqlEndpoint.trim().length > 0 && !isValidUrl(gqlEndpoint.trim())}
               helperText={gqlEndpoint.trim().length > 0 && !isValidUrl(gqlEndpoint.trim()) ? t('servers:hint.invalidUrlShort') : ''}
@@ -965,23 +965,23 @@ export default function NewServer() {
           </Paper>
 
           <Paper variant="outlined" sx={{ p: 3 }}>
-            <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Schema source</Typography>
+            <Typography variant="subtitle2" fontWeight={700} mb={0.5}>{t('servers:newServer.graphql.schemaSourceTitle')}</Typography>
             <Typography variant="body2" color="text.secondary" mb={2}>
-              Choose how to load the GraphQL schema.
+              {t('servers:newServer.graphql.schemaSourceDescription')}
             </Typography>
             <Box display="flex" gap={1.5} flexWrap="wrap">
               <Paper variant="outlined" onClick={() => setGqlIntrospect(true)}
                 sx={{ p: 2, flex: 1, minWidth: 180, cursor: 'pointer', borderColor: gqlIntrospect ? 'primary.main' : undefined, borderWidth: gqlIntrospect ? 2 : 1, bgcolor: gqlIntrospect ? 'primary.50' : undefined, transition: 'all 0.15s' }}>
-                <Typography variant="subtitle2" fontWeight={700} fontSize="0.85rem">🔍 Auto-introspect</Typography>
+                <Typography variant="subtitle2" fontWeight={700} fontSize="0.85rem">{t('servers:newServer.graphql.autoIntrospectTitle')}</Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Query the endpoint's introspection API to discover all operations automatically.
+                  {t('servers:newServer.graphql.autoIntrospectDescription')}
                 </Typography>
               </Paper>
               <Paper variant="outlined" onClick={() => setGqlIntrospect(false)}
                 sx={{ p: 2, flex: 1, minWidth: 180, cursor: 'pointer', borderColor: !gqlIntrospect ? 'primary.main' : undefined, borderWidth: !gqlIntrospect ? 2 : 1, bgcolor: !gqlIntrospect ? 'primary.50' : undefined, transition: 'all 0.15s' }}>
-                <Typography variant="subtitle2" fontWeight={700} fontSize="0.85rem">📄 Upload SDL file</Typography>
+                <Typography variant="subtitle2" fontWeight={700} fontSize="0.85rem">{t('servers:newServer.graphql.uploadSdlTitle')}</Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Provide a <code>.graphql</code> or <code>.gql</code> SDL schema file manually.
+                  {t('servers:newServer.graphql.uploadSdlDescription')}
                 </Typography>
               </Paper>
             </Box>
@@ -996,13 +996,13 @@ export default function NewServer() {
                     <Box display="flex" flexDirection="column" alignItems="center" gap={1}>
                       <IconFile size={32} color="var(--mui-palette-success-main)" />
                       <Typography fontWeight={700} color="success.main" fontSize="0.875rem">{gqlFile.name}</Typography>
-                      <Button size="small" startIcon={<IconX size={14} />} onClick={(e) => { e.stopPropagation(); setGqlFile(null) }}>Remove</Button>
+                      <Button size="small" startIcon={<IconX size={14} />} onClick={(e) => { e.stopPropagation(); setGqlFile(null) }}>{t('common:action.remove')}</Button>
                     </Box>
                   ) : (
                     <Box display="flex" flexDirection="column" alignItems="center" gap={0.5}>
                       <IconCloudUpload size={32} style={{ opacity: 0.4 }} />
-                      <Typography fontSize="0.875rem" fontWeight={500}>Upload SDL schema</Typography>
-                      <Typography variant="caption" color="text.secondary">.graphql · .gql · .sdl</Typography>
+                      <Typography fontSize="0.875rem" fontWeight={500}>{t('servers:newServer.graphql.uploadSdlButton')}</Typography>
+                      <Typography variant="caption" color="text.secondary">{t('servers:newServer.graphql.sdlFormats')}</Typography>
                     </Box>
                   )}
                 </Box>
@@ -1011,7 +1011,7 @@ export default function NewServer() {
           </Paper>
 
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-            Operations discovered from the schema will each become an MCP tool with typed inputs.
+            {t('servers:newServer.graphql.operationsHint')}
           </Typography>
         </Box>
       )}
@@ -1020,29 +1020,29 @@ export default function NewServer() {
       {sourceType === 'grpc' && activeStep === 2 && (
         <Box display="flex" flexDirection="column" gap={2.5}>
           <Paper variant="outlined" sx={{ p: 3 }}>
-            <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Service address</Typography>
+            <Typography variant="subtitle2" fontWeight={700} mb={0.5}>{t('servers:newServer.grpc.serviceAddressTitle')}</Typography>
             <Typography variant="body2" color="text.secondary" mb={2}>
-              The host and port of the gRPC server.
+              {t('servers:newServer.grpc.serviceAddressDescription')}
             </Typography>
             <Grid container spacing={1.5}>
               <Grid item xs={9}>
-                <TextField fullWidth size="small" required autoFocus label="Host" placeholder="grpc.example.com"
+                <TextField fullWidth size="small" required autoFocus label={t('servers:newServer.fields.host')} placeholder="grpc.example.com"
                   value={grpcHost} onChange={(e) => setGrpcHost(e.target.value)} />
               </Grid>
               <Grid item xs={3}>
-                <TextField fullWidth size="small" label="Port" value={grpcPort} onChange={(e) => setGrpcPort(e.target.value)} />
+                <TextField fullWidth size="small" label={t('servers:newServer.fields.port')} value={grpcPort} onChange={(e) => setGrpcPort(e.target.value)} />
               </Grid>
             </Grid>
             <FormControlLabel sx={{ mt: 1.5 }}
               control={<Switch size="small" checked={grpcTls} onChange={(e) => setGrpcTls(e.target.checked)} />}
-              label={<Typography variant="body2">Use TLS (secure connection)</Typography>}
+              label={<Typography variant="body2">{t('servers:newServer.fields.useTlsSecure')}</Typography>}
             />
           </Paper>
 
           <Paper variant="outlined" sx={{ p: 3 }}>
-            <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Protocol Buffer definition</Typography>
+            <Typography variant="subtitle2" fontWeight={700} mb={0.5}>{t('servers:newServer.grpc.protoDefinitionTitle')}</Typography>
             <Typography variant="body2" color="text.secondary" mb={2}>
-              Upload your <code>.proto</code> file. Each RPC method will become an MCP tool.
+              {t('servers:newServer.grpc.protoDefinitionDescription')}
             </Typography>
             <input ref={protoFileRef} type="file" accept=".proto" hidden
               onChange={(e) => { const f = e.target.files?.[0]; if (f) { setProtoFile(f); setError('') }; e.target.value = '' }} />
@@ -1052,13 +1052,13 @@ export default function NewServer() {
                 <Box display="flex" flexDirection="column" alignItems="center" gap={1}>
                   <IconFile size={32} color="var(--mui-palette-success-main)" />
                   <Typography fontWeight={700} color="success.main" fontSize="0.875rem">{protoFile.name}</Typography>
-                  <Button size="small" startIcon={<IconX size={14} />} onClick={(e) => { e.stopPropagation(); setProtoFile(null) }}>Remove</Button>
+                  <Button size="small" startIcon={<IconX size={14} />} onClick={(e) => { e.stopPropagation(); setProtoFile(null) }}>{t('common:action.remove')}</Button>
                 </Box>
               ) : (
                 <Box display="flex" flexDirection="column" alignItems="center" gap={0.5}>
                   <IconCloudUpload size={32} style={{ opacity: 0.4 }} />
-                  <Typography fontSize="0.875rem" fontWeight={500}>Upload .proto file</Typography>
-                  <Typography variant="caption" color="text.secondary">Optional — can be added later</Typography>
+                  <Typography fontSize="0.875rem" fontWeight={500}>{t('servers:newServer.grpc.uploadProtoButton')}</Typography>
+                  <Typography variant="caption" color="text.secondary">{t('servers:newServer.grpc.uploadProtoOptional')}</Typography>
                 </Box>
               )}
             </Box>
@@ -1069,30 +1069,30 @@ export default function NewServer() {
       {/* ── Standard SQL connection (postgresql/mysql/mariadb/mssql/oracle/cockroachdb/clickhouse/cassandra) */}
       {SQL_HOSTS.includes(sourceType as SourceType) && activeStep === 2 && (
         <Paper variant="outlined" sx={{ p: 3 }}>
-          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Database connection</Typography>
+          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>{t('servers:newServer.database.connectionTitle')}</Typography>
           <Typography variant="body2" color="text.secondary" mb={3}>
             Connection details for your {t(`source.types.${sourceType}.name` as Parameters<typeof t>[0])} database.
           </Typography>
           <Box display="flex" flexDirection="column" gap={2}>
             <Grid container spacing={1.5}>
               <Grid item xs={9}>
-                <TextField fullWidth size="small" required autoFocus label="Host" placeholder="db.example.com"
+                <TextField fullWidth size="small" required autoFocus label={t('servers:newServer.fields.host')} placeholder="db.example.com"
                   value={dbHost} onChange={(e) => setDbHost(e.target.value)} />
               </Grid>
               <Grid item xs={3}>
-                <TextField fullWidth size="small" label="Port" value={dbPort} onChange={(e) => setDbPort(e.target.value)} />
+                <TextField fullWidth size="small" label={t('servers:newServer.fields.port')} value={dbPort} onChange={(e) => setDbPort(e.target.value)} />
               </Grid>
             </Grid>
             <TextField fullWidth size="small" required
-              label={DB_DATABASE_LABEL[sourceType as SourceType] ?? 'Database name'}
+              label={DB_DATABASE_LABEL[sourceType as SourceType] ?? t('servers:newServer.fields.databaseName')}
               placeholder={DB_DATABASE_PLACEHOLDER[sourceType as SourceType] ?? 'myapp_production'}
               value={dbDatabase} onChange={(e) => setDbDatabase(e.target.value)} />
-            <TextField fullWidth size="small" required label="Username"
+            <TextField fullWidth size="small" required label={t('servers:newServer.fields.username')}
               value={dbUser} onChange={(e) => setDbUser(e.target.value)} />
-            {secretInput(dbPassword, setDbPassword, 'Password')}
+            {secretInput(dbPassword, setDbPassword, t('servers:newServer.fields.password'))}
             <FormControlLabel
               control={<Switch size="small" checked={dbSsl} onChange={(e) => setDbSsl(e.target.checked)} />}
-              label={<Typography variant="body2">Enable SSL / TLS</Typography>}
+              label={<Typography variant="body2">{t('servers:newServer.fields.enableSslTls')}</Typography>}
             />
           </Box>
           <Alert severity="warning" sx={{ mt: 2.5, fontSize: '0.78rem' }}>
@@ -1104,14 +1104,14 @@ export default function NewServer() {
       {/* ── MongoDB ───────────────────────────────────────────────────────── */}
       {sourceType === 'mongodb' && activeStep === 2 && (
         <Paper variant="outlined" sx={{ p: 3 }}>
-          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>MongoDB connection</Typography>
+          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>{t('servers:newServer.mongodb.connectionTitle')}</Typography>
           <Typography variant="body2" color="text.secondary" mb={3}>
-            Connection URI including credentials and database name.
+            {t('servers:newServer.mongodb.connectionDescription')}
           </Typography>
-          <TextField fullWidth size="small" required autoFocus label="Connection URI"
+          <TextField fullWidth size="small" required autoFocus label={t('servers:newServer.mongodb.connectionUriLabel')}
             placeholder="mongodb+srv://user:password@cluster.mongodb.net/mydb"
             value={mongoUri} onChange={(e) => setMongoUri(e.target.value)}
-            helperText="mongodb:// or mongodb+srv:// format"
+            helperText={t('servers:newServer.mongodb.connectionUriFormat')}
           />
           <Alert severity="warning" sx={{ mt: 2.5, fontSize: '0.78rem' }}>
             {t('servers:hint.mongoReadOnlyWarning')}
@@ -1122,24 +1122,24 @@ export default function NewServer() {
       {/* ── Redis ─────────────────────────────────────────────────────────── */}
       {sourceType === 'redis' && activeStep === 2 && (
         <Paper variant="outlined" sx={{ p: 3 }}>
-          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Redis connection</Typography>
+          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>{t('servers:newServer.redis.connectionTitle')}</Typography>
           <Typography variant="body2" color="text.secondary" mb={3}>
-            Connection details for your Redis instance.
+            {t('servers:newServer.redis.connectionDescription')}
           </Typography>
           <Box display="flex" flexDirection="column" gap={2}>
             <Grid container spacing={1.5}>
               <Grid item xs={9}>
-                <TextField fullWidth size="small" required autoFocus label="Host" placeholder="redis.example.com"
+                <TextField fullWidth size="small" required autoFocus label={t('servers:newServer.fields.host')} placeholder="redis.example.com"
                   value={redisHost} onChange={(e) => setRedisHost(e.target.value)} />
               </Grid>
               <Grid item xs={3}>
-                <TextField fullWidth size="small" label="Port" value={redisPort} onChange={(e) => setRedisPort(e.target.value)} />
+                <TextField fullWidth size="small" label={t('servers:newServer.fields.port')} value={redisPort} onChange={(e) => setRedisPort(e.target.value)} />
               </Grid>
             </Grid>
-            {secretInput(redisPassword, setRedisPassword, 'Password (optional)')}
+            {secretInput(redisPassword, setRedisPassword, t('servers:newServer.fields.passwordOptional'))}
             <FormControlLabel
               control={<Switch size="small" checked={redisTls} onChange={(e) => setRedisTls(e.target.checked)} />}
-              label={<Typography variant="body2">Enable TLS</Typography>}
+              label={<Typography variant="body2">{t('servers:newServer.fields.enableTls')}</Typography>}
             />
           </Box>
         </Paper>
@@ -1148,24 +1148,24 @@ export default function NewServer() {
       {/* ── DynamoDB ──────────────────────────────────────────────────────── */}
       {sourceType === 'dynamodb' && activeStep === 2 && (
         <Paper variant="outlined" sx={{ p: 3 }}>
-          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>DynamoDB connection</Typography>
+          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>{t('servers:newServer.dynamodb.connectionTitle')}</Typography>
           <Typography variant="body2" color="text.secondary" mb={3}>
-            AWS credentials to access your DynamoDB tables.
+            {t('servers:newServer.dynamodb.connectionDescription')}
           </Typography>
           <Box display="flex" flexDirection="column" gap={2}>
             <FormControl size="small" fullWidth>
-              <InputLabel>AWS Region</InputLabel>
-              <Select value={dynamoRegion} label="AWS Region" onChange={(e) => setDynamoRegion(e.target.value)}>
+              <InputLabel>{t('servers:newServer.dynamodb.awsRegion')}</InputLabel>
+              <Select value={dynamoRegion} label={t('servers:newServer.dynamodb.awsRegion')} onChange={(e) => setDynamoRegion(e.target.value)}>
                 {['us-east-1','us-east-2','us-west-1','us-west-2','eu-west-1','eu-west-2','eu-central-1','ap-southeast-1','ap-southeast-2','ap-northeast-1','sa-east-1'].map((r) => (
                   <MenuItem key={r} value={r}>{r}</MenuItem>
                 ))}
               </Select>
             </FormControl>
-            {secretInput(dynamoAccessKey, setDynamoAccessKey, 'Access Key ID')}
-            {secretInput(dynamoSecretKey, setDynamoSecretKey, 'Secret Access Key')}
-            <TextField fullWidth size="small" label="Custom endpoint (optional)" placeholder="http://localhost:8000"
+            {secretInput(dynamoAccessKey, setDynamoAccessKey, t('servers:newServer.dynamodb.accessKeyId'))}
+            {secretInput(dynamoSecretKey, setDynamoSecretKey, t('servers:newServer.dynamodb.secretAccessKey'))}
+            <TextField fullWidth size="small" label={t('servers:newServer.dynamodb.customEndpointOptional')} placeholder="http://localhost:8000"
               value={dynamoEndpoint} onChange={(e) => setDynamoEndpoint(e.target.value)}
-              helperText="Leave blank to use the standard AWS endpoint. Use for DynamoDB Local."
+              helperText={t('servers:newServer.dynamodb.customEndpointHint')}
             />
           </Box>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2.5 }}>
@@ -1177,22 +1177,22 @@ export default function NewServer() {
       {/* ── Elasticsearch ─────────────────────────────────────────────────── */}
       {sourceType === 'elasticsearch' && activeStep === 2 && (
         <Paper variant="outlined" sx={{ p: 3 }}>
-          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Elasticsearch connection</Typography>
+          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>{t('servers:newServer.elasticsearch.connectionTitle')}</Typography>
           <Typography variant="body2" color="text.secondary" mb={3}>
-            URL and credentials for your Elasticsearch cluster.
+            {t('servers:newServer.elasticsearch.connectionDescription')}
           </Typography>
           <Box display="flex" flexDirection="column" gap={2}>
-            <TextField fullWidth size="small" required autoFocus label="Cluster URL"
+            <TextField fullWidth size="small" required autoFocus label={t('servers:newServer.elasticsearch.clusterUrlLabel')}
               placeholder="https://my-cluster.es.io:9200"
               value={esUrl} onChange={(e) => setEsUrl(e.target.value)}
-              helperText="Full URL including protocol and port"
+              helperText={t('servers:newServer.elasticsearch.clusterUrlHint')}
             />
-            {secretInput(esApiKey, setEsApiKey, 'API Key (recommended)')}
+            {secretInput(esApiKey, setEsApiKey, t('servers:newServer.elasticsearch.apiKeyRecommended'))}
             <Typography variant="caption" color="text.secondary" sx={{ mt: -1 }}>
-              Or use Basic Auth — fill username and password below.
+              {t('servers:newServer.elasticsearch.orBasicAuth')}
             </Typography>
-            <TextField fullWidth size="small" label="Username (optional)" value={dbUser} onChange={(e) => setDbUser(e.target.value)} />
-            {secretInput(dbPassword, setDbPassword, 'Password (optional)')}
+            <TextField fullWidth size="small" label={t('servers:newServer.fields.usernameOptional')} value={dbUser} onChange={(e) => setDbUser(e.target.value)} />
+            {secretInput(dbPassword, setDbPassword, t('servers:newServer.fields.passwordOptional'))}
           </Box>
         </Paper>
       )}
@@ -1200,25 +1200,25 @@ export default function NewServer() {
       {/* ── Snowflake ─────────────────────────────────────────────────────── */}
       {sourceType === 'snowflake' && activeStep === 2 && (
         <Paper variant="outlined" sx={{ p: 3 }}>
-          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Snowflake connection</Typography>
+          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>{t('servers:newServer.snowflake.connectionTitle')}</Typography>
           <Typography variant="body2" color="text.secondary" mb={3}>
-            Account and credentials for your Snowflake data warehouse.
+            {t('servers:newServer.snowflake.connectionDescription')}
           </Typography>
           <Box display="flex" flexDirection="column" gap={2}>
-            <TextField fullWidth size="small" required autoFocus label="Account identifier"
+            <TextField fullWidth size="small" required autoFocus label={t('servers:newServer.snowflake.accountIdentifier')}
               placeholder="myorg-myaccount"
               value={snowflakeAccount} onChange={(e) => setSnowflakeAccount(e.target.value)}
-              helperText="Found in your Snowflake URL: <account>.snowflakecomputing.com"
+              helperText={t('servers:newServer.snowflake.accountIdentifierHint')}
             />
-            <TextField fullWidth size="small" label="Warehouse" placeholder="COMPUTE_WH"
+            <TextField fullWidth size="small" label={t('servers:newServer.snowflake.warehouse')} placeholder="COMPUTE_WH"
               value={snowflakeWarehouse} onChange={(e) => setSnowflakeWarehouse(e.target.value)} />
-            <TextField fullWidth size="small" required label="Database" placeholder="MY_DATABASE"
+            <TextField fullWidth size="small" required label={t('servers:newServer.snowflake.database')} placeholder="MY_DATABASE"
               value={dbDatabase} onChange={(e) => setDbDatabase(e.target.value)} />
-            <TextField fullWidth size="small" label="Schema" placeholder="PUBLIC"
+            <TextField fullWidth size="small" label={t('servers:newServer.snowflake.schema')} placeholder="PUBLIC"
               value={snowflakeSchema} onChange={(e) => setSnowflakeSchema(e.target.value)} />
-            <TextField fullWidth size="small" required label="Username"
+            <TextField fullWidth size="small" required label={t('servers:newServer.fields.username')}
               value={dbUser} onChange={(e) => setDbUser(e.target.value)} />
-            {secretInput(dbPassword, setDbPassword, 'Password')}
+            {secretInput(dbPassword, setDbPassword, t('servers:newServer.fields.password'))}
           </Box>
         </Paper>
       )}
@@ -1226,20 +1226,20 @@ export default function NewServer() {
       {/* ── Firestore ─────────────────────────────────────────────────────── */}
       {sourceType === 'firestore' && activeStep === 2 && (
         <Paper variant="outlined" sx={{ p: 3 }}>
-          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Firestore connection</Typography>
+          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>{t('servers:newServer.firestore.connectionTitle')}</Typography>
           <Typography variant="body2" color="text.secondary" mb={3}>
-            Google Cloud project and service account credentials.
+            {t('servers:newServer.firestore.connectionDescription')}
           </Typography>
           <Box display="flex" flexDirection="column" gap={2}>
-            <TextField fullWidth size="small" required autoFocus label="GCP Project ID"
+            <TextField fullWidth size="small" required autoFocus label={t('servers:newServer.firestore.projectId')}
               placeholder="my-firebase-project"
               value={firestoreProject} onChange={(e) => setFirestoreProject(e.target.value)}
             />
             <TextField fullWidth size="small" multiline minRows={4} maxRows={8}
-              label="Service Account JSON"
+              label={t('servers:newServer.firestore.serviceAccountJson')}
               placeholder='{"type": "service_account", "project_id": "...", ...}'
               value={firestoreCredentials} onChange={(e) => setFirestoreCredentials(e.target.value)}
-              helperText="Paste the content of your service account key file"
+              helperText={t('servers:newServer.firestore.serviceAccountHint')}
             />
           </Box>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2.5 }}>
@@ -1267,8 +1267,8 @@ export default function NewServer() {
             </Typography>
 
             <FormControl size="small" fullWidth sx={{ mb: 3 }}>
-              <InputLabel>Authentication type</InputLabel>
-              <Select value={authType} label="Authentication type" onChange={(e) => setAuthType(e.target.value as AuthType)}>
+              <InputLabel>{t('servers:newServer.auth.authenticationType')}</InputLabel>
+              <Select value={authType} label={t('servers:newServer.auth.authenticationType')} onChange={(e) => setAuthType(e.target.value as AuthType)}>
                 {(Object.keys(AUTH_TYPE_LABELS) as AuthType[]).map((t) => (
                   <MenuItem key={t} value={t}>{AUTH_TYPE_LABELS[t]}</MenuItem>
                 ))}
@@ -1279,7 +1279,7 @@ export default function NewServer() {
 
             {authType === 'bearer' && (
               <Box display="flex" flexDirection="column" gap={1.5}>
-                {secretInput(token, setToken, 'Bearer Token')}
+                {secretInput(token, setToken, t('servers:newServer.auth.bearerToken'))}
                 <Typography variant="caption" color="text.secondary">{t('servers:auth.bearerSent')}</Typography>
               </Box>
             )}
@@ -1287,14 +1287,14 @@ export default function NewServer() {
             {authType === 'api-key' && (
               <Box display="flex" flexDirection="column" gap={1.5}>
                 <Grid container spacing={1.5}>
-                  <Grid item xs={12} sm={5}><TextField size="small" fullWidth label="Header name" placeholder="X-Api-Key" value={keyName} onChange={(e) => setKeyName(e.target.value)} /></Grid>
-                  <Grid item xs={12} sm={7}>{secretInput(keyValue, setKeyValue, 'Value')}</Grid>
+                  <Grid item xs={12} sm={5}><TextField size="small" fullWidth label={t('servers:newServer.auth.headerName')} placeholder="X-Api-Key" value={keyName} onChange={(e) => setKeyName(e.target.value)} /></Grid>
+                  <Grid item xs={12} sm={7}>{secretInput(keyValue, setKeyValue, t('servers:newServer.auth.value'))}</Grid>
                 </Grid>
                 <FormControl size="small" fullWidth>
-                  <InputLabel>Send as</InputLabel>
-                  <Select value={keyIn} label="Send as" onChange={(e) => setKeyIn(e.target.value as 'header' | 'query')}>
-                    <MenuItem value="header">Header HTTP</MenuItem>
-                    <MenuItem value="query">Query param (?{keyName || 'key'}=…)</MenuItem>
+                  <InputLabel>{t('servers:newServer.auth.sendAs')}</InputLabel>
+                  <Select value={keyIn} label={t('servers:newServer.auth.sendAs')} onChange={(e) => setKeyIn(e.target.value as 'header' | 'query')}>
+                    <MenuItem value="header">{t('servers:newServer.auth.headerHttp')}</MenuItem>
+                    <MenuItem value="query">{t('servers:newServer.auth.queryParam', { keyName: keyName || 'key' })}</MenuItem>
                   </Select>
                 </FormControl>
               </Box>
@@ -1302,20 +1302,20 @@ export default function NewServer() {
 
             {authType === 'basic' && (
               <Box display="flex" flexDirection="column" gap={1.5}>
-                <TextField size="small" fullWidth label="Username" value={basicUser} onChange={(e) => setBasicUser(e.target.value)} />
-                {secretInput(basicPass, setBasicPass, 'Password')}
+                <TextField size="small" fullWidth label={t('servers:newServer.fields.username')} value={basicUser} onChange={(e) => setBasicUser(e.target.value)} />
+                {secretInput(basicPass, setBasicPass, t('servers:newServer.fields.password'))}
                 <Typography variant="caption" color="text.secondary">{t('servers:auth.basicSent')}</Typography>
               </Box>
             )}
 
             {authType === 'oauth2-client' && (
               <Box display="flex" flexDirection="column" gap={1.5}>
-                <TextField size="small" fullWidth label="Token URL" placeholder="https://auth.example.com/oauth/token" value={oauthTokenUrl} onChange={(e) => setOauthTokenUrl(e.target.value)} />
+                <TextField size="small" fullWidth label={t('servers:newServer.auth.tokenUrl')} placeholder="https://auth.example.com/oauth/token" value={oauthTokenUrl} onChange={(e) => setOauthTokenUrl(e.target.value)} />
                 <Grid container spacing={1.5}>
-                  <Grid item xs={12} sm={6}><TextField size="small" fullWidth label="Client ID" value={oauthClientId} onChange={(e) => setOauthClientId(e.target.value)} /></Grid>
-                  <Grid item xs={12} sm={6}>{secretInput(oauthClientSecret, setOauthClientSecret, 'Client Secret')}</Grid>
+                  <Grid item xs={12} sm={6}><TextField size="small" fullWidth label={t('servers:newServer.auth.clientId')} value={oauthClientId} onChange={(e) => setOauthClientId(e.target.value)} /></Grid>
+                  <Grid item xs={12} sm={6}>{secretInput(oauthClientSecret, setOauthClientSecret, t('servers:newServer.auth.clientSecret'))}</Grid>
                 </Grid>
-                <TextField size="small" fullWidth label="Scope (optional)" placeholder="read write" value={oauthScope} onChange={(e) => setOauthScope(e.target.value)} />
+                <TextField size="small" fullWidth label={t('servers:newServer.auth.scopeOptional')} placeholder="read write" value={oauthScope} onChange={(e) => setOauthScope(e.target.value)} />
                 <Typography variant="caption" color="text.secondary">{t('servers:auth.oauthFlow')}</Typography>
               </Box>
             )}
@@ -1327,13 +1327,13 @@ export default function NewServer() {
                 </Typography>
                 {customHeaders.map((h, i) => (
                   <Box key={i} display="flex" gap={1} alignItems="center">
-                    <TextField size="small" label="Header" placeholder="X-Custom-Header" sx={{ flex: 1 }}
+                    <TextField size="small" label={t('servers:newServer.auth.header')} placeholder="X-Custom-Header" sx={{ flex: 1 }}
                       value={h.name} onChange={(e) => setCustomHeaders(customHeaders.map((x, idx) => idx === i ? { ...x, name: e.target.value } : x))} />
-                    <TextField size="small" label="Value" sx={{ flex: 2 }} type={showSecrets ? 'text' : 'password'}
+                    <TextField size="small" label={t('servers:newServer.auth.value')} sx={{ flex: 2 }} type={showSecrets ? 'text' : 'password'}
                       value={h.value} onChange={(e) => setCustomHeaders(customHeaders.map((x, idx) => idx === i ? { ...x, value: e.target.value } : x))}
                       InputProps={{ endAdornment: i === 0 ? (
                         <InputAdornment position="end">
-                          <Tooltip title="Toggle visibility">
+                          <Tooltip title={t('servers:newServer.auth.toggleVisibility')}>
                             <IconButton size="small" onClick={() => setShowSecrets((s) => !s)} edge="end">
                               {showSecrets ? <IconEyeOff size={16} /> : <IconEye size={16} />}
                             </IconButton>
@@ -1341,7 +1341,7 @@ export default function NewServer() {
                         </InputAdornment>
                       ) : undefined }}
                     />
-                    <Tooltip title="Remove">
+                    <Tooltip title={t('common:action.remove')}>
                       <span>
                         <IconButton size="small" color="error" onClick={() => setCustomHeaders(customHeaders.filter((_, idx) => idx !== i))} disabled={customHeaders.length === 1}>
                           <IconTrash size={16} />

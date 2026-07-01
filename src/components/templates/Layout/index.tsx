@@ -145,7 +145,7 @@ function SidebarContent() {
       ) : (
         <Box component="img"
           src={mode === ColorMode.Dark ? '/images/logos/arthur_mcp_logo_dark_mode.svg' : '/images/logos/arthur_mcp_logo_light_mode.svg'}
-          alt="Arthur MCP Adapter"
+          alt="Arthur MCP"
           sx={{ height: '100%', maxWidth: '100%' }}
           onError={() => setLogoError(true)}
         />

@@ -36,7 +36,7 @@
   },
   "help": {
     "title": "Logs de Auditoria",
-    "intro": "O Log de Auditoria é um registro completo e à prova de adulteração de cada alteração administrativa feita neste servidor Arthur MCP Adapter. Destina-se ao monitoramento de segurança, auditoria de conformidade e depuração de comportamentos inesperados.",
+    "intro": "O Log de Auditoria é um registro completo e à prova de adulteração de cada alteração administrativa feita neste servidor Arthur MCP. Destina-se ao monitoramento de segurança, auditoria de conformidade e depuração de comportamentos inesperados.",
     "body": "Sempre que um usuário cria, modifica ou exclui um servidor, ferramenta, chave de API ou configuração do sistema, uma entrada é automaticamente registrada aqui. Eventos de login também são registrados. As entradas não podem ser editadas ou excluídas por nenhum usuário.",
     "howToUse": "Como usar:",
     "tipInvestigate": "Investigar uma alteração: Veja as colunas Data/Hora e Item para descobrir quando e o que foi alterado.",

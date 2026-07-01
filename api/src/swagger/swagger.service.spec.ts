@@ -32,6 +32,7 @@ const makeProject = (overrides: Partial<SwaggerProjectRecord> = {}): SwaggerProj
 
 const mockProjectRepo = {
   findById: jest.fn(),
+  findByIdOrShareSlug: jest.fn(),
   findAll: jest.fn(),
   findAllIds: jest.fn(),
   create: jest.fn(),
@@ -73,6 +74,7 @@ describe('SwaggerService', () => {
     jest.clearAllMocks();
     mockJwtSecretService.getSecret.mockResolvedValue('test-jwt-secret-value');
     mockPromptRepo.findById.mockResolvedValue(null);
+    mockProjectRepo.findAll.mockResolvedValue([]);
   });
 
   describe('updateRateLimit', () => {
@@ -123,14 +125,74 @@ describe('SwaggerService', () => {
   });
 
   describe('getProjectForShare', () => {
+    it('generates and saves a unique human-readable slug for share links', async () => {
+      mockProjectRepo.findById.mockResolvedValue(makeProject({ name: 'Payments API - São Paulo!' }));
+      mockProjectRepo.findAll.mockResolvedValue([
+        makeProject({ _id: 'proj-2', shareSlug: 'payments-api-sao-paulo' }),
+      ]);
+      mockProjectRepo.update.mockResolvedValue(makeProject({
+        name: 'Payments API - São Paulo!',
+        shareSlug: 'payments-api-sao-paulo-2',
+      }));
+
+      const result = await service.generateShareLink('proj-1');
+
+      expect(mockProjectRepo.update).toHaveBeenCalledWith('proj-1', { shareSlug: 'payments-api-sao-paulo-2' });
+      expect(result.shareSlug).toBe('payments-api-sao-paulo-2');
+      expect(result.url).toBe('/mcp-swagger/payments-api-sao-paulo-2');
+    });
+
+    it('keeps a manually edited slug when generating share links', async () => {
+      mockProjectRepo.findById.mockResolvedValue(makeProject({ shareSlug: 'custom-docs' }));
+
+      const result = await service.generateShareLink('proj-1');
+
+      expect(mockProjectRepo.update).not.toHaveBeenCalled();
+      expect(result.shareSlug).toBe('custom-docs');
+      expect(result.url).toBe('/mcp-swagger/custom-docs');
+    });
+
+    it('rejects manual share slugs already used by another server', async () => {
+      mockProjectRepo.findAll.mockResolvedValue([
+        makeProject({ _id: 'proj-2', shareSlug: 'used-slug' }),
+      ]);
+
+      await expect(service.updateShareSlug('proj-1', 'used-slug')).rejects.toThrow(BadRequestException);
+    });
+
+    it('normalizes and saves a manually edited unique share slug', async () => {
+      const updated = makeProject({ shareSlug: 'minha-api' });
+      mockProjectRepo.update.mockResolvedValue(updated);
+
+      const result = await service.updateShareSlug('proj-1', 'Minha API!');
+
+      expect(mockProjectRepo.update).toHaveBeenCalledWith('proj-1', { shareSlug: 'minha-api' });
+      expect(result).toBe(updated);
+    });
+
+    it('creates empty servers with a unique generated share slug', async () => {
+      mockProjectRepo.findAll.mockResolvedValue([
+        makeProject({ _id: 'proj-2', shareSlug: 'test-project' }),
+      ]);
+      mockProjectRepo.create.mockImplementation(async (data: any) => makeProject({ _id: 'new-project', ...data }));
+
+      const result = await service.createEmpty({ name: 'Test Project', baseUrl: 'https://api.example.com' });
+
+      expect(mockProjectRepo.create).toHaveBeenCalledWith(expect.objectContaining({ shareSlug: 'test-project-2' }));
+      expect(result.shareSlug).toBe('test-project-2');
+    });
+
     it('returns public MCP server documentation without exposing credentials', async () => {
       const token = jwt.sign({ serverId: 'proj-1', type: 'share' }, 'test-jwt-secret-value');
       mockProjectRepo.findById.mockResolvedValue(makeProject({
         description: 'Shared API',
         version: '1.2.3',
+        shareSlug: 'shared-api',
         tags: ['source:rest', 'billing'],
         auth: { type: 'api-key', name: 'x-api-key', value: 'secret-value', in: 'header' } as any,
         mcpApiKey: 'legacy-secret',
+        oauthClientId: 'oauth-client-id',
+        oauthClientSecret: 'oauth-client-secret',
         tools: [{
           name: 'list_invoices',
           description: 'List invoices [GET /v1/private-invoices]',
@@ -195,6 +257,9 @@ describe('SwaggerService', () => {
       expect(result.tools).toHaveLength(1);
       expect(result.resources).toHaveLength(1);
       expect(result.prompts).toHaveLength(1);
+      expect(result.hasOAuthClient).toBe(true);
+      expect(result.shareSlug).toBe('shared-api');
+      expect(result.mcpUrl).toBe('/api/mcp/server/shared-api');
       expect(result.prompts[0]).toEqual(expect.objectContaining({
         name: 'Summarize invoice',
         arguments: ['invoiceId'],
@@ -214,6 +279,8 @@ describe('SwaggerService', () => {
       const serialized = JSON.stringify(result);
       expect(serialized).not.toContain('secret-value');
       expect(serialized).not.toContain('legacy-secret');
+      expect(serialized).not.toContain('oauth-client-id');
+      expect(serialized).not.toContain('oauth-client-secret');
       expect(serialized).not.toContain('inputSchema');
       expect(serialized).not.toContain('https://api.example.com');
       expect(serialized).not.toContain('/v1/private-invoices');
@@ -229,6 +296,21 @@ describe('SwaggerService', () => {
       expect(serialized).not.toContain('disabled_tool');
       expect(serialized).not.toContain('Disabled docs');
       expect(serialized).not.toContain('prompt-2');
+    });
+
+    it('looks up the project by share slug for the permanent public link', async () => {
+      mockProjectRepo.findByIdOrShareSlug.mockResolvedValue(makeProject({ shareSlug: 'shared-api' }));
+
+      const result = await service.getProjectForShareBySlug('shared-api');
+
+      expect(mockProjectRepo.findByIdOrShareSlug).toHaveBeenCalledWith('shared-api');
+      expect(result.shareSlug).toBe('shared-api');
+    });
+
+    it('rejects an unknown share slug', async () => {
+      mockProjectRepo.findByIdOrShareSlug.mockResolvedValue(null);
+
+      await expect(service.getProjectForShareBySlug('missing-slug')).rejects.toThrow(NotFoundException);
     });
   });
 });
