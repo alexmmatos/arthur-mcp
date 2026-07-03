@@ -63,7 +63,7 @@ export default function ForgotPassword() {
             <Box display="flex" alignItems="center" justifyContent="center" mb={2}>
               <Box
                 component="img"
-                src={mode === ColorMode.Dark ? '/images/logos/arthur_mcp_logo_dark_mode.svg' : '/images/logos/arthur_mcp_logo_light_mode.svg'}
+                src={mode === ColorMode.Dark ? '/images/logos/arthur_mcp_dark.png' : '/images/logos/arthur_mcp_light.png'}
                 alt="Arthur MCP"
                 sx={{ height: '100%', maxWidth: '100%' }}
                 onError={(e) => {

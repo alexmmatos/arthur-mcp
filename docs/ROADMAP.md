@@ -8,6 +8,7 @@ This file should be updated when task state changes. It does not replace issues 
 - [ ] Review existing uncommitted changes before starting a new task.
 - [ ] Keep `docs/HANDOFF.md` updated at the end of each Codex or Claude Code session.
 - [ ] Enforce the documentation gate for every code or configuration change.
+- [ ] Add the first formal TypeORM migration workflow/baseline so future database changes have a documented command path.
 
 ## In Progress
 
@@ -139,6 +140,7 @@ This file should be updated when task state changes. It does not replace issues 
 - The Portuguese document `docs/INTEGRATION_MODEL.pt-BR.md` is an explicit exception to the English documentation rule.
 - During the compatibility phase, user-facing UI should say `Operations` while legacy backend names may still use `DbQuery` and `/queries`.
 - Data-source operations should define schemas before being exposed as MCP Tools or Resources; Tools inherit operation schemas when available.
+- All database schema changes and persisted data-shape changes must be delivered through migrations. TypeORM `synchronize` stays disabled for SQLite, PostgreSQL, and MySQL.
 - Technical observability endpoints are intentionally public operational surfaces, not user-facing product actions, and do not require role permissions.
 - The `/observability` app page is permission-gated with `observability_view`; provider create/edit/delete routes are not part of the current observability implementation and redirect to the runtime dashboard.
 

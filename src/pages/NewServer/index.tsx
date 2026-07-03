@@ -106,6 +106,8 @@ const DB_PORT_DEFAULTS: Partial<Record<SourceType, string>> = {
 // Databases that use the standard host/port/database/user/password/SSL form
 const SQL_HOSTS: SourceType[] = ['postgresql', 'mysql', 'mariadb', 'mssql', 'oracle', 'cockroachdb', 'clickhouse', 'cassandra']
 
+const AI_TOOL_IMPROVEMENT_AVAILABLE = false
+
 const DB_DATABASE_LABEL: Partial<Record<SourceType, string>> = {
   cassandra:  'Keyspace',
   clickhouse: 'Database',
@@ -296,8 +298,11 @@ export default function NewServer() {
     ? (file ? (baseUrl.trim() === '' || isValidUrl(baseUrl.trim())) : (baseUrl.trim().length > 0 && isValidUrl(baseUrl.trim())))
     : !!postmanFile
 
+  const isSourceAvailable = (nextSourceType: SourceType | null) =>
+    nextSourceType !== null && SOURCE_TYPES.some((source) => source.id === nextSourceType && source.available)
+
   const canNext = (): boolean => {
-    if (activeStep === 0) return sourceType !== null
+    if (activeStep === 0) return isSourceAvailable(sourceType)
     if (activeStep === 1) return name.trim().length > 0
     if (sourceType === 'rest') {
       if (activeStep === 2) return restStep2Valid
@@ -343,11 +348,13 @@ export default function NewServer() {
   }
 
   const selectSource = (nextSourceType: SourceType) => {
+    if (!isSourceAvailable(nextSourceType)) return
     setSourceType(nextSourceType)
     if (DB_PORT_DEFAULTS[nextSourceType]) setDbPort(DB_PORT_DEFAULTS[nextSourceType]!)
   }
 
   const selectSourceAndContinue = (nextSourceType: SourceType) => {
+    if (!isSourceAvailable(nextSourceType)) return
     selectSource(nextSourceType)
     setActiveStep(1)
   }
@@ -402,7 +409,7 @@ export default function NewServer() {
   }
 
   const handleAiImproveTools = async () => {
-    if (!localTools.length || !can(Permission.AiProvidersExecute)) return
+    if (!AI_TOOL_IMPROVEMENT_AVAILABLE || !localTools.length || !can(Permission.AiProvidersExecute)) return
     setAiGenerating(true); setError('')
     try {
       const { data } = await api.post<{
@@ -638,13 +645,17 @@ export default function NewServer() {
                           variant="outlined"
                           onClick={() => selectSource(s.id)}
                           onDoubleClick={() => selectSourceAndContinue(s.id)}
+                          aria-disabled={!s.available}
                           sx={{
-                            p: 2, cursor: 'pointer', height: '100%',
+                            p: 2,
+                            cursor: s.available ? 'pointer' : 'not-allowed',
+                            height: '100%',
+                            opacity: s.available ? 1 : 0.58,
                             borderColor: selected ? s.color : undefined,
                             borderWidth: selected ? 2 : 1,
                             bgcolor: selected ? `${s.color}0d` : undefined,
                             transition: 'border-color 0.15s, background-color 0.15s',
-                            '&:hover': { borderColor: s.color, bgcolor: `${s.color}08` },
+                            '&:hover': s.available ? { borderColor: s.color, bgcolor: `${s.color}08` } : undefined,
                           }}
                         >
                           <Box display="flex" alignItems="center" gap={1.5}>
@@ -870,11 +881,16 @@ export default function NewServer() {
                 </Box>
               </Paper>
               {can(Permission.AiProvidersExecute) && (
-                <Paper variant="outlined" sx={{ p: 2 }}>
+                <Paper variant="outlined" sx={{ p: 2, opacity: AI_TOOL_IMPROVEMENT_AVAILABLE ? 1 : 0.68 }}>
                   <Box display="flex" alignItems="center" gap={1.5} flexWrap="wrap">
                     <IconSparkles size={18} style={{ opacity: 0.7 }} />
                     <Box flexGrow={1} minWidth={220}>
-                      <Typography variant="subtitle2" fontWeight={700}>{t('servers:ai.improveTitle')}</Typography>
+                      <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                        <Typography variant="subtitle2" fontWeight={700}>{t('servers:ai.improveTitle')}</Typography>
+                        {!AI_TOOL_IMPROVEMENT_AVAILABLE && (
+                          <Chip label={t('servers:source.soon')} size="small" sx={{ fontSize: '0.6rem', height: 16 }} />
+                        )}
+                      </Box>
                       <Typography variant="caption" color="text.secondary">{t('servers:ai.improveHint')}</Typography>
                     </Box>
                     {activeAiProviders.length > 0 ? (
@@ -885,6 +901,7 @@ export default function NewServer() {
                             label={t('servers:ai.provider')}
                             value={selectedAiProviderId}
                             onChange={(e) => setSelectedAiProviderId(e.target.value)}
+                            disabled={!AI_TOOL_IMPROVEMENT_AVAILABLE}
                           >
                             {activeAiProviders.map((provider) => (
                               <MenuItem key={provider.id} value={provider.id}>
@@ -897,14 +914,14 @@ export default function NewServer() {
                           size="small"
                           variant="contained"
                           startIcon={aiGenerating ? <CircularProgress size={14} color="inherit" /> : <IconSparkles size={15} />}
-                          disabled={!selectedAiProviderId || aiGenerating}
+                          disabled={!AI_TOOL_IMPROVEMENT_AVAILABLE || !selectedAiProviderId || aiGenerating}
                           onClick={handleAiImproveTools}
                         >
                           {aiGenerating ? t('servers:ai.improving') : t('servers:ai.improveAction')}
                         </Button>
                       </>
                     ) : (
-                      <Button size="small" variant="outlined" onClick={() => navigate('/ai-providers/new')}>
+                      <Button size="small" variant="outlined" disabled={!AI_TOOL_IMPROVEMENT_AVAILABLE} onClick={() => navigate('/ai-providers/new')}>
                         {t('servers:ai.connectProvider')}
                       </Button>
                     )}

@@ -2,11 +2,8 @@ export const config = {
   get port(): number {
     return parseInt(process.env.PORT, 10) || 3000;
   },
-  get database(): string {
-    return (process.env.DATABASE ?? 'sqlite').toLowerCase();
-  },
-  get mongoUri(): string | undefined {
-    return process.env.MONGODB_URI;
+  get databaseUri(): string {
+    return process.env.DATABASE_URI ?? 'sqlite:database.sqlite';
   },
   get dashboardUser(): string {
     return process.env.DASHBOARD_USER ?? 'admin';

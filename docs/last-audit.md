@@ -664,3 +664,4 @@ The following are excluded from audit tracking (generated, config, or non-archit
 | File | Role | Last Arch Audit | Last SOLID Audit |
 |------|------|:-:|:-:|
 | `src/features/server/settings/ResponseLimitPanel/index.tsx` | — | — | — |
+| `api/src/database/database-uri.ts` | — | — | — |

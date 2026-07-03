@@ -1,5 +1,7 @@
 databases:
-  - name: meu-banco
+  - name: Arthur MCP
+    type: postgresql
+    databaseName: arthur_mcp
     plan: free
 
 services:
@@ -32,22 +34,17 @@ services:
         value: /metrics
 
       # ── Database ─────────────────────────────────────────────────────────────
-      #- key: DATABASE
-      #- key: DATABASE
-      #  value: sqlite
-      #- key: SQLITE_PATH
-      #  value: /app/data/database.sqlite
-      - key: DATABASE
-        sync: false   # set in the Render dashboard
-      - key: SQLITE_PATH
-        sync: false   # set in the Render dashboard
-      
-
-      # To use MongoDB Atlas instead, replace the values above with:
-      # - key: DATABASE
-      #   value: mongodb
-      # - key: MONGODB_URI
-      #   sync: false
+      # DATABASE_URI is a single connection string; the driver (sqlite/postgres/
+      # mysql) is auto-detected from its scheme. Set the value in the Render
+      # dashboard, e.g.:
+      #   sqlite:/app/data/database.sqlite
+      #   postgres://user:password@host:5432/db_name       (see the "meu-banco"
+      #     managed database above — use its connection string here)
+      #   mysql://user:password@host:3306/db_name
+      - key: DATABASE_URI
+        fromDatabase:
+          name: Arthur MCP
+          property: connectionString
 
       # ── Credenciais ──────────────────────────────────────────────────────────
       - key: DASHBOARD_USER

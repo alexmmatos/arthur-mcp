@@ -175,6 +175,8 @@ Frontend behavior:
 - Primary create buttons navigate to a dedicated `new` route.
 - New entity pages use a stepper and a final review step.
 - Server creation remains the most complex flow with source-specific steps.
+- On `/servers/new`, source cards marked as not available show the `Soon` badge and are intentionally non-selectable; only available source cards can unlock the next step or advance on double-click.
+- On `/servers/new`, the REST tools overview shows the AI tool improvement panel as `Soon` and disabled; the frontend does not allow the generation action to run while the feature is blocked.
 
 Risk to preserve:
 
@@ -237,7 +239,7 @@ Frontend behavior:
 - Detail page shows the same metadata with an edit form, test connection action, and default-provider action.
 - The current frontend only allows one AI provider to be configured: the list disables the new-provider action once a provider exists, and `/ai-providers/new` shows a limited-state message with a link to edit the existing provider. This is a UI/platform constraint for the current version, not a backend persistence guarantee.
 - New provider setup supports OpenAI, Anthropic, Google Gemini, Mistral, Groq, Cohere, Azure OpenAI, Ollama, and custom OpenAI-compatible providers.
-- The REST server creation flow can use an active AI provider to improve imported tool names/descriptions before creation. The frontend applies those improvements to the created server after the import completes.
+- The REST server creation flow has a planned AI-assisted tool improvement panel for imported tool names/descriptions, but it is currently shown as `Soon` and disabled in the frontend.
 
 Risk to preserve:
 

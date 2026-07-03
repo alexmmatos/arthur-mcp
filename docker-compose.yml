@@ -5,14 +5,7 @@ services:
       - "80:3000"
     environment:
       PORT: 3000
-      DATABASE: ${DATABASE:-sqlite}
-      SQLITE_PATH: /app/data/database.sqlite
-      DB_HOST: ${DB_HOST:-}
-      DB_PORT: ${DB_PORT:-}
-      DB_USER: ${DB_USER:-}
-      DB_PASSWORD: ${DB_PASSWORD:-}
-      DB_NAME: ${DB_NAME:-}
-      DB_SSL: ${DB_SSL:-false}
+      DATABASE_URI: ${DATABASE_URI:-sqlite:/app/data/database.sqlite}
       DB_SYNC: ${DB_SYNC:-false}
       DASHBOARD_USER: ${DASHBOARD_USER:-admin}
       DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:-admin}
@@ -31,14 +24,16 @@ services:
       retries: 3
       start_period: 15s
 
+  # To use MySQL locally: docker compose --profile mysql up
+  # then set DATABASE_URI=mysql://mcp:mcppassword@mysql:3306/mcp_db
   mysql:
     image: mysql:8.0
     profiles: [mysql]
     environment:
       MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: ${DB_NAME:-mcp_db}
-      MYSQL_USER: ${DB_USER:-mcp}
-      MYSQL_PASSWORD: ${DB_PASSWORD:-mcppassword}
+      MYSQL_DATABASE: mcp_db
+      MYSQL_USER: mcp
+      MYSQL_PASSWORD: mcppassword
     ports:
       - "3306:3306"
     volumes:
@@ -49,19 +44,21 @@ services:
       timeout: 5s
       retries: 5
 
+  # To use PostgreSQL locally: docker compose --profile postgres up
+  # then set DATABASE_URI=postgres://mcp:mcppassword@postgres:5432/mcp_db
   postgres:
     image: postgres:16-alpine
     profiles: [postgres]
     environment:
-      POSTGRES_DB: ${DB_NAME:-mcp_db}
-      POSTGRES_USER: ${DB_USER:-mcp}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-mcppassword}
+      POSTGRES_DB: mcp_db
+      POSTGRES_USER: mcp
+      POSTGRES_PASSWORD: mcppassword
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-mcp}"]
+      test: ["CMD-SHELL", "pg_isready -U mcp"]
       interval: 10s
       timeout: 5s
       retries: 5

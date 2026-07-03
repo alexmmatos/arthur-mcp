@@ -145,9 +145,9 @@ function SidebarContent() {
         </Typography>
       ) : (
         <Box component="img"
-          src={mode === ColorMode.Dark ? '/images/logos/arthur_mcp_logo_dark_mode.svg' : '/images/logos/arthur_mcp_logo_light_mode.svg'}
+          src={mode === ColorMode.Dark ? '/images/logos/arthur_mcp_dark.png' : '/images/logos/arthur_mcp_light.png'}
           alt="Arthur MCP"
-          sx={{ height: '100%', maxWidth: '100%' }}
+          sx={{ height: '200%', maxWidth: '200%' }}
           onError={() => setLogoError(true)}
         />
       )}
@@ -304,7 +304,7 @@ function SidebarContent() {
                         <Icon stroke={selected ? 2 : 1.5} size="1.1rem" />
                       </ListItemIcon>
                       <ListItemText
-                        primary={item.wip ? `${t(item.titleKey)} (WIP)` : t(item.titleKey)}
+                        primary={item.wip ? `${t(item.titleKey)} (Soon)` : t(item.titleKey)}
                         primaryTypographyProps={{
                           fontSize: '0.8375rem',
                           fontWeight: selected ? 600 : 400,

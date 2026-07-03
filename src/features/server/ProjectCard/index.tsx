@@ -99,6 +99,18 @@ export function ProjectCard({ p, onDelete, onDuplicate }: {
               variant="outlined"
               sx={{ fontWeight: 500 }}
             />
+            <Chip
+              label={t('label.resourceCount', { count: p.resources?.length ?? 0 })}
+              size="small"
+              variant="outlined"
+              sx={{ fontWeight: 500 }}
+            />
+            <Chip
+              label={t('label.promptCount', { count: p.prompts?.length ?? 0 })}
+              size="small"
+              variant="outlined"
+              sx={{ fontWeight: 500 }}
+            />
             {p.version && (
               <Chip label={`v${p.version}`} size="small" variant="outlined" sx={{ fontWeight: 500 }} />
             )}

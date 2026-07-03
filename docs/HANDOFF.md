@@ -14,6 +14,27 @@ Frontend duplication optimization is progressing through a phased extraction pla
 
 ## Latest Changes
 
+- Enforced supported database URL validation at startup:
+  - `DATABASE_URI` validation explicitly accepts only `sqlite:`, `postgres://`/`postgresql://`, and `mysql://` schemes.
+  - Unsupported values such as `mongodb://`, `mariadb://`, `redis://`, or a bare file path fail environment validation and block project startup.
+  - Added `api/src/config/env.validation.spec.ts` coverage for accepted and rejected database URLs.
+- Adopted a migration-only database change policy:
+  - TypeORM `synchronize` is now disabled for SQLite, PostgreSQL, and MySQL in `DatabaseModule`.
+  - `AGENTS.md`, `docs/DESIGN_PATTERNS.md`, `docs/ENTITIES.md`, `README.md`, and `api/.env.example` now state that schema/data-shape changes must be shipped through migrations.
+  - Added a roadmap item to create the first formal migration workflow/baseline because no migration setup was present yet.
+- Marked the `/servers/new` REST "Improve tools with AI" panel as planned but blocked:
+  - Added a local frontend availability flag that prevents the AI tool improvement handler from calling `/ai-providers/generate-tools`.
+  - The panel now shows a `Soon` chip, appears disabled, and disables provider selection plus Improve/Connect Provider actions.
+  - Documented the disabled planned state in `docs/FLOWS.md`.
+- Replaced remaining frontend user-facing `WIP` labels with `Soon`:
+  - Server Detail's disabled Chains tab now renders `Chains (Soon)`.
+  - The layout sidebar now renders disabled work-in-progress nav items as `(Soon)`.
+  - Verified no `WIP` strings remain under `src/` and ran `npm run type-check` successfully.
+- Updated `/servers/new` source selection so source cards marked as unavailable (`Soon`) are display-only:
+  - `NewServer` now refuses to select or double-click-advance unavailable source types.
+  - The Next button only unlocks when the selected source is available.
+  - Unavailable cards use a disabled visual state and `aria-disabled`.
+  - Documented the behavior in `docs/FLOWS.md` under page-based entity creation.
 - Corrected the Vercel specialist guidance so future deployment debugging uses the actual repository shape:
   - The React/Vite frontend deploys from the repository root, not `client/`.
   - Vercel Project Settings should use Root Directory `.` or blank, Framework Preset `Vite`, Install Command `npm install` unless a root lockfile exists, Build Command `npm run build`, and Output Directory `dist`.

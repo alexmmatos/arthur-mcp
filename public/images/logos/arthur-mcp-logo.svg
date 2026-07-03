@@ -1,0 +1,41 @@
+<svg width="1254" height="1254" viewBox="0 0 1254 1254" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="nodeGradient" x1="300" y1="880" x2="940" y2="470" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#06BEEA"/>
+      <stop offset="0.48" stop-color="#087BFF"/>
+      <stop offset="1" stop-color="#7B1EF2"/>
+    </linearGradient>
+    <linearGradient id="lineGradient" x1="350" y1="910" x2="930" y2="520" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#04BDEB"/>
+      <stop offset="0.5" stop-color="#087BFF"/>
+      <stop offset="1" stop-color="#7A21F3"/>
+    </linearGradient>
+    <filter id="softShadow" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="8" stdDeviation="18" flood-color="#001A3D" flood-opacity="0.14"/>
+    </filter>
+  </defs>
+
+  <rect x="0" y="0" width="1254" height="1254" rx="305" fill="white" filter="url(#softShadow)"/>
+
+  <!-- Outer A mark -->
+  <path d="M244 932 L433 448 C501 276 752 276 821 448 L1010 932"
+        stroke="#001F49" stroke-width="150" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Inner connector white backing -->
+  <path d="M627 485 L382 880 L872 880 Z"
+        stroke="white" stroke-width="125" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Inner connector gradient -->
+  <path d="M627 485 L382 880 L872 880 Z"
+        stroke="url(#lineGradient)" stroke-width="74" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Node white rings -->
+  <circle cx="627" cy="485" r="126" fill="white"/>
+  <circle cx="382" cy="880" r="126" fill="white"/>
+  <circle cx="872" cy="880" r="126" fill="white"/>
+
+  <!-- Node fills -->
+  <circle cx="627" cy="485" r="95" fill="url(#nodeGradient)"/>
+  <circle cx="382" cy="880" r="95" fill="url(#nodeGradient)"/>
+  <circle cx="872" cy="880" r="95" fill="url(#nodeGradient)"/>
+</svg>

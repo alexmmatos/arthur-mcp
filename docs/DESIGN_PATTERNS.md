@@ -43,50 +43,49 @@ Rules:
 
 ### Repository Contract
 
-Pattern: services depend on repository interfaces injected by tokens, not directly on TypeORM repositories or Mongoose models.
+Pattern: services depend on repository interfaces injected by tokens, not directly on TypeORM repositories.
 
 Examples:
 
 - Tokens: `api/src/database/database.tokens.ts`
 - Contracts: `api/src/users/user.repository.ts`, `api/src/swagger/swagger-project.repository.ts`
-- Implementations: `repositories/mongo-*.repository.ts` and `repositories/typeorm-*.repository.ts`
+- Implementations: `repositories/typeorm-*.repository.ts`
 
 Rules:
 
-- Add or change fields in this order: entity/schema, repository contract, Mongo repository, TypeORM repository, service usage, docs.
-- Keep repository return records stable across persistence backends.
-- Map TypeORM `id` and Mongo `_id` consistently at repository boundaries.
+- Add or change fields in this order: entity, repository contract, TypeORM repository, service usage, docs.
+- Keep repository return records stable.
+- Map TypeORM `id` to `_id` consistently at repository boundaries.
 - Keep JSON serialization/deserialization inside repository implementations, not services.
 - Use separate read models for security-sensitive records when different use cases need different field visibility. For example, `SecretRecord` includes `value` for internal resolution, while API-facing list/read flows return metadata without `value`.
 - Preserve server source tags as regular `tags` entries using the `source:<type>` format.
 
-### Multi-Persistence Strategy
+### Database Driver Selection
 
-Pattern: `DatabaseModule.forRoot()` selects the persistence backend based on the `DATABASE` env var.
+Pattern: `DatabaseModule.forRoot()` selects the TypeORM driver by parsing the `DATABASE_URI` connection string. There is no separate `DATABASE` variable — the scheme of `DATABASE_URI` determines the driver.
 
-Supported values:
+Supported schemes:
 
-| `DATABASE` | Driver | Notes |
+| `DATABASE_URI` scheme | Driver | Notes |
 |---|---|---|
-| `sqlite` (default) | TypeORM + better-sqlite3 | Local file, zero setup, `synchronize: true` |
-| `mysql` | TypeORM + mysql2 | MySQL 8+ / MariaDB 10.6+, `DB_SYNC=true` required for schema sync |
-| `postgres` / `postgresql` | TypeORM + pg | PostgreSQL 14+, `DB_SYNC=true` required for schema sync |
-| `mongodb` | Mongoose | Separate Mongoose schema path, no TypeORM |
+| `sqlite:<path>` (default: `sqlite:database.sqlite`) | TypeORM + sqlite3 | Local file, zero setup; schema changes must use migrations |
+| `postgres://...` / `postgresql://...` | TypeORM + pg | PostgreSQL 14+; add `?sslmode=require` to enable TLS |
+| `mysql://...` | TypeORM + mysql2 | MySQL 8+ / MariaDB 10.6+; add `?ssl=true` to enable TLS |
 
 Examples:
 
-- MongoDB path uses `MongooseModule.forRootAsync()` and `MongooseModule.forFeature()`.
-- TypeORM path (SQLite/MySQL/PostgreSQL) uses `TypeOrmModule.forRoot()` and `TypeOrmModule.forFeature()`. The driver is selected by `buildTypeOrmOptions()` inside `DatabaseModule`.
+- `TypeOrmModule.forRoot()` and `TypeOrmModule.forFeature()`. The driver is selected by `buildTypeOrmOptions()`, which calls `parseDatabaseUri()` (`api/src/database/database-uri.ts`) to detect the scheme and builds `DataSourceOptions` accordingly.
 
 Rules:
 
-- Any domain entity must support all persistence paths unless the feature is intentionally backend-specific.
-- Keep TypeORM entities and Mongoose schemas semantically aligned.
+- Any domain entity must support all three drivers unless the feature is intentionally backend-specific.
+- Application startup must fail during environment validation when `DATABASE_URI` does not use one of the supported schemes: `sqlite:`, `postgres://`/`postgresql://`, or `mysql://`.
 - Document differences in `docs/ENTITIES.md`.
 - Avoid leaking database-specific types outside repositories.
 - TypeORM repositories are driver-agnostic and prefixed `typeorm-*`. They work identically with SQLite, MySQL, and PostgreSQL.
-- `DB_SYNC=true` is dangerous in production for MySQL and PostgreSQL — TypeORM may drop columns on schema divergence. Use migrations in production; rely on `DB_SYNC` only in development.
-- Connection variables for MySQL/PostgreSQL: `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SSL`.
+- TypeORM `synchronize` must stay disabled for every driver, including local SQLite.
+- All database schema changes, seed/backfill changes, field additions/removals, index changes, and data-shape migrations must be shipped through explicit migrations. Do not use `DB_SYNC`, startup sync, or manual edits to local database files as the delivery mechanism.
+- When changing persistence, commit the entity/repository change and its migration together, then document the resulting entity shape in `docs/ENTITIES.md`.
 
 ### Guard and Decorator Authorization
 

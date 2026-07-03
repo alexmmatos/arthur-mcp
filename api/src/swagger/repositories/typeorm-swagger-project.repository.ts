@@ -106,7 +106,7 @@ export class TypeOrmSwaggerProjectRepository implements ISwaggerProjectRepositor
         id: true, name: true, baseUrl: true, description: true, version: true,
         shareSlug: true,
         tools: true, auth: true, status: true, errorMessage: true,
-        mcpApiKeys: true, tags: true, rateLimit: true, isPaused: true,
+        mcpApiKeys: true, resources: true, prompts: true, tags: true, rateLimit: true, isPaused: true,
         maintenanceMode: true, availabilityWindow: true, alertConfig: true,
         createdAt: true, updatedAt: true,
       },

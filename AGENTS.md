@@ -69,6 +69,7 @@ While working:
 - Treat permissions as part of every new feature, not as follow-up work. Any new user-facing surface, route, action, API endpoint, integration, or settings panel must either reuse an existing permission intentionally or add a new permission end-to-end.
 - Update tests when changing meaningful behavior.
 - Update the relevant documentation in the same change whenever behavior, architecture, entities, flows, commands, infrastructure, agents, or project conventions change.
+- All database schema or data-shape changes must be implemented through migrations. Do not rely on TypeORM `synchronize`, manual local database edits, or implicit startup sync for database changes.
 - Do not change local database files, lockfiles, or deploy configuration unless there is a clear reason.
 - If you change frontend code, validate with at least `npm run type-check` or `npm test` when practical.
 - If you change backend code, validate with at least `npm test --prefix api` or a focused test when practical.

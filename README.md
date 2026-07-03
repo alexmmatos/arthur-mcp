@@ -258,8 +258,7 @@ Guard Rails is the safety layer that constrains what the AI is allowed to send a
 - NestJS
 - TypeScript
 - TypeORM
-- SQLite, MySQL, PostgreSQL
-- MongoDB through Mongoose for supported domains
+- SQLite, MySQL, PostgreSQL (driver auto-detected from `DATABASE_URI`)
 - JWT and Passport
 - Jest
 - Prometheus metrics
@@ -310,14 +309,26 @@ cp api/.env.example api/.env
 For local development, SQLite works out of the box:
 
 ```env
-DATABASE=sqlite
-SQLITE_PATH=database.sqlite
+DATABASE_URI=sqlite:database.sqlite
 JWT_SECRET=dev-jwt-secret-change-in-production
 DASHBOARD_USER=admin
 DASHBOARD_PASSWORD=admin
 ```
 
+To use PostgreSQL or MySQL instead, point `DATABASE_URI` at a connection string — the driver is
+detected automatically from the scheme:
+
+```env
+DATABASE_URI=postgres://mcp:mcppassword@localhost:5432/mcp_db
+# or
+DATABASE_URI=mysql://mcp:mcppassword@localhost:3306/mcp_db
+```
+
 For production, always replace default credentials and use a long random JWT secret.
+
+Database schema and persisted data-shape changes are managed through migrations only. TypeORM
+`synchronize` is disabled for SQLite, PostgreSQL, and MySQL; do not use startup sync or manual
+database edits as the delivery path for schema changes.
 
 ### Run Frontend And Backend
 
@@ -377,7 +388,6 @@ The backend can use:
 - SQLite
 - MySQL
 - PostgreSQL
-- MongoDB
 
 For MySQL:
 
@@ -414,7 +424,7 @@ The backend:
 
 - Replace all development credentials.
 - Generate a strong `JWT_SECRET`.
-- Avoid `DB_SYNC=true` in production for MySQL or PostgreSQL.
+- Keep TypeORM `synchronize` disabled and ship database changes through migrations.
 - Use managed databases for durable production deployments.
 - Protect backups for SQLite volumes if you use SQLite outside development.
 
