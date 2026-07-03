@@ -2,21 +2,21 @@ import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeor
 
 @Entity('password_resets')
 export class PasswordResetEntity {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn('uuid', { name: 'id' })
   id: string;
 
-  @Column()
+  @Column({ name: 'user_id' })
   userId: string;
 
-  @Column({ unique: true })
+  @Column({ name: 'token', unique: true })
   token: string;
 
-  @Column()
+  @Column({ name: 'expires_at' })
   expiresAt: Date;
 
-  @Column({ default: false })
+  @Column({ name: 'used', default: false })
   used: boolean;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }

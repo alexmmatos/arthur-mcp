@@ -79,7 +79,7 @@ const NAV_SECTIONS: NavSection[] = [
       { titleKey: 'nav.servers', icon: IconFolder, path: '/', permission: 'servers_view' },
       { titleKey: 'nav.prompts', icon: IconMessage2, path: '/prompts', permission: 'prompts_view' },
       { titleKey: 'nav.secrets', icon: IconLock, path: '/secrets', permission: 'secrets_view_names' },
-      { titleKey: 'nav.aiProviders', icon: IconRobot, path: '/ai-providers', permission: 'ai_providers_view', wip: true },
+      { titleKey: 'nav.aiProviders', icon: IconRobot, path: '/ai-providers', permission: 'ai_providers_view' },
     ],
   },
   {

@@ -2,39 +2,39 @@ import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('settings')
 export class SettingsEntity {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn('uuid', { name: 'id' })
   id: string;
 
-  @Column({ unique: true, default: 'global' })
+  @Column({ name: 'key', unique: true, default: 'global' })
   key: string;
 
-  @Column({ default: '' })
+  @Column({ name: 'server_base_url', default: '' })
   serverBaseUrl: string;
 
-  @Column({ default: 30000 })
+  @Column({ name: 'default_timeout_ms', default: 30000 })
   defaultTimeoutMs: number;
 
-  @Column({ default: '' })
+  @Column({ name: 'smtp_host', default: '' })
   smtpHost: string;
 
-  @Column({ default: 587 })
+  @Column({ name: 'smtp_port', default: 587 })
   smtpPort: number;
 
-  @Column({ default: '' })
+  @Column({ name: 'smtp_user', default: '' })
   smtpUser: string;
 
-  @Column({ default: '' })
+  @Column({ name: 'smtp_pass', default: '' })
   smtpPass: string;
 
-  @Column({ default: '' })
+  @Column({ name: 'smtp_from', default: '' })
   smtpFrom: string;
 
-  @Column({ default: '' })
+  @Column({ name: 'jwt_secret', default: '' })
   jwtSecret: string;
 
-  @Column({ type: 'simple-json', nullable: true })
+  @Column({ name: 'global_request_headers', type: 'simple-json', nullable: true })
   globalRequestHeaders: { name: string; value: string }[] | null;
 
-  @Column({ type: 'simple-json', nullable: true })
+  @Column({ name: 'observability_environment', type: 'simple-json', nullable: true })
   observabilityEnvironment: Record<string, string> | null;
 }

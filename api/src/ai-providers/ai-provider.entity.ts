@@ -2,18 +2,18 @@ import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateCol
 
 @Entity('ai_providers')
 export class AiProviderEntity {
-  @PrimaryGeneratedColumn('uuid') id: string;
-  @Column() name: string;
-  @Column({ nullable: true }) description?: string;
-  @Column() provider: string;
-  @Column() model: string;
-  @Column('text') apiKey: string;
-  @Column({ nullable: true }) baseUrl?: string;
-  @Column({ default: true }) isActive: boolean;
-  @Column({ default: false }) isDefault: boolean;
-  @Column({ nullable: true }) lastTestStatus?: string;
-  @Column({ nullable: true }) lastTestedAt?: Date;
-  @Column({ nullable: true }) lastTestError?: string;
-  @CreateDateColumn() createdAt: Date;
-  @UpdateDateColumn() updatedAt: Date;
+  @PrimaryGeneratedColumn('uuid', { name: 'id' }) id: string;
+  @Column({ name: 'name' }) name: string;
+  @Column({ name: 'description', nullable: true }) description?: string;
+  @Column({ name: 'provider' }) provider: string;
+  @Column({ name: 'model' }) model: string;
+  @Column('text', { name: 'api_key' }) apiKey: string;
+  @Column({ name: 'base_url', nullable: true }) baseUrl?: string;
+  @Column({ name: 'is_active', default: true }) isActive: boolean;
+  @Column({ name: 'is_default', default: false }) isDefault: boolean;
+  @Column({ name: 'last_test_status', nullable: true }) lastTestStatus?: string;
+  @Column({ name: 'last_tested_at', nullable: true }) lastTestedAt?: Date;
+  @Column({ name: 'last_test_error', nullable: true }) lastTestError?: string;
+  @CreateDateColumn({ name: 'created_at' }) createdAt: Date;
+  @UpdateDateColumn({ name: 'updated_at' }) updatedAt: Date;
 }

@@ -2,14 +2,14 @@ import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateCol
 
 @Entity('error_tracking_providers')
 export class ErrorTrackingProviderEntity {
-  @PrimaryGeneratedColumn('uuid') id: string
-  @Column() name: string
-  @Column({ nullable: true }) description?: string
-  @Column() tool: string
-  @Column('text') dsn: string
-  @Column({ nullable: true }) projectName?: string
-  @Column({ nullable: true }) environment?: string
-  @Column({ default: false }) isActive: boolean
-  @CreateDateColumn() createdAt: Date
-  @UpdateDateColumn() updatedAt: Date
+  @PrimaryGeneratedColumn('uuid', { name: 'id' }) id: string
+  @Column({ name: 'name' }) name: string
+  @Column({ name: 'description', nullable: true }) description?: string
+  @Column({ name: 'tool' }) tool: string
+  @Column('text', { name: 'dsn' }) dsn: string
+  @Column({ name: 'project_name', nullable: true }) projectName?: string
+  @Column({ name: 'environment', nullable: true }) environment?: string
+  @Column({ name: 'is_active', default: false }) isActive: boolean
+  @CreateDateColumn({ name: 'created_at' }) createdAt: Date
+  @UpdateDateColumn({ name: 'updated_at' }) updatedAt: Date
 }

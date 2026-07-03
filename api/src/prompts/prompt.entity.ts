@@ -2,24 +2,24 @@ import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateCol
 
 @Entity('prompts')
 export class PromptEntity {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn('uuid', { name: 'id' })
   id: string;
 
-  @Column()
+  @Column({ name: 'name' })
   name: string;
 
-  @Column({ nullable: true })
+  @Column({ name: 'description', nullable: true })
   description?: string;
 
-  @Column('text')
+  @Column('text', { name: 'content' })
   content: string;
 
-  @Column('text', { default: '[]' })
+  @Column('text', { name: 'tags_json', default: '[]' })
   tagsJson: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }

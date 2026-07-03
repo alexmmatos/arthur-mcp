@@ -3,21 +3,21 @@ import { RolePermissions } from './role.repository';
 
 @Entity('roles')
 export class RoleEntity {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn('uuid', { name: 'id' })
   id: string;
 
-  @Column({ unique: true })
+  @Column({ name: 'name', unique: true })
   name: string;
 
-  @Column({ nullable: true })
+  @Column({ name: 'description', nullable: true })
   description?: string;
 
-  @Column('simple-json')
+  @Column('simple-json', { name: 'permissions' })
   permissions: RolePermissions;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }

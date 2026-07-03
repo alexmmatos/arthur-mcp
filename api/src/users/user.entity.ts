@@ -2,24 +2,24 @@ import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateCol
 
 @Entity('users')
 export class UserEntity {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn('uuid', { name: 'id' })
   id: string;
 
-  @Column({ unique: true })
+  @Column({ name: 'username', unique: true })
   username: string;
 
-  @Column({ unique: true })
+  @Column({ name: 'email', unique: true })
   email: string;
 
-  @Column()
+  @Column({ name: 'password' })
   password: string;
 
-  @Column({ default: 'user' })
+  @Column({ name: 'role', default: 'user' })
   role: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }
