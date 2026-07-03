@@ -1,4 +1,5 @@
 # Arthur MCP
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/alexmmatos/arthur-mcp)
 
 Arthur MCP is an open, self-hostable control plane for building and operating Model Context Protocol servers from APIs, databases, prompts, resources, and internal tools.
 
@@ -416,7 +417,6 @@ This repository includes `render.yaml`.
 The backend:
 
 - Reads `process.env.PORT`.
-- Binds to `0.0.0.0`.
 - Uses `/health` as the Render health check.
 - Enables structured logs and metrics by default.
 - Keeps tracing disabled until an OTLP endpoint is configured.
