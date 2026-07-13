@@ -14,14 +14,9 @@ import {
 import CloudUploadIcon from '@mui/icons-material/CloudUpload'
 import api from '../../api'
 import { HelpButton } from '../../components'
+import type { Phase } from './phase.type'
+import type { UploadResult } from './uploadResult.interface'
 
-type Phase = 'idle' | 'uploading' | 'success' | 'error'
-
-interface UploadResult {
-  _id: string
-  name: string
-  tools: { name: string }[]
-}
 
 export default function Upload() {
   const { t } = useTranslation('servers')

@@ -1,27 +1,15 @@
-import { createContext, useContext, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ThemeProvider, CssBaseline } from '@mui/material'
 import baselightTheme, { basedarkTheme } from './index'
+import { ColorMode } from './colorMode.enum'
+import type { ColorModeContextType } from './colorModeContextType.interface'
+import { ColorModeContext } from './colorMode.context'
+import type { ColorModeProviderProps } from './colorModeProviderProps.interface'
 
-export enum ColorMode {
-  Light = 'light',
-  Dark = 'dark',
-}
+export { ColorMode } from './colorMode.enum'
+export { useColorMode } from './useColorMode.hook'
 
-interface ColorModeContextType {
-  mode: ColorMode
-  toggle: () => void
-}
-
-const ColorModeContext = createContext<ColorModeContextType>({
-  mode: ColorMode.Light,
-  toggle: () => {},
-})
-
-export function useColorMode() {
-  return useContext(ColorModeContext)
-}
-
-export function ColorModeProvider({ children }: { children: React.ReactNode }) {
+export function ColorModeProvider({ children }: ColorModeProviderProps) {
   const [mode, setMode] = useState<ColorMode>(() => {
     return (localStorage.getItem('colorMode') as ColorMode) ?? ColorMode.Dark
   })

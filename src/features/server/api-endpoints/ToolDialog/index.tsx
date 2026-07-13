@@ -21,9 +21,9 @@ import type {
   ParameterMapping, ParamEntry, HeaderEntry, Project, ToolDialogProps,
 } from '../../types'
 import { METHOD_COLOR, METHODS, SOURCES, PARAM_TYPES, SOURCE_CHIP_COLOR } from '../../constants'
-import { inferSchema } from '../curl-utils'
+import { inferSchema } from '../utils'
 import { extractHbSchema } from '../../resources/DynamicResourceDialog'
-import { emptyParam, emptyHeader, toolToFormState } from '../tool-form-utils'
+import { emptyParam, emptyHeader, toolToFormState } from '../utils'
 
 export function ToolDialog({ open, onClose, onSaved, onDeleted, projectId, projectBaseUrl, editTool, prefillFrom, mode = 'tool', allTools }: ToolDialogProps) {
   const { t } = useTranslation(['serverDetail', 'common'])

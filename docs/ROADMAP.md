@@ -12,6 +12,14 @@ This file should be updated when task state changes. It does not replace issues 
 
 ## In Progress
 
+- [x] Apply the frontend file organization plan (`docs/FRONTEND_FILE_ORGANIZATION_PLAN.md`):
+  - [x] **Phase 0:** Validated Git state while ignoring stale `.claude/worktrees` gitlinks, captured the frontend baseline, and generated the declaration/helper/import inventory.
+  - [x] **Phase 1:** Used authentication and permissions as the reference slice for isolated contracts, focused role/permission utilities, hooks, and the React provider.
+  - [x] **Phase 2:** Split shared contracts and mixed global utilities by responsibility.
+  - [x] **Phase 3:** Migrated leaf features (`prompts`, `secrets`, AI providers, error tracking, observability, and shared components).
+  - [x] **Phase 4:** Split server contracts and utilities by dependency and feature sub-area.
+  - [x] **Phase 5:** Migrated page-local contracts, component props, hooks, constants, and utilities, including `NewServer`.
+  - [x] **Phase 6:** Renamed JSX-free barrels, removed compatibility catch-alls, and added automated AST-based structural enforcement.
 - [ ] Audit permission coverage for newly added feature domains and integrations:
   - [x] Verify frontend permissions for AI providers are present in backend `RolePermissions`, backend built-in role presets, frontend fallback presets, and AI Provider UI gates, including `ai_providers_execute` for test/generation actions.
   - [ ] Verify frontend permissions for error tracking are present in backend `RolePermissions` and backend built-in role presets.
@@ -45,6 +53,7 @@ This file should be updated when task state changes. It does not replace issues 
 
 ## Done
 
+- [x] Completed the frontend file organization migration: 249 isolated contract files, focused utility/hook/constant modules, pure `index.ts` barrels, and an enforced `check:frontend-structure` gate.
 - [x] Audited frontend hardcoded user-facing terms that bypass i18n and documented findings/remediation priorities in `docs/FRONTEND_I18N_HARDCODED_AUDIT_2026-07-01.md`.
 - [x] Added missing `serverDetail` and `errorTracking` locale keys introduced by the recent i18n sweep in EN/PT-BR and stabilized translated UI references.
 - [x] Internationalized core `NewServer` connection/auth flows (GraphQL, gRPC, SQL/NoSQL/cloud connection blocks, auth forms, and import tab labels) using `servers:newServer.*` keys in EN/PT-BR.

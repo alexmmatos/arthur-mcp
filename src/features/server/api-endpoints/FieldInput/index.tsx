@@ -9,14 +9,8 @@ import {
   Typography,
 } from '@mui/material'
 import type { JsonSchema } from '../../types'
+import type { FieldInputProps } from './fieldInputProps.interface'
 
-interface FieldInputProps {
-  name: string
-  schema: JsonSchema
-  value: string
-  required: boolean
-  onChange: (value: string) => void
-}
 
 export function FieldInput({ name, schema, value, required, onChange }: FieldInputProps) {
   const label = `${name}${required ? ' *' : ''}`

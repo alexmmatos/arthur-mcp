@@ -23,25 +23,14 @@ import {
 import { useTranslation } from 'react-i18next'
 import api from '../../api'
 import { useAuth, Permission } from '../../context/AuthContext'
-import { useDetailPageNav } from '../../hooks/useDetailPageNav'
+import { useDetailPageNav } from '../../hooks/useDetailPageNav.hook'
 import { AppSnackbar, HelpButton } from '../../components'
 import { GlobalRequestHeadersPanel, type HeaderEntry } from '../../features/settings'
 import { ObservabilityEnvironmentPanel } from '../../features/observability'
 import { emailValid, portValid } from '../../utils/validation'
+import type { SettingsData } from './settingsData.interface'
+import type { SettingsTab } from './settingsTab.type'
 
-interface SettingsData {
-  serverBaseUrl: string
-  defaultTimeoutMs: number
-  smtpHost: string
-  smtpPort: number
-  smtpUser: string
-  smtpFrom: string
-  smtpPassSet: boolean
-  jwtSecretSet: boolean
-  globalRequestHeaders?: { name: string; value: string }[]
-}
-
-type SettingsTab = 'server' | 'security' | 'headers' | 'email' | 'observability'
 
 export default function Settings() {
   const { can, loading: authLoading } = useAuth()

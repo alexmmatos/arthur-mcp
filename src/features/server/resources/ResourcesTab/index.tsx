@@ -18,14 +18,12 @@ import type { GeneratedTool, McpResource } from '../../types'
 import { DynamicResourceDialog } from '../DynamicResourceDialog'
 import { ResourceTestPanel } from '../ResourceTestPanel'
 import { FromEndpointPickerDialog } from '../../api-endpoints/FromEndpointPickerDialog'
+import type { ResourcesTabProps } from './resourcesTabProps.interface'
+import { createEmptyResourceForm } from '../utils/createEmptyResourceForm.factory'
+import { slugifyResourceName } from '../utils/slugifyResourceName.util'
 
-export function ResourcesTab({ projectId, initialResources, tools, onChange, anyApiKey }: {
-  projectId: string
-  initialResources: McpResource[]
-  tools: GeneratedTool[]
-  onChange: (resources: McpResource[]) => void
-  anyApiKey?: string
-}) {
+
+export function ResourcesTab({ projectId, initialResources, tools, onChange, anyApiKey }: ResourcesTabProps) {
   const { t } = useTranslation(['serverDetail', 'common'])
   const [resources, setResources] = useState<McpResource[]>(initialResources)
   const [dynDialogOpen, setDynDialogOpen] = useState(false)
@@ -43,14 +41,11 @@ export function ResourcesTab({ projectId, initialResources, tools, onChange, any
   const { mode: colorMode } = useColorMode()
   const { can } = useAuth()
 
-  const emptyForm = () => ({ name: '', uri: '', description: '', mimeType: 'text/html', content: '' })
-  const [form, setForm] = useState(emptyForm())
-
-  const slugify = (s: string) => s.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+  const [form, setForm] = useState(createEmptyResourceForm())
 
   const openAdd = () => {
     setEditTarget(null)
-    setForm(emptyForm())
+    setForm(createEmptyResourceForm())
     setFormError('')
     setDialogOpen(true)
   }
@@ -63,7 +58,7 @@ export function ResourcesTab({ projectId, initialResources, tools, onChange, any
   }
 
   const handleNameChange = (name: string) => {
-    const uri = editTarget ? form.uri : `resource://${projectId}/${slugify(name)}`
+    const uri = editTarget ? form.uri : `resource://${projectId}/${slugifyResourceName(name)}`
     setForm((f) => ({ ...f, name, uri }))
   }
 

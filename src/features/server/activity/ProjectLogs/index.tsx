@@ -7,8 +7,13 @@ import { IconChevronDown, IconChevronRight } from '@tabler/icons-react'
 import { useTranslation } from 'react-i18next'
 import api from '../../../../api'
 import type { ExecLog } from '../../types'
+import type { StatCardProps } from './statCardProps.interface'
+import type { JsonBlockProps } from './jsonBlockProps.interface'
+import type { LogRowProps } from './logRowProps.interface'
+import type { ProjectLogsProps } from './projectLogsProps.interface'
 
-export function StatCard({ label, value, color }: { label: string; value: number | string; color?: string }) {
+
+export function StatCard({ label, value, color }: StatCardProps) {
   return (
     <Paper variant="outlined" sx={{ p: 2, textAlign: 'center', borderColor: color ? `${color}44` : 'divider' }}>
       <Typography variant="h4" fontWeight={700} color={color ?? 'text.primary'}>{value}</Typography>
@@ -17,7 +22,7 @@ export function StatCard({ label, value, color }: { label: string; value: number
   )
 }
 
-function JsonBlock({ value }: { value: unknown }) {
+function JsonBlock({ value }: JsonBlockProps) {
   const { t } = useTranslation('serverDetail')
   if (value === undefined || value === null) {
     return <Typography fontSize="0.78rem" color="text.disabled" fontStyle="italic">{t('logs.noPayload')}</Typography>
@@ -43,7 +48,7 @@ function JsonBlock({ value }: { value: unknown }) {
   )
 }
 
-function LogRow({ log }: { log: ExecLog }) {
+function LogRow({ log }: LogRowProps) {
   const { t } = useTranslation('serverDetail')
   const [open, setOpen] = useState(false)
   const hasPayload = log.requestPayload !== undefined || log.responsePayload !== undefined
@@ -125,7 +130,7 @@ function LogRow({ log }: { log: ExecLog }) {
   )
 }
 
-export function ProjectLogs({ projectId }: { projectId: string }) {
+export function ProjectLogs({ projectId }: ProjectLogsProps) {
   const { t } = useTranslation('serverDetail')
   const [logs, setLogs] = useState<ExecLog[]>([])
   const [total, setTotal] = useState(0)

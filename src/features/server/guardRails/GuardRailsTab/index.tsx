@@ -6,13 +6,8 @@ import { AuthConfigPanel } from '../../settings/AuthConfigPanel'
 import { InputConstraintsPanel } from '../InputConstraintsPanel'
 import { OutputFilteringPanel } from '../OutputFilteringPanel'
 import { ToolRestrictionsPanel } from '../ToolRestrictionsPanel'
+import type { GuardRailsTabProps } from './guardRailsTabProps.interface'
 
-interface GuardRailsTabProps {
-  projectId: string
-  tools: GeneratedTool[]
-  initialAuth?: AuthConfig
-  onAuthChange: (auth: AuthConfig) => void
-}
 
 export function GuardRailsTab({ projectId, tools, initialAuth, onAuthChange }: GuardRailsTabProps) {
   const { t } = useTranslation('serverDetail')

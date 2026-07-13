@@ -31,17 +31,18 @@ import {
 import { useTranslation } from 'react-i18next'
 import { useAuth, Permission } from '../../context/AuthContext'
 import api from '../../api'
-import { useDetailPageNav } from '../../hooks/useDetailPageNav'
+import { useDetailPageNav } from '../../hooks/useDetailPageNav.hook'
 import { PROVIDER_COLORS, type ObservabilityProvider, type ObservabilityProviderType } from '../../features/observability'
 import Swal from 'sweetalert2'
+import type { OverviewTabProps } from './overviewTabProps.interface'
+import type { SettingsTabProps } from './settingsTabProps.interface'
+import { PROVIDER_TYPES } from './constants/providerTypes.constant'
 
-const PROVIDER_TYPES: ObservabilityProviderType[] = [
-  'grafana', 'prometheus', 'datadog', 'newrelic', 'elastic', 'loki', 'custom',
-]
+
 
 // ─── Tab 0 — Overview ─────────────────────────────────────────────────────────
 
-function OverviewTab({ provider }: { provider: ObservabilityProvider }) {
+function OverviewTab({ provider }: OverviewTabProps) {
   const { t } = useTranslation('observability')
   const color = PROVIDER_COLORS[provider.type] ?? '#6b7280'
 
@@ -106,7 +107,7 @@ function OverviewTab({ provider }: { provider: ObservabilityProvider }) {
 
 // ─── Tab 1 — Settings ────────────────────────────────────────────────────────
 
-function SettingsTab({ provider, onUpdated }: { provider: ObservabilityProvider; onUpdated: (p: ObservabilityProvider) => void }) {
+function SettingsTab({ provider, onUpdated }: SettingsTabProps) {
   const { t } = useTranslation('observability')
   const navigate = useNavigate()
   const { can } = useAuth()

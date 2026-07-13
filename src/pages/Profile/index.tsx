@@ -39,200 +39,25 @@ import {
 import { useTranslation } from 'react-i18next'
 import api from '../../api'
 import { useAuth, Permission } from '../../context/AuthContext'
-import { useDetailPageNav } from '../../hooks/useDetailPageNav'
-import { useAsyncFeedback } from '../../hooks/useAsyncFeedback'
+import { useDetailPageNav } from '../../hooks/useDetailPageNav.hook'
+import { useAsyncFeedback } from '../../hooks/useAsyncFeedback.hook'
 import { ConfirmDialog } from '../../components'
 import { AppSnackbar } from '../../components'
 import { avatarLetter, avatarColor } from '../../utils/avatar'
+import type { UserProfile } from './userProfile.interface'
+import type { RolePermissions } from './rolePermissions.interface'
+import type { Role } from './role.interface'
+import type { UserDialogProps } from './userDialogProps.interface'
+import type { MyProfileTabProps } from './myProfileTabProps.interface'
+import type { UsersTabProps } from './usersTabProps.interface'
+import type { RoleDrawerProps } from './roleDrawerProps.interface'
+import { PERMISSION_GROUPS } from './constants/permissionGroups.constant'
+import { ALL_OFF } from './constants/allOff.constant'
+import { BUILTIN_ROLES } from './constants/builtinRoles.constant'
+import { emptyPermissions } from './utils/emptyPermissions.util'
+import { permissionCount } from './utils/permissionCount.util'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 
-interface UserProfile {
-  _id: string
-  username: string
-  email: string
-  role: string
-  createdAt: string
-}
-
-interface RolePermissions {
-  servers_view: boolean
-  servers_create: boolean
-  servers_edit_settings: boolean
-  servers_delete: boolean
-  servers_toggle_active: boolean
-  servers_share: boolean
-  tools_view: boolean
-  tools_create: boolean
-  tools_edit: boolean
-  tools_delete: boolean
-  tools_test: boolean
-  endpoints_create: boolean
-  resources_view: boolean
-  resources_create: boolean
-  resources_edit: boolean
-  resources_delete: boolean
-  prompts_view: boolean
-  prompts_create: boolean
-  prompts_edit: boolean
-  prompts_delete: boolean
-  secrets_view_names: boolean
-  secrets_reveal_values: boolean
-  secrets_create: boolean
-  secrets_edit: boolean
-  secrets_delete: boolean
-  api_keys_view: boolean
-  api_keys_create: boolean
-  api_keys_delete: boolean
-  users_view: boolean
-  users_invite: boolean
-  users_edit: boolean
-  users_delete: boolean
-  roles_view: boolean
-  roles_manage: boolean
-  audit_view: boolean
-  audit_export: boolean
-  templates_use: boolean
-  settings_manage: boolean
-  observability_view: boolean
-  observability_create: boolean
-  observability_edit: boolean
-  observability_delete: boolean
-  error_tracking_view: boolean
-  error_tracking_create: boolean
-  error_tracking_edit: boolean
-  error_tracking_delete: boolean
-  ai_providers_view: boolean
-  ai_providers_create: boolean
-  ai_providers_edit: boolean
-  ai_providers_delete: boolean
-  ai_providers_execute: boolean
-}
-
-interface Role {
-  _id: string
-  id?: string
-  name: string
-  description?: string
-  builtin?: boolean
-  permissions: RolePermissions
-}
-
-const PERMISSION_GROUPS: {
-  label: string
-  keys: (keyof RolePermissions)[]
-}[] = [
-  { label: 'Servers',      keys: ['servers_view', 'servers_create', 'servers_edit_settings', 'servers_delete', 'servers_toggle_active', 'servers_share'] },
-  { label: 'Tools',        keys: ['tools_view', 'tools_create', 'tools_edit', 'tools_delete', 'tools_test', 'endpoints_create'] },
-  { label: 'Resources',    keys: ['resources_view', 'resources_create', 'resources_edit', 'resources_delete'] },
-  { label: 'Prompts',      keys: ['prompts_view', 'prompts_create', 'prompts_edit', 'prompts_delete'] },
-  { label: 'Secrets',      keys: ['secrets_view_names', 'secrets_reveal_values', 'secrets_create', 'secrets_edit', 'secrets_delete'] },
-  { label: 'API Keys',     keys: ['api_keys_view', 'api_keys_create', 'api_keys_delete'] },
-  { label: 'Users & Roles', keys: ['users_view', 'users_invite', 'users_edit', 'users_delete', 'roles_view', 'roles_manage'] },
-  { label: 'Audit & Logs', keys: ['audit_view', 'audit_export'] },
-  { label: 'Templates',    keys: ['templates_use'] },
-  { label: 'Settings',       keys: ['settings_manage'] },
-  { label: 'Observability',  keys: ['observability_view', 'observability_create', 'observability_edit', 'observability_delete'] },
-  { label: 'Error Tracking', keys: ['error_tracking_view', 'error_tracking_create', 'error_tracking_edit', 'error_tracking_delete'] },
-  { label: 'AI Providers',   keys: ['ai_providers_view', 'ai_providers_create', 'ai_providers_edit', 'ai_providers_delete', 'ai_providers_execute'] },
-]
-
-const ALL_OFF: RolePermissions = {
-  servers_view: false, servers_create: false, servers_edit_settings: false, servers_delete: false,
-  servers_toggle_active: false, servers_share: false,
-  tools_view: false, tools_create: false, tools_edit: false, tools_delete: false, tools_test: false, endpoints_create: false,
-  resources_view: false, resources_create: false, resources_edit: false, resources_delete: false,
-  prompts_view: false, prompts_create: false, prompts_edit: false, prompts_delete: false,
-  secrets_view_names: false, secrets_reveal_values: false, secrets_create: false, secrets_edit: false, secrets_delete: false,
-  api_keys_view: false, api_keys_create: false, api_keys_delete: false,
-  users_view: false, users_invite: false, users_edit: false, users_delete: false,
-  roles_view: false, roles_manage: false,
-  audit_view: false, audit_export: false,
-  templates_use: false,
-  settings_manage: false,
-  observability_view: false, observability_create: false, observability_edit: false, observability_delete: false,
-  error_tracking_view: false, error_tracking_create: false, error_tracking_edit: false, error_tracking_delete: false,
-  ai_providers_view: false, ai_providers_create: false, ai_providers_edit: false, ai_providers_delete: false,
-  ai_providers_execute: false,
-}
-
-const BUILTIN_ROLES: Role[] = [
-  {
-    _id: 'admin',
-    name: 'Administrator',
-    builtin: true,
-    permissions: Object.fromEntries(Object.keys(ALL_OFF).map((k) => [k, true])) as unknown as RolePermissions,
-  },
-  {
-    _id: 'developer',
-    name: 'Developer',
-    builtin: true,
-    permissions: {
-      ...ALL_OFF,
-      servers_view: true, servers_create: true, servers_edit_settings: true, servers_delete: false,
-      servers_toggle_active: true, servers_share: true,
-      tools_view: true, tools_create: true, tools_edit: true, tools_delete: true, tools_test: true, endpoints_create: true,
-      resources_view: true, resources_create: true, resources_edit: true, resources_delete: true,
-      prompts_view: true, prompts_create: true, prompts_edit: true, prompts_delete: true,
-      secrets_view_names: true, secrets_reveal_values: false,
-      api_keys_view: true, api_keys_create: true, api_keys_delete: false,
-      users_view: true, roles_view: true,
-      audit_view: true, templates_use: true,
-      observability_view: true,
-      error_tracking_view: true, error_tracking_create: true, error_tracking_edit: true, error_tracking_delete: true,
-      ai_providers_view: true, ai_providers_create: true, ai_providers_edit: true, ai_providers_delete: true,
-      ai_providers_execute: true,
-    },
-  },
-  {
-    _id: 'editor',
-    name: 'Editor',
-    builtin: true,
-    permissions: {
-      ...ALL_OFF,
-      servers_view: true,
-      tools_view: true, tools_create: true, tools_edit: true, tools_delete: true, tools_test: true, endpoints_create: true,
-      resources_view: true, resources_create: true, resources_edit: true, resources_delete: true,
-      prompts_view: true, prompts_create: true, prompts_edit: true, prompts_delete: true,
-      secrets_view_names: true,
-      users_view: true,
-      templates_use: true,
-      observability_view: true,
-      error_tracking_view: true, error_tracking_create: true, error_tracking_edit: true,
-      ai_providers_view: true, ai_providers_create: true, ai_providers_edit: true,
-      ai_providers_execute: true,
-    },
-  },
-  {
-    _id: 'viewer',
-    name: 'Viewer',
-    builtin: true,
-    permissions: {
-      ...ALL_OFF,
-      servers_view: true,
-      tools_view: true, resources_view: true, prompts_view: true,
-      users_view: true, roles_view: true,
-      audit_view: true,
-      observability_view: true,
-      error_tracking_view: true,
-      ai_providers_view: true,
-    },
-  },
-]
-
-const emptyPermissions = (): RolePermissions => ({ ...ALL_OFF, servers_view: true })
-
-// ─── User dialog ──────────────────────────────────────────────────────────────
-
-interface UserDialogProps {
-  open: boolean
-  onClose: () => void
-  onSaved: (user: UserProfile) => void
-  editUser?: UserProfile
-  onDeleted?: (id: string) => void
-  canDelete?: boolean
-  currentUserId?: string
-}
 
 function UserDialog({ open, onClose, onSaved, editUser, onDeleted, canDelete, currentUserId }: UserDialogProps) {
   const { t } = useTranslation('profile')
@@ -385,7 +210,7 @@ function UserDialog({ open, onClose, onSaved, editUser, onDeleted, canDelete, cu
 
 // ─── My profile tab ───────────────────────────────────────────────────────────
 
-function MyProfileTab({ me, onUpdated }: { me: UserProfile; onUpdated: (u: UserProfile) => void }) {
+function MyProfileTab({ me, onUpdated }: MyProfileTabProps) {
   const { t } = useTranslation('profile')
   const [username, setUsername] = useState(me.username)
   const [email, setEmail] = useState(me.email)
@@ -499,7 +324,7 @@ function MyProfileTab({ me, onUpdated }: { me: UserProfile; onUpdated: (u: UserP
 
 // ─── Users tab ────────────────────────────────────────────────────────────────
 
-function UsersTab({ currentUserId }: { currentUserId: string }) {
+function UsersTab({ currentUserId }: UsersTabProps) {
   const { t } = useTranslation('profile')
   const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
@@ -627,12 +452,7 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
 
 function RoleDrawer({
   open, onClose, onSaved, editRole,
-}: {
-  open: boolean
-  onClose: () => void
-  onSaved: (role: Role) => void
-  editRole?: Role
-}) {
+}: RoleDrawerProps) {
   const { t } = useTranslation('profile')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -823,7 +643,6 @@ function RolesTab() {
     }
   }
 
-  const permissionCount = (p: RolePermissions) => Object.values(p).filter(Boolean).length
   const totalPermissions = Object.keys(emptyPermissions()).length
 
   if (loading) return <Box display="flex" justifyContent="center" py={6}><CircularProgress /></Box>

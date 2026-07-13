@@ -27,16 +27,9 @@ import {
 } from '@tabler/icons-react'
 import api from '../../api'
 import { Permission, useAuth } from '../../context/AuthContext'
+import type { SecretRecord } from './secretRecord.interface'
+import type { SecretForm } from './secretForm.interface'
 
-interface SecretRecord {
-  id: string
-}
-
-interface SecretForm {
-  name: string
-  value: string
-  description: string
-}
 
 export default function NewSecret() {
   const navigate = useNavigate()

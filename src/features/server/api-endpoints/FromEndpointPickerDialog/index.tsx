@@ -7,16 +7,10 @@ import { useTranslation } from 'react-i18next'
 import { BaseDialogLayout } from '../../../../components'
 import type { GeneratedTool } from '../../types'
 import { METHOD_COLOR } from '../../constants'
+import type { FromEndpointPickerDialogProps } from './fromEndpointPickerDialogProps.interface'
 
-export function FromEndpointPickerDialog({ open, tools, onPick, onClose, onBlank, title = 'Create tool from endpoint', description = "Select an endpoint to pre-fill the tool form with its HTTP details. You'll only need to fill in the tool name and description." }: {
-  open: boolean
-  tools: GeneratedTool[]
-  onPick: (tool: GeneratedTool) => void
-  onClose: () => void
-  onBlank?: () => void
-  title?: string
-  description?: string
-}) {
+
+export function FromEndpointPickerDialog({ open, tools, onPick, onClose, onBlank, title = 'Create tool from endpoint', description = "Select an endpoint to pre-fill the tool form with its HTTP details. You'll only need to fill in the tool name and description." }: FromEndpointPickerDialogProps) {
   const { t } = useTranslation('serverDetail')
   const [search, setSearch] = useState('')
   const filtered = tools.filter((t) => {

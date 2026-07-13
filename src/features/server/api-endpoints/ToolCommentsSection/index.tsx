@@ -8,12 +8,10 @@ import {
 import { useAuth, Permission } from '../../../../context/AuthContext'
 import api from '../../../../api'
 import type { ToolComment } from '../../types'
+import type { ToolCommentsSectionProps } from './toolCommentsSectionProps.interface'
 
-export function ToolCommentsSection({ projectId, toolName, initialComments }: {
-  projectId: string
-  toolName: string
-  initialComments: ToolComment[]
-}) {
+
+export function ToolCommentsSection({ projectId, toolName, initialComments }: ToolCommentsSectionProps) {
   const { can } = useAuth()
   const [comments, setComments] = useState<ToolComment[]>(initialComments)
   const [text, setText] = useState('')

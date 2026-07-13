@@ -9,35 +9,15 @@ import {
 } from '@mui/material'
 import { IconShieldLock } from '@tabler/icons-react'
 import api from '../../../api'
+import type { SecretEntry } from './secretEntry.interface'
+import { useSecrets } from './hooks/useSecrets.hook'
+import type { SecretAutocompleteProps } from './secretAutocompleteProps.interface'
 
-export interface SecretEntry {
-  id: string
-  name: string
-  description?: string
-}
+export { useSecrets } from './hooks/useSecrets.hook'
 
-export function useSecrets() {
-  const [secrets, setSecrets] = useState<SecretEntry[]>([])
-  const [loading, setLoading] = useState(false)
+export type { SecretEntry } from './secretEntry.interface'
 
-  useEffect(() => {
-    setLoading(true)
-    api.get<SecretEntry[]>('/secrets')
-      .then((r) => setSecrets(r.data))
-      .finally(() => setLoading(false))
-  }, [])
-
-  return { secrets, loading }
-}
-
-export default function SecretAutocomplete({ value, onChange, label, secrets, loadingSecrets, disabled }: {
-  value: string
-  onChange: (v: string) => void
-  label: string
-  secrets: SecretEntry[]
-  loadingSecrets: boolean
-  disabled?: boolean
-}) {
+export default function SecretAutocomplete({ value, onChange, label, secrets, loadingSecrets, disabled }: SecretAutocompleteProps) {
   const options = secrets.map((s) => `{{secret:${s.name}}}`)
   const isSecretRef = value.startsWith('{{secret:')
   const selectedName = isSecretRef ? value.replace(/^\{\{secret:/, '').replace(/\}\}$/, '') : null

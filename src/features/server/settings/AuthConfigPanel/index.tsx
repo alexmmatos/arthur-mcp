@@ -10,12 +10,10 @@ import { HelpButton } from '../../../../components'
 import { SaveIndicator } from '../../../../components'
 import { SecretAutocomplete, useSecrets } from '../../../secrets'
 import type { AuthConfig, AuthType, SaveStatus } from '../../types'
+import type { AuthConfigPanelProps } from './authConfigPanelProps.interface'
 
-export function AuthConfigPanel({ projectId, initialAuth, onChange }: {
-  projectId: string
-  initialAuth?: AuthConfig
-  onChange: (auth: AuthConfig) => void
-}) {
+
+export function AuthConfigPanel({ projectId, initialAuth, onChange }: AuthConfigPanelProps) {
   const { t } = useTranslation('serverDetail')
   const [authType, setAuthType] = useState<AuthType>((initialAuth?.type as AuthType) ?? 'none')
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')

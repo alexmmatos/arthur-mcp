@@ -31,30 +31,21 @@ import { useAuth, Permission } from '../../context/AuthContext'
 import { HelpButton } from '../../components'
 import { STATUS_COLORS } from '../../theme/index'
 import { type Preset, presetToDates, toInputDate } from '../../utils/dateRange'
+import type { DashStats } from './dashStats.interface'
+import type { HealthEntry } from './healthEntry.interface'
+import { useHealthStatusText } from './hooks/useHealthStatusText.hook'
+import type { SummaryBannerProps } from './summaryBannerProps.interface'
+import type { StatCardProps } from './statCardProps.interface'
+import type { CallsChartProps } from './callsChartProps.interface'
+import type { HealthDotProps } from './healthDotProps.interface'
 
-// ─── Types ─────────────────────────────────────────────────────────────────────
 
-interface DashStats {
-  period: { from: string; to: string }
-  projects: { total: number; withApiKey: number; active: number }
-  tools: { total: number }
-  calls: { total: number; errors: number; successRate: number }
-  topTools: { toolName: string; count: number; serverName: string }[]
-  callsByBucket: { _id: string; calls: number; errors: number }[]
-  recentProjects: { _id: string; name: string; toolCount: number; status: string; tags: string[] }[]
-}
 
-interface HealthEntry {
-  projectId: string
-  serverName: string
-  isPaused: boolean
-  errorRatePct: number
-  totalCalls: number
-}
+
 
 // ─── Summary banner ────────────────────────────────────────────────────────────
 
-function SummaryBanner({ stats, preset }: { stats: DashStats; preset: Preset }) {
+function SummaryBanner({ stats, preset }: SummaryBannerProps) {
   const { t } = useTranslation('dashboard')
   const { calls, projects } = stats
   const period = t(`period.${preset === 'custom' ? 'selected' : `last${preset}`}`)
@@ -87,14 +78,7 @@ function SummaryBanner({ stats, preset }: { stats: DashStats; preset: Preset }) 
 
 // ─── Stat card ─────────────────────────────────────────────────────────────────
 
-function StatCard({ icon, color, headline, subline, helpTitle, helpContent }: {
-  icon: React.ReactNode
-  color: string
-  headline: React.ReactNode
-  subline?: string
-  helpTitle?: string
-  helpContent?: React.ReactNode
-}) {
+function StatCard({ icon, color, headline, subline, helpTitle, helpContent }: StatCardProps) {
   return (
     <Paper variant="outlined" sx={{ height: '100%', p: 2, display: 'flex', alignItems: 'flex-start', gap: 2 }}>
       <Box sx={{ p: 1.2, borderRadius: 2, bgcolor: 'action.hover', color, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
@@ -113,7 +97,7 @@ function StatCard({ icon, color, headline, subline, helpTitle, helpContent }: {
 
 // ─── Bar chart ─────────────────────────────────────────────────────────────────
 
-function CallsChart({ data, preset }: { data: DashStats['callsByBucket']; preset: Preset }) {
+function CallsChart({ data, preset }: CallsChartProps) {
   const { t } = useTranslation('dashboard')
   if (!data.length) return <Typography color="text.secondary" fontSize="0.85rem">{t('chart.noActivity')}</Typography>
 
@@ -150,21 +134,11 @@ function CallsChart({ data, preset }: { data: DashStats['callsByBucket']; preset
 
 // ─── Project health row ────────────────────────────────────────────────────────
 
-function HealthDot({ errorRatePct, isPaused, totalCalls }: { errorRatePct: number; isPaused: boolean; totalCalls: number }) {
+function HealthDot({ errorRatePct, isPaused, totalCalls }: HealthDotProps) {
   if (isPaused) return <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: STATUS_COLORS.inactive, flexShrink: 0 }} />
   if (totalCalls === 0) return <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'action.disabledBackground', flexShrink: 0 }} />
   const color = errorRatePct === 0 ? STATUS_COLORS.healthy : errorRatePct < 20 ? STATUS_COLORS.warning : STATUS_COLORS.critical
   return <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: color, flexShrink: 0 }} />
-}
-
-function useHealthStatusText() {
-  const { t } = useTranslation('dashboard')
-  return (h: HealthEntry): string => {
-    if (h.isPaused) return t('healthStatus.paused')
-    if (h.totalCalls === 0) return t('healthStatus.noActivity')
-    if (h.errorRatePct === 0) return t('healthStatus.allSucceeded', { count: h.totalCalls })
-    return t('healthStatus.errorRate', { count: h.totalCalls, rate: h.errorRatePct })
-  }
 }
 
 // ─── Main page ─────────────────────────────────────────────────────────────────

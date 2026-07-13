@@ -11,20 +11,13 @@ import { useAuth, Permission } from '../../../../context/AuthContext'
 import api from '../../../../api'
 import { SaveIndicator } from '../../../../components'
 import type { SaveStatus, ScheduleEntry } from '../../types'
+import type { ProjectControlsPanelProps } from './projectControlsPanelProps.interface'
+import { formatHour } from './utils/formatHour.util'
+import { TIMEZONES } from './constants/timezones.constant'
 
-const TIMEZONES = [
-  'UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
-  'America/Sao_Paulo', 'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Moscow',
-  'Asia/Dubai', 'Asia/Kolkata', 'Asia/Singapore', 'Asia/Tokyo', 'Australia/Sydney',
-]
 
-export function ProjectControlsPanel({ projectId, initialPaused, initialMaintenance, initialAvailability, onPausedChange }: {
-  projectId: string
-  initialPaused?: boolean
-  initialMaintenance?: { enabled: boolean; message: string }
-  initialAvailability?: { enabled: boolean; timezone: string; schedule?: Array<{ day: number; startHour: number; endHour: number }> }
-  onPausedChange: (v: boolean) => void
-}) {
+
+export function ProjectControlsPanel({ projectId, initialPaused, initialMaintenance, initialAvailability, onPausedChange }: ProjectControlsPanelProps) {
   const { t } = useTranslation('serverDetail')
   const [paused, setPaused] = useState(initialPaused ?? false)
   const [pauseSaving, setPauseSaving] = useState(false)
@@ -95,7 +88,6 @@ export function ProjectControlsPanel({ projectId, initialPaused, initialMaintena
   }
 
   const hours = Array.from({ length: 25 }, (_, i) => i)
-  const fmtHour = (h: number) => h === 0 ? '12:00 AM' : h < 12 ? `${h}:00 AM` : h === 12 ? '12:00 PM' : `${h - 12}:00 PM`
   const DAY_LABELS = [
     t('days.sunday'),
     t('days.monday'),
@@ -199,7 +191,7 @@ export function ProjectControlsPanel({ projectId, initialPaused, initialMaintena
                     <InputLabel>{t('label.from')}</InputLabel>
                     <Select value={entry.startHour} label={t('label.from')}
                       onChange={(e) => updateEntry(entry.id, 'startHour', Number(e.target.value))}>
-                      {hours.filter(h => h < entry.endHour).map(h => <MenuItem key={h} value={h}>{fmtHour(h)}</MenuItem>)}
+                      {hours.filter(h => h < entry.endHour).map(h => <MenuItem key={h} value={h}>{formatHour(h)}</MenuItem>)}
                     </Select>
                   </FormControl>
                   <Typography variant="body2" color="text.secondary">–</Typography>
@@ -207,7 +199,7 @@ export function ProjectControlsPanel({ projectId, initialPaused, initialMaintena
                     <InputLabel>{t('label.to')}</InputLabel>
                     <Select value={entry.endHour} label={t('label.to')}
                       onChange={(e) => updateEntry(entry.id, 'endHour', Number(e.target.value))}>
-                      {hours.filter(h => h > entry.startHour).map(h => <MenuItem key={h} value={h}>{fmtHour(h)}</MenuItem>)}
+                      {hours.filter(h => h > entry.startHour).map(h => <MenuItem key={h} value={h}>{formatHour(h)}</MenuItem>)}
                     </Select>
                   </FormControl>
                   <IconButton size="small" color="error" onClick={() => removeEntry(entry.id)}>

@@ -12,16 +12,10 @@ import {
 import { useTranslation } from 'react-i18next'
 import { BaseListCard, type BaseListCardAction } from '../../../components'
 import type { Prompt } from '../types'
+import type { PromptCardProps } from './promptCardProps.interface'
 
-export function PromptCard({ prompt, onEdit, onCopy, onDelete, canEdit, canDelete, copied }: {
-  prompt: Prompt
-  onEdit: (prompt: Prompt) => void
-  onCopy: (prompt: Prompt) => void
-  onDelete: (prompt: Prompt) => void
-  canEdit: boolean
-  canDelete: boolean
-  copied: boolean
-}) {
+
+export function PromptCard({ prompt, onEdit, onCopy, onDelete, canEdit, canDelete, copied }: PromptCardProps) {
   const { t } = useTranslation('prompts')
 
   const actions: BaseListCardAction[] = []

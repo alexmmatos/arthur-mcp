@@ -15,19 +15,16 @@ import { useColorMode } from '../../../../theme/ColorModeContext'
 import api from '../../../../api'
 import type { HbArray, HbScalar, ParameterMapping } from '../../types'
 import { extractHbSchema } from '../../resources/DynamicResourceDialog'
-import type { toolToFormState } from '../tool-form-utils'
+import type { toolToFormState } from '../utils'
+import type { ToolOutputTemplateSectionProps } from './toolOutputTemplateSectionProps.interface'
+
 
 export function ToolOutputTemplateSection({
   projectId,
   projectBaseUrl,
   form,
   setForm,
-}: {
-  projectId: string
-  projectBaseUrl: string
-  form: ReturnType<typeof toolToFormState>
-  setForm: React.Dispatch<React.SetStateAction<ReturnType<typeof toolToFormState>>>
-}) {
+}: ToolOutputTemplateSectionProps) {
   const { t } = useTranslation(['serverDetail', 'common'])
   const { mode: colorMode } = useColorMode()
   const [testArgs, setTestArgs] = useState<Record<string, string>>({})

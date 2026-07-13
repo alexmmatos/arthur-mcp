@@ -91,7 +91,7 @@ import MonacoEditor from '@monaco-editor/react'
 import { useTranslation } from 'react-i18next'
 import { useColorMode } from '../../theme/ColorModeContext'
 import { useAuth, Permission } from '../../context/AuthContext'
-import { useDetailPageNav } from '../../hooks/useDetailPageNav'
+import { useDetailPageNav } from '../../hooks/useDetailPageNav.hook'
 import { getProjectIcon, getSourceType } from '../../utils/sourceType'
 import { parseMcpResponse } from '../../utils/mcpResponse'
 import api from '../../api'
@@ -121,38 +121,14 @@ import {
   ToolAccordion,
   ToolDialog,
 } from '../../features/server'
+import { METHOD_COLOR } from './constants/methodColor.constant'
+import { METHOD_BG } from './constants/methodBg.constant'
+import { SOURCE_CHIP_COLOR } from './constants/sourceChipColor.constant'
+import { METHODS } from './constants/methods.constant'
+import { SOURCES } from './constants/sources.constant'
+import { PARAM_TYPES } from './constants/paramTypes.constant'
 
-// ─── Constants ────────────────────────────────────────────────────────────────
 
-const METHOD_COLOR: Record<string, string> = {
-  GET: '#61affe',
-  POST: '#49cc90',
-  PUT: '#fca130',
-  PATCH: '#50e3c2',
-  DELETE: '#f93e3e',
-}
-
-const METHOD_BG: Record<string, string> = {
-  GET: 'rgba(97,175,254,0.12)',
-  POST: 'rgba(73,204,144,0.12)',
-  PUT: 'rgba(252,161,48,0.12)',
-  PATCH: 'rgba(80,227,194,0.12)',
-  DELETE: 'rgba(249,62,62,0.12)',
-}
-
-const SOURCE_CHIP_COLOR: Record<
-  string,
-  'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'error'
-> = {
-  path: 'secondary',
-  query: 'primary',
-  body: 'success',
-  header: 'warning',
-}
-
-const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
-const SOURCES = ['path', 'query', 'body', 'header'] as const
-const PARAM_TYPES = ['string', 'number', 'integer', 'boolean', 'object', 'array']
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 

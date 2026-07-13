@@ -35,24 +35,12 @@ import { HelpButton } from '../../components'
 import { useAuth, Permission } from '../../context/AuthContext'
 import type { ErrorTrackingProvider, TestConnectionResult } from '../../features/errorTracking'
 import { formatTestedAt } from '../../utils/format'
+import type { SentryForm } from './sentryForm.interface'
+import type { LastTestResult } from './lastTestResult.interface'
+import { SENTRY_COLOR } from './constants/sentryColor.constant'
+import { EMPTY_FORM } from './constants/emptyForm.constant'
 
-const SENTRY_COLOR = '#362d59'
 
-interface SentryForm {
-  dsn: string
-  environment: string
-  projectName: string
-  isActive: boolean
-}
-
-interface LastTestResult {
-  ok: boolean
-  latencyMs: number
-  error?: string
-  testedAt: Date
-}
-
-const EMPTY_FORM: SentryForm = { dsn: '', environment: '', projectName: '', isActive: true }
 
 export default function ErrorTracking() {
   const { t } = useTranslation('errorTracking')

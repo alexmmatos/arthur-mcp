@@ -7,10 +7,10 @@ import { IconCheck, IconEdit, IconWorld, IconX } from '@tabler/icons-react'
 import { useAuth, Permission } from '../../../../context/AuthContext'
 import api from '../../../../api'
 import { HelpButton } from '../../../../components'
+import type { BaseUrlPanelProps } from './baseUrlPanelProps.interface'
 
-export function BaseUrlPanel({ projectId, initialValue, onChange }: {
-  projectId: string; initialValue: string; onChange: (url: string) => void
-}) {
+
+export function BaseUrlPanel({ projectId, initialValue, onChange }: BaseUrlPanelProps) {
   const { can } = useAuth()
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(initialValue)

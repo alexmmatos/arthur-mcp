@@ -49,49 +49,14 @@ import { avatarLetter, avatarColor } from '../../../utils/avatar'
 import { useColorMode, ColorMode } from '../../../theme/ColorModeContext'
 import { useAuth, type UserPermissions } from '../../../context/AuthContext'
 import { useServerNav } from '../../../context/ServerNavContext'
+import type { NavItem } from './navItem.type'
+import type { NavSection } from './navSection.type'
+import type { Status } from './status.type'
+import type { LayoutProps } from './layoutProps.interface'
+import { SIDEBAR_WIDTH } from './constants/sidebarWidth.constant'
+import { NAV_SECTIONS } from './constants/navSections.constant'
 
-const SIDEBAR_WIDTH = 248
 
-type NavItem = {
-  titleKey: string
-  icon: React.ElementType
-  path: string
-  permission?: keyof UserPermissions
-  adminOnly?: boolean
-  wip?: boolean
-}
-
-type NavSection = {
-  subheaderKey: string
-  items: NavItem[]
-}
-
-const NAV_SECTIONS: NavSection[] = [
-  {
-    subheaderKey: 'section.overview',
-    items: [
-      { titleKey: 'nav.dashboard', icon: IconLayoutDashboard, path: '/dashboard', permission: 'servers_view' },
-    ],
-  },
-  {
-    subheaderKey: 'section.main',
-    items: [
-      { titleKey: 'nav.servers', icon: IconFolder, path: '/', permission: 'servers_view' },
-      { titleKey: 'nav.prompts', icon: IconMessage2, path: '/prompts', permission: 'prompts_view' },
-      { titleKey: 'nav.secrets', icon: IconLock, path: '/secrets', permission: 'secrets_view_names' },
-      { titleKey: 'nav.aiProviders', icon: IconRobot, path: '/ai-providers', permission: 'ai_providers_view' },
-    ],
-  },
-  {
-    subheaderKey: 'section.administration',
-    items: [
-      { titleKey: 'nav.observability', icon: IconActivity, path: '/observability', permission: 'observability_view' },
-      { titleKey: 'nav.errorTracking', icon: IconBug, path: '/error-tracking', permission: 'error_tracking_view' },
-      { titleKey: 'nav.settings', icon: IconSettings, path: '/settings', permission: 'settings_manage' },
-      { titleKey: 'nav.auditLogs', icon: IconClipboardList, path: '/audit-logs', permission: 'audit_view' },
-    ],
-  },
-]
 
 
 const AppBarStyled = styled(AppBar)(({ theme }) => ({
@@ -110,8 +75,6 @@ const ToolbarStyled = styled(Toolbar)(({ theme }) => ({
   paddingLeft: '16px',
   paddingRight: '12px',
 }))
-
-type Status = 'checking' | 'online' | 'offline'
 
 function SidebarContent() {
   const location = useLocation()
@@ -324,7 +287,7 @@ function SidebarContent() {
   )
 }
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+export default function Layout({ children }: LayoutProps) {
   const theme = useTheme()
   const mdUp = useMediaQuery(theme.breakpoints.up('md'))
   const [mobileOpen, setMobileOpen] = useState(false)

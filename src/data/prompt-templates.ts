@@ -1,13 +1,7 @@
-export interface PromptTemplate {
-  id: string
-  name: string
-  tagline: string
-  description: string
-  category: string
-  emoji: string
-  tags: string[]
-  content: string
-}
+
+import type { PromptTemplate } from './promptTemplate.interface'
+export type { PromptTemplate } from './promptTemplate.interface'
+
 
 export const PROMPT_TEMPLATE_CATEGORIES = [
   'Summarization',

@@ -25,31 +25,15 @@ import { useTranslation } from 'react-i18next'
 import api from '../../api'
 import { useAuth, Permission } from '../../context/AuthContext'
 import { PROMPT_TEMPLATES, PROMPT_TEMPLATE_CATEGORIES, PromptTemplate } from '../../data/prompt-templates'
+import type { PromptTemplateCardProps } from './promptTemplateCardProps.interface'
+import type { UsePromptTemplateDrawerProps } from './usePromptTemplateDrawerProps.interface'
+import { CATEGORY_COLOR } from './constants/categoryColor.constant'
 
-// ─── Category colors ──────────────────────────────────────────────────────────
 
-const CATEGORY_COLOR: Record<string, string> = {
-  Summarization: '#5D87FF',
-  Code: '#49cc90',
-  Analysis: '#fca130',
-  Writing: '#7B5EA7',
-  'Customer Support': '#FA896B',
-  'Data Extraction': '#50e3c2',
-  Research: '#f93e3e',
-  'SEO & Marketing': '#FF5722',
-  'HR & Recruiting': '#4CAF50',
-  Finance: '#FF9800',
-  Legal: '#607D8B',
-  Education: '#9C27B0',
-  'Social Media': '#E91E63',
-  'Product Management': '#00BCD4',
-  Sales: '#795548',
-  DevOps: '#009688',
-}
 
 // ─── Template card ────────────────────────────────────────────────────────────
 
-function PromptTemplateCard({ template, onUse }: { template: PromptTemplate; onUse: (t: PromptTemplate) => void }) {
+function PromptTemplateCard({ template, onUse }: PromptTemplateCardProps) {
   const { t } = useTranslation('prompts')
   const { can } = useAuth()
   const color = CATEGORY_COLOR[template.category] ?? '#5D87FF'
@@ -118,7 +102,7 @@ function PromptTemplateCard({ template, onUse }: { template: PromptTemplate; onU
 
 // ─── Use-template drawer ──────────────────────────────────────────────────────
 
-function UsePromptTemplateDrawer({ template, onClose }: { template: PromptTemplate; onClose: () => void }) {
+function UsePromptTemplateDrawer({ template, onClose }: UsePromptTemplateDrawerProps) {
   const { t } = useTranslation('prompts')
   const navigate = useNavigate()
   const [name, setName] = useState(template.name)

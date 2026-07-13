@@ -11,14 +11,10 @@ import { useAuth, Permission } from '../../../../context/AuthContext'
 import api from '../../../../api'
 import { ConfirmDialog } from '../../../../components'
 import { HelpButton } from '../../../../components'
+import type { OAuthClientPanelProps } from './oauthClientPanelProps.interface'
 
-export function OAuthClientPanel({ projectId, initialClientId, initialClientSecret, serverBase, onChange }: {
-  projectId: string
-  initialClientId?: string
-  initialClientSecret?: string
-  serverBase: string
-  onChange: (clientId: string | null, clientSecret: string | null) => void
-}) {
+
+export function OAuthClientPanel({ projectId, initialClientId, initialClientSecret, serverBase, onChange }: OAuthClientPanelProps) {
   const { t } = useTranslation(['serverDetail', 'common'])
   const { can } = useAuth()
   const [clientId, setClientId] = useState(initialClientId ?? '')

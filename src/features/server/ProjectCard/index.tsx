@@ -15,12 +15,10 @@ import { Permission, useAuth } from '../../../context/AuthContext'
 import { BaseListCard, type BaseListCardAction } from '../../../components'
 import { getProjectIcon } from '../../../utils/sourceType'
 import type { Project } from '../types'
+import type { ProjectCardProps } from './projectCardProps.interface'
 
-export function ProjectCard({ p, onDelete, onDuplicate }: {
-  p: Project
-  onDelete: (id: string) => void
-  onDuplicate: (id: string) => void
-}) {
+
+export function ProjectCard({ p, onDelete, onDuplicate }: ProjectCardProps) {
   const navigate = useNavigate()
   const { can } = useAuth()
   const { t } = useTranslation('servers')

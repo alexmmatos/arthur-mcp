@@ -2,6 +2,8 @@
 
 This plan defines how to align the frontend with Feature-Driven Architecture, Atomic Design, and controlled barrel exports. It is intentionally incremental: preserve behavior first, then improve structure in small validated steps.
 
+Current file convention: `docs/FRONTEND_FILE_ORGANIZATION_PLAN.md` has been implemented and supersedes this document's historical `types.ts`, `constants.ts`, `utils.ts`, and JSX-free `index.tsx` examples. Contracts now use individual `name.kind.ts` files, utilities have one responsibility per file, hooks use `.hook.ts`, and pure barrels use `index.ts`. Component entry points continue to use `ComponentName/index.tsx`.
+
 ## Goals
 
 - Keep route pages thin and focused on routing, top-level loading, page-level state, and feature composition.
@@ -61,25 +63,26 @@ src/
       components/
       hooks/
       api/
-      types.ts
-      constants.ts
-      index.tsx
+      types/
+      constants/
+      utils/
+      index.ts
     prompts/
       components/
       hooks/
-      types.ts
-      index.tsx
+      types/
+      index.ts
     secrets/
       components/
       hooks/
-      types.ts
-      index.tsx
+      types/
+      index.ts
   components/
     atoms/
     molecules/
     organisms/
     templates/
-    index.tsx
+    index.ts
   hooks/
   utils/
 ```
@@ -111,7 +114,7 @@ Only create folders when there is enough code to justify them.
 
 ### Barrel Exports
 
-- Use `index.tsx` as a controlled public API for React component and feature folders, not as a dumping ground.
+- Use `index.ts` as a controlled public API for component groups and features; reserve `ComponentName/index.tsx` for JSX-rendering entry points.
 - Prefer named exports and `export type` over broad `export *`.
 - Barrel files belong at feature boundaries and shared component group boundaries.
 - Avoid importing from a barrel inside the same folder that defines the exported files.

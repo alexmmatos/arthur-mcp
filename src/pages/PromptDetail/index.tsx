@@ -22,22 +22,23 @@ import {
 } from '@tabler/icons-react'
 import { useTranslation } from 'react-i18next'
 import api from '../../api'
-import { useDetailPageNav } from '../../hooks/useDetailPageNav'
+import { useDetailPageNav } from '../../hooks/useDetailPageNav.hook'
 import type { Prompt } from '../../features/prompts'
 import Swal from 'sweetalert2'
 import { extractVars } from '../../utils/promptVariables'
+import type { SwaggerProject } from './swaggerProject.interface'
+import type { TagInputProps } from './tagInputProps.interface'
+import type { EditorTabProps } from './editorTabProps.interface'
+import type { VariablesTabProps } from './variablesTabProps.interface'
+import type { PreviewTabProps } from './previewTabProps.interface'
+import type { UsageTabProps } from './usageTabProps.interface'
+import type { SettingsTabProps } from './settingsTabProps.interface'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 
-interface SwaggerProject {
-  id: string
-  name: string
-  prompts?: Array<{ name: string }>
-}
 
 // ─── Tag input (inline) ───────────────────────────────────────────────────────
 
-function TagInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) => void }) {
+function TagInput({ tags, onChange }: TagInputProps) {
   const { t } = useTranslation('prompts')
   const [inputValue, setInputValue] = useState('')
 
@@ -98,13 +99,7 @@ function EditorTab({
   onSave,
   dirty,
   saving,
-}: {
-  content: string
-  onContentChange: (v: string) => void
-  onSave: () => void
-  dirty: boolean
-  saving: boolean
-}) {
+}: EditorTabProps) {
   const { t } = useTranslation('prompts')
   const detectedVars = extractVars(content)
 
@@ -156,7 +151,7 @@ function EditorTab({
 
 // ─── Tab 1 — Variables ────────────────────────────────────────────────────────
 
-function VariablesTab({ content }: { content: string }) {
+function VariablesTab({ content }: VariablesTabProps) {
   const { t } = useTranslation('prompts')
   const detectedVars = extractVars(content)
 
@@ -202,7 +197,7 @@ function VariablesTab({ content }: { content: string }) {
 
 // ─── Tab 2 — Preview ──────────────────────────────────────────────────────────
 
-function PreviewTab({ content }: { content: string }) {
+function PreviewTab({ content }: PreviewTabProps) {
   const { t } = useTranslation('prompts')
   const detectedVars = extractVars(content)
   const [values, setValues] = useState<Record<string, string>>({})
@@ -293,7 +288,7 @@ function PreviewTab({ content }: { content: string }) {
 
 // ─── Tab 3 — Usage ────────────────────────────────────────────────────────────
 
-function UsageTab({ promptName }: { promptName: string }) {
+function UsageTab({ promptName }: UsageTabProps) {
   const { t } = useTranslation('prompts')
   const [loading, setLoading] = useState(true)
   const [usages, setUsages] = useState<SwaggerProject[]>([])
@@ -357,10 +352,7 @@ function UsageTab({ promptName }: { promptName: string }) {
 function SettingsTab({
   prompt,
   onUpdated,
-}: {
-  prompt: Prompt
-  onUpdated: (p: Prompt) => void
-}) {
+}: SettingsTabProps) {
   const { t } = useTranslation('prompts')
   const navigate = useNavigate()
   const [editName, setEditName] = useState(prompt.name)

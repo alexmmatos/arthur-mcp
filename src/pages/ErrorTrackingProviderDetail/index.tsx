@@ -29,15 +29,18 @@ import {
 import { useTranslation } from 'react-i18next'
 import { useAuth, Permission } from '../../context/AuthContext'
 import api from '../../api'
-import { useDetailPageNav } from '../../hooks/useDetailPageNav'
+import { useDetailPageNav } from '../../hooks/useDetailPageNav.hook'
 import { TOOL_COLORS, type ErrorTrackingProvider, type TestConnectionResult } from '../../features/errorTracking'
 import Swal from 'sweetalert2'
+import type { OverviewTabProps } from './overviewTabProps.interface'
+import type { SettingsTabProps } from './settingsTabProps.interface'
+import { SENTRY_COLOR } from './constants/sentryColor.constant'
 
-const SENTRY_COLOR = TOOL_COLORS['sentry'] ?? '#362d59'
+
 
 // ─── Tab 0 — Overview ─────────────────────────────────────────────────────────
 
-function OverviewTab({ provider }: { provider: ErrorTrackingProvider }) {
+function OverviewTab({ provider }: OverviewTabProps) {
   const { t } = useTranslation('errorTracking')
 
   return (
@@ -99,7 +102,7 @@ function OverviewTab({ provider }: { provider: ErrorTrackingProvider }) {
 
 // ─── Tab 1 — Settings ────────────────────────────────────────────────────────
 
-function SettingsTab({ provider, onUpdated }: { provider: ErrorTrackingProvider; onUpdated: (p: ErrorTrackingProvider) => void }) {
+function SettingsTab({ provider, onUpdated }: SettingsTabProps) {
   const { t } = useTranslation('errorTracking')
   const navigate = useNavigate()
   const { can } = useAuth()

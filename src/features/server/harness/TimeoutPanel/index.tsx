@@ -18,20 +18,14 @@ import { useTranslation } from 'react-i18next'
 import api from '../../../../api'
 import { HelpButton, SaveIndicator } from '../../../../components'
 import type { GeneratedTool, SaveStatus } from '../../types'
+import type { ToolTimeout } from './toolTimeout.interface'
+import type { TimeoutConfig } from './timeoutConfig.interface'
+import type { TimeoutPanelProps } from './timeoutPanelProps.interface'
+import { DEFAULT_CONFIG } from './constants/defaultConfig.constant'
 
-interface ToolTimeout {
-  toolName: string
-  timeoutMs: number
-}
 
-interface TimeoutConfig {
-  globalTimeoutMs: number
-  overrides: ToolTimeout[]
-}
 
-const DEFAULT_CONFIG: TimeoutConfig = { globalTimeoutMs: 30000, overrides: [] }
-
-export function TimeoutPanel({ projectId, tools }: { projectId: string; tools: GeneratedTool[] }) {
+export function TimeoutPanel({ projectId, tools }: TimeoutPanelProps) {
   const { t } = useTranslation('serverDetail')
   const [config, setConfig] = useState<TimeoutConfig>(DEFAULT_CONFIG)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')

@@ -13,27 +13,13 @@ import { useAuth, Permission } from '../../../../context/AuthContext'
 import api from '../../../../api'
 import type { EndpointRef, GeneratedTool } from '../../types'
 import { METHOD_COLOR, METHOD_BG, SOURCE_CHIP_COLOR } from '../../constants'
-import { inferSchema } from '../curl-utils'
+import { inferSchema } from '../utils'
 import { FieldInput } from '../../resources/DynamicResourceDialog'
+import { parseMcpResponse } from '../../../../utils/mcpResponse'
+import type { EndpointAccordionProps } from './endpointAccordionProps.interface'
 
-function parseMcpResponse(data: unknown): any {
-  if (typeof data === 'object' && data !== null) return data
-  if (typeof data === 'string') {
-    const match = data.match(/^data:\s*(.+)$/m)
-    if (match) { try { return JSON.parse(match[1]) } catch { /* fall through */ } }
-    try { return JSON.parse(data) } catch { /* fall through */ }
-  }
-  return {}
-}
 
-export function EndpointAccordion({ endpoint, projectId, anyApiKey, canTest, onEdit, onToolChanged }: {
-  endpoint: { tool: GeneratedTool } & EndpointRef
-  projectId: string
-  anyApiKey?: string
-  canTest: boolean
-  onEdit?: () => void
-  onToolChanged?: (oldName: string, newTool: GeneratedTool) => void
-}) {
+export function EndpointAccordion({ endpoint, projectId, anyApiKey, canTest, onEdit, onToolChanged }: EndpointAccordionProps) {
   const { t } = useTranslation('serverDetail')
   const method = endpoint.method.toUpperCase()
   const parameterMap = endpoint.parameterMap ?? []

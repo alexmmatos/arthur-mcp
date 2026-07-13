@@ -29,28 +29,17 @@ import api from '../../api'
 import { useAuth, Permission } from '../../context/AuthContext'
 import { API_TEMPLATES, ApiTemplate, SERVER_TEMPLATE_SOURCE_TAG, TEMPLATE_CATEGORIES, buildToolPayload } from '../../data/api-templates'
 import { SecretAutocomplete, useSecrets } from '../../features/secrets'
+import type { AuthChipColor } from './authChipColor.type'
+import type { TemplateCardProps } from './templateCardProps.interface'
+import type { UseTemplateDialogProps } from './useTemplateDialogProps.interface'
+import { AUTH_LABEL_KEYS } from './constants/authLabelKeys.constant'
+import { AUTH_CHIP_COLORS } from './constants/authChipColors.constant'
 
-// ─── Auth badge ───────────────────────────────────────────────────────────────
 
-const AUTH_LABEL_KEYS: Record<string, string> = {
-  none: 'template.authNone',
-  bearer: 'template.authBearer',
-  'api-key': 'template.authApiKey',
-  basic: 'template.authBasic',
-}
-
-type AuthChipColor = 'default' | 'primary' | 'warning' | 'error'
-
-const AUTH_CHIP_COLORS: Record<string, AuthChipColor> = {
-  none: 'default',
-  bearer: 'primary',
-  'api-key': 'warning',
-  basic: 'error',
-}
 
 // ─── Template card ────────────────────────────────────────────────────────────
 
-function TemplateCard({ template, onUse }: { template: ApiTemplate; onUse: (tmpl: ApiTemplate) => void }) {
+function TemplateCard({ template, onUse }: TemplateCardProps) {
   const { can } = useAuth()
   const { t } = useTranslation('servers')
   return (
@@ -137,10 +126,7 @@ function TemplateCard({ template, onUse }: { template: ApiTemplate; onUse: (tmpl
 function UseTemplateDialog({
   template,
   onClose,
-}: {
-  template: ApiTemplate
-  onClose: () => void
-}) {
+}: UseTemplateDialogProps) {
   const navigate = useNavigate()
   const { t } = useTranslation('servers')
   const [serverName, setProjectName] = useState(template.name)

@@ -32,24 +32,21 @@ import {
 import { useTranslation } from 'react-i18next'
 import { useAuth, Permission } from '../../context/AuthContext'
 import api from '../../api'
-import { useDetailPageNav } from '../../hooks/useDetailPageNav'
+import { useDetailPageNav } from '../../hooks/useDetailPageNav.hook'
 import type { Project } from '../../features/server/types'
 import type { Secret } from '../../features/secrets'
 import Swal from 'sweetalert2'
+import type { AuditLog } from './auditLog.interface'
+import type { OverviewTabProps } from './overviewTabProps.interface'
+import type { UsageTabProps } from './usageTabProps.interface'
+import type { ActivityTabProps } from './activityTabProps.interface'
+import type { SettingsTabProps } from './settingsTabProps.interface'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 
-interface AuditLog {
-  id: string
-  action: string
-  resourceId?: string
-  username?: string
-  createdAt: string
-}
 
 // ─── Tab 0 — Overview ─────────────────────────────────────────────────────────
 
-function OverviewTab({ secret }: { secret: Secret }) {
+function OverviewTab({ secret }: OverviewTabProps) {
   const { t } = useTranslation('secrets')
   const [showValue, setShowValue] = useState(false)
   const [editValue, setEditValue] = useState('')
@@ -162,7 +159,7 @@ function OverviewTab({ secret }: { secret: Secret }) {
 
 // ─── Tab 1 — Usage ───────────────────────────────────────────────────────────
 
-function UsageTab({ secret }: { secret: Secret }) {
+function UsageTab({ secret }: UsageTabProps) {
   const { t } = useTranslation('secrets')
   const navigate = useNavigate()
   const [projects, setProjects] = useState<Project[]>([])
@@ -227,7 +224,7 @@ function UsageTab({ secret }: { secret: Secret }) {
 
 // ─── Tab 2 — Activity ─────────────────────────────────────────────────────────
 
-function ActivityTab({ secret }: { secret: Secret }) {
+function ActivityTab({ secret }: ActivityTabProps) {
   const { t } = useTranslation('secrets')
   const [filteredLogs, setFilteredLogs] = useState<AuditLog[]>([])
   const [loadingLogs, setLoadingLogs] = useState(true)
@@ -297,7 +294,7 @@ function ActivityTab({ secret }: { secret: Secret }) {
 
 // ─── Tab 3 — Settings ────────────────────────────────────────────────────────
 
-function SettingsTab({ secret, onUpdated }: { secret: Secret; onUpdated: (s: Secret) => void }) {
+function SettingsTab({ secret, onUpdated }: SettingsTabProps) {
   const { t } = useTranslation('secrets')
   const navigate = useNavigate()
   const [editName, setEditName] = useState(secret.name)

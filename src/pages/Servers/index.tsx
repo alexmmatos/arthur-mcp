@@ -23,7 +23,7 @@ import { HelpButton } from '../../components'
 import { ConfirmDialog } from '../../components'
 import { AppSnackbar } from '../../components'
 import { ProjectCard } from '../../features/server/ProjectCard'
-import { useListPageLogic } from '../../hooks/useListPageLogic'
+import { useListPageLogic } from '../../hooks/useListPageLogic.hook'
 import type { Project } from '../../features/server/types'
 
 // ─── Skeleton grid ────────────────────────────────────────────────────────────

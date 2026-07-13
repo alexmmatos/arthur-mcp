@@ -19,25 +19,15 @@ import { useTranslation } from 'react-i18next'
 import api from '../../../../api'
 import { HelpButton, SaveIndicator } from '../../../../components'
 import type { GeneratedTool, SaveStatus } from '../../types'
+import type { FilterType } from './filterType.type'
+import type { OutputFilter } from './outputFilter.interface'
+import { newFilter } from './utils/newFilter.util'
+import type { OutputFilteringPanelProps } from './outputFilteringPanelProps.interface'
+import { needsReplacement } from './constants/needsReplacement.constant'
 
-type FilterType = 'mask_field' | 'remove_field' | 'redact_pattern'
 
-interface OutputFilter {
-  id: string
-  type: FilterType
-  target: string
-  replacement: string
-  toolName: string
-  enabled: boolean
-}
 
-const needsReplacement: FilterType[] = ['mask_field', 'redact_pattern']
-
-function newFilter(): OutputFilter {
-  return { id: crypto.randomUUID(), type: 'mask_field', target: '', replacement: '*****', toolName: '*', enabled: true }
-}
-
-export function OutputFilteringPanel({ projectId, tools }: { projectId: string; tools: GeneratedTool[] }) {
+export function OutputFilteringPanel({ projectId, tools }: OutputFilteringPanelProps) {
   const { t } = useTranslation('serverDetail')
   const [filters, setFilters] = useState<OutputFilter[]>([])
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')

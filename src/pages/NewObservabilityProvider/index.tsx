@@ -30,20 +30,11 @@ import {
 import api from '../../api'
 import { Permission, useAuth } from '../../context/AuthContext'
 import type { ObservabilityProviderType } from '../../features/observability'
+import type { ObservabilityProviderRecord } from './observabilityProviderRecord.interface'
+import type { ObservabilityProviderForm } from './observabilityProviderForm.interface'
+import { PROVIDER_TYPES } from './constants/providerTypes.constant'
 
-const PROVIDER_TYPES: ObservabilityProviderType[] = [
-  'grafana', 'prometheus', 'datadog', 'newrelic', 'elastic', 'loki', 'custom',
-]
 
-interface ObservabilityProviderRecord { id: string }
-
-interface ObservabilityProviderForm {
-  name: string
-  description: string
-  type: ObservabilityProviderType
-  url: string
-  apiKey: string
-}
 
 export default function NewObservabilityProvider() {
   const navigate = useNavigate()

@@ -1,45 +1,21 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import type { ContextualNavTab } from './contextualNavTab.type'
+import type { ServerNavItem } from './serverNavItem.interface'
+import type { ServerDetailNav } from './serverDetailNav.interface'
+import type { ServerNavContextValue } from './serverNavContextValue.interface'
+import { ServerNavContext } from './serverNav.context'
+import type { ServerNavProviderProps } from './serverNavProviderProps.interface'
 
-export type ContextualNavTab = number | string
+export type { ContextualNavTab } from './contextualNavTab.type'
+export type { ServerNavItem } from './serverNavItem.interface'
+export type { ServerDetailNav } from './serverDetailNav.interface'
+export { useServerNav } from './useServerNav.hook'
 
-export interface ServerNavItem {
-  label: string
-  icon: ReactNode
-  idx: ContextualNavTab
-  badge?: number
-  disabled?: boolean
-}
-
-export interface ServerDetailNav {
-  name: string
-  sourceEmoji: string
-  sourceColor: string
-  navItems: ServerNavItem[]
-  tab: ContextualNavTab
-  onTabChange: (n: ContextualNavTab) => void
-  backLabel?: string
-  backPath?: string
-}
-
-interface ServerNavContextValue {
-  serverDetail: ServerDetailNav | null
-  setServerDetail: (detail: ServerDetailNav | null) => void
-}
-
-const ServerNavContext = createContext<ServerNavContextValue>({
-  serverDetail: null,
-  setServerDetail: () => {},
-})
-
-export function ServerNavProvider({ children }: { children: ReactNode }) {
+export function ServerNavProvider({ children }: ServerNavProviderProps) {
   const [serverDetail, setServerDetail] = useState<ServerDetailNav | null>(null)
   return (
     <ServerNavContext.Provider value={{ serverDetail, setServerDetail }}>
       {children}
     </ServerNavContext.Provider>
   )
-}
-
-export function useServerNav() {
-  return useContext(ServerNavContext)
 }

@@ -1,10 +1,10 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react'
-import { useAsyncFeedback } from './useAsyncFeedback'
-import { useCopyToClipboard } from './useCopyToClipboard'
-import { useDetailPageNav } from './useDetailPageNav'
-import { useListPageLogic } from './useListPageLogic'
+import { useAsyncFeedback } from './useAsyncFeedback.hook'
+import { useCopyToClipboard } from './useCopyToClipboard.hook'
+import { useDetailPageNav } from './useDetailPageNav.hook'
+import { useListPageLogic } from './useListPageLogic.hook'
 import { Permission } from '../context/AuthContext'
 
 const authState = vi.hoisted(() => ({

@@ -10,6 +10,7 @@
     "@mui/material": "^5.14.0",
     "@tabler/icons-react": "^3.44.0",
     "axios": "^1.6.0",
+    "essentials-claude-code": "^0.1.1",
     "grapesjs": "^0.23.2",
     "handlebars": "^4.7.9",
     "i18next": "^26.3.3",
@@ -53,6 +54,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
-    "type-check": "tsc --noEmit"
+    "check:frontend-structure": "node scripts/check-frontend-structure.mjs",
+    "type-check": "npm run check:frontend-structure && tsc --noEmit"
   }
 }

@@ -17,10 +17,15 @@ import api from '../../../../api'
 import { useColorMode } from '../../../../theme/ColorModeContext'
 import type { GeneratedTool, HbArray, HbScalar, JsonSchema, McpResource } from '../../types'
 import { METHOD_COLOR } from '../../constants'
+import { extractHbSchema } from './utils/extractHbSchema.util'
+import { slugifyResourceName } from '../utils/slugifyResourceName.util'
+import type { FieldInputProps } from './fieldInputProps.interface'
+import type { DynamicResourceDialogProps } from './dynamicResourceDialogProps.interface'
 
-export function FieldInput({ name, schema, value, required, onChange }: {
-  name: string; schema: JsonSchema; value: string; required: boolean; onChange: (v: string) => void
-}) {
+export { extractHbSchema } from './utils/extractHbSchema.util'
+
+
+export function FieldInput({ name, schema, value, required, onChange }: FieldInputProps) {
   const label = `${name}${required ? ' *' : ''}`
   if (schema.enum?.length) {
     return (
@@ -50,39 +55,9 @@ export function FieldInput({ name, schema, value, required, onChange }: {
   )
 }
 
-export function extractHbSchema(root: unknown, prefix = '', depth = 0): { scalars: HbScalar[]; arrays: HbArray[] } {
-  const scalars: HbScalar[] = []
-  const arrays: HbArray[] = []
-  if (root == null || typeof root !== 'object' || Array.isArray(root) || depth > 3) return { scalars, arrays }
-  for (const [k, v] of Object.entries(root as Record<string, unknown>)) {
-    const path = prefix ? `${prefix}.${k}` : k
-    if (Array.isArray(v)) {
-      const itemScalars: string[] = []
-      if (v.length > 0 && v[0] != null && typeof v[0] === 'object') {
-        extractHbSchema(v[0], '', 0).scalars.forEach((s) => itemScalars.push(s.path))
-      }
-      arrays.push({ path, length: v.length, itemScalars })
-    } else if (v !== null && typeof v === 'object') {
-      const nested = extractHbSchema(v, path, depth + 1)
-      scalars.push(...nested.scalars)
-      arrays.push(...nested.arrays)
-    } else {
-      scalars.push({ path, sample: v == null ? '' : String(v).slice(0, 120) })
-    }
-  }
-  return { scalars, arrays }
-}
-
 export function DynamicResourceDialog({
   open, projectId, tools, onSave, onClose, prefillTool,
-}: {
-  open: boolean
-  projectId: string
-  tools: GeneratedTool[]
-  onSave: (resource: McpResource) => void
-  onClose: () => void
-  prefillTool?: GeneratedTool
-}) {
+}: DynamicResourceDialogProps) {
   const { t } = useTranslation(['serverDetail', 'common'])
   const [selectedTool, setSelectedTool] = useState<GeneratedTool | null>(null)
   const [args, setArgs] = useState<Record<string, string>>({})
@@ -107,8 +82,6 @@ export function DynamicResourceDialog({
   useEffect(() => {
     setErrorMessage(t('error.resourceLoadFailedTemplate'))
   }, [t])
-
-  const slugify = (s: string) => s.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
 
   useEffect(() => {
     if (open && prefillTool) {
@@ -166,7 +139,7 @@ export function DynamicResourceDialog({
   }
 
   const handleNameChange = (n: string) => {
-    setName(n); setUri(`resource://${projectId}/${slugify(n)}`)
+    setName(n); setUri(`resource://${projectId}/${slugifyResourceName(n)}`)
   }
 
   const handleSave = async () => {

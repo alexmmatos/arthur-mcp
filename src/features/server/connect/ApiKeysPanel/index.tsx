@@ -13,12 +13,10 @@ import api from '../../../../api'
 import { ConfirmDialog } from '../../../../components'
 import { HelpButton } from '../../../../components'
 import type { McpApiKeyEntry } from '../../types'
+import type { ApiKeysPanelProps } from './apiKeysPanelProps.interface'
 
-export function ApiKeysPanel({ projectId, initialKeys, onChange }: {
-  projectId: string
-  initialKeys: McpApiKeyEntry[]
-  onChange: (keys: McpApiKeyEntry[]) => void
-}) {
+
+export function ApiKeysPanel({ projectId, initialKeys, onChange }: ApiKeysPanelProps) {
   const { t } = useTranslation(['serverDetail', 'common'])
   const [keys, setKeys] = useState<McpApiKeyEntry[]>(initialKeys)
   const [newKeyName, setNewKeyName] = useState('')

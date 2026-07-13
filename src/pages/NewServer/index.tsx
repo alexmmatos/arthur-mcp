@@ -47,141 +47,23 @@ import {
 import api from '../../api'
 import { isValidUrl } from '../../utils/validation'
 import { uid } from '../../utils/id'
+import type { SourceType } from './sourceType.type'
+import type { AuthType } from './authType.type'
+import type { LocalTool } from './localTool.interface'
+import type { SpecMeta } from './specMeta.interface'
+import type { AiProviderOption } from './aiProviderOption.interface'
+import { SOURCE_TYPES } from './constants/sourceTypes.constant'
+import { DB_PORT_DEFAULTS } from './constants/dbPortDefaults.constant'
+import { SQL_HOSTS } from './constants/sqlHosts.constant'
+import { AI_TOOL_IMPROVEMENT_AVAILABLE } from './constants/aiToolImprovementAvailable.constant'
+import { DB_DATABASE_LABEL } from './constants/dbDatabaseLabel.constant'
+import { DB_DATABASE_PLACEHOLDER } from './constants/dbDatabasePlaceholder.constant'
+import { STEP_KEYS } from './constants/stepKeys.constant'
+import { DEFAULT_STEP_KEYS } from './constants/defaultStepKeys.constant'
+import { METHOD_COLOR } from './constants/methodColor.constant'
+import { AUTH_TYPE_LABELS } from './constants/authTypeLabels.constant'
 
-// ─── Source types ─────────────────────────────────────────────────────────────
 
-type SourceType =
-  | 'blank'
-  | 'rest' | 'graphql' | 'grpc'
-  | 'postgresql' | 'mysql' | 'mariadb' | 'mssql' | 'oracle' | 'cockroachdb'
-  | 'mongodb' | 'redis' | 'cassandra' | 'dynamodb' | 'elasticsearch' | 'snowflake' | 'clickhouse' | 'firestore'
-
-const SOURCE_TYPES: Array<{
-  id: SourceType
-  name: string
-  description: string
-  emoji: string
-  color: string
-  available: boolean
-  group: string
-}> = [
-  // ── Blank ─────────────────────────────────────────────────────────────────
-  { id: 'blank',   name: 'Blank / Static', description: 'No external connection. Define tools that return hardcoded or parameter-based responses.', emoji: '📄', color: '#9E9E9E', available: true, group: 'Other' },
-  // ── APIs ──────────────────────────────────────────────────────────────────
-  { id: 'rest',    name: 'REST API',  description: 'HTTP APIs described with OpenAPI, Swagger, or Postman collections.', emoji: '🌐', color: '#5D87FF', available: true,  group: 'API' },
-  { id: 'graphql', name: 'GraphQL',   description: 'Expose queries and mutations from a GraphQL endpoint as MCP tools.', emoji: '🔮', color: '#E535AB', available: false, group: 'API' },
-  { id: 'grpc',    name: 'gRPC',      description: 'High-performance RPC services using Protocol Buffer definitions.',    emoji: '⚡', color: '#fca130', available: false, group: 'API' },
-  // ── Relational databases ──────────────────────────────────────────────────
-  { id: 'postgresql',  name: 'PostgreSQL',   description: 'Open-source object-relational database system.',                        emoji: '🐘', color: '#336791', available: false, group: 'SQL' },
-  { id: 'mysql',       name: 'MySQL',        description: 'The world\'s most popular open-source relational database.',             emoji: '🐬', color: '#4479A1', available: false, group: 'SQL' },
-  { id: 'mariadb',     name: 'MariaDB',      description: 'MySQL-compatible community-driven relational database.',                 emoji: '🦭', color: '#003545', available: false, group: 'SQL' },
-  { id: 'mssql',       name: 'SQL Server',   description: 'Microsoft\'s enterprise relational database management system.',        emoji: '🏢', color: '#CC2927', available: false, group: 'SQL' },
-  { id: 'oracle',      name: 'Oracle DB',    description: 'Oracle\'s enterprise-grade relational database.',                       emoji: '🏛️', color: '#F80000', available: false, group: 'SQL' },
-  { id: 'cockroachdb', name: 'CockroachDB',  description: 'Distributed SQL database with PostgreSQL compatibility.',               emoji: '🪳', color: '#6933FF', available: false, group: 'SQL' },
-  { id: 'clickhouse',  name: 'ClickHouse',   description: 'Column-oriented database for real-time analytics at scale.',            emoji: '🖱️', color: '#FAFF00', available: false, group: 'SQL' },
-  // ── NoSQL / Document / Key-value ─────────────────────────────────────────
-  { id: 'mongodb',       name: 'MongoDB',       description: 'Document-oriented NoSQL database with flexible schema.',              emoji: '🍃', color: '#47A248', available: false, group: 'NoSQL' },
-  { id: 'redis',         name: 'Redis',          description: 'In-memory key-value store for caching, queues, and pub/sub.',        emoji: '🔴', color: '#DC382D', available: false, group: 'NoSQL' },
-  { id: 'cassandra',     name: 'Cassandra',      description: 'Wide-column store for high availability and massive datasets.',       emoji: '👁️', color: '#1287B1', available: false, group: 'NoSQL' },
-  { id: 'firestore',     name: 'Firestore',      description: 'Google\'s serverless document database for web and mobile apps.',    emoji: '🔥', color: '#FFCA28', available: false, group: 'NoSQL' },
-  // ── Cloud / Warehouse ────────────────────────────────────────────────────
-  { id: 'dynamodb',      name: 'DynamoDB',       description: 'AWS fully managed key-value and document database service.',         emoji: '🔷', color: '#232F3E', available: false, group: 'Cloud' },
-  { id: 'elasticsearch', name: 'Elasticsearch',  description: 'Distributed search and analytics engine built on Apache Lucene.',    emoji: '🔍', color: '#FEC514', available: false, group: 'Cloud' },
-  { id: 'snowflake',     name: 'Snowflake',      description: 'Cloud data warehouse with multi-cluster shared data architecture.',  emoji: '❄️', color: '#29B5E8', available: false, group: 'Cloud' },
-]
-
-// ─── Step definitions (dynamic per source type) ───────────────────────────────
-
-const DB_PORT_DEFAULTS: Partial<Record<SourceType, string>> = {
-  postgresql:    '5432',
-  mysql:         '3306',
-  mariadb:       '3306',
-  mssql:         '1433',
-  oracle:        '1521',
-  cockroachdb:   '26257',
-  clickhouse:    '8443',
-  cassandra:     '9042',
-  redis:         '6379',
-  elasticsearch: '9200',
-}
-
-// Databases that use the standard host/port/database/user/password/SSL form
-const SQL_HOSTS: SourceType[] = ['postgresql', 'mysql', 'mariadb', 'mssql', 'oracle', 'cockroachdb', 'clickhouse', 'cassandra']
-
-const AI_TOOL_IMPROVEMENT_AVAILABLE = false
-
-const DB_DATABASE_LABEL: Partial<Record<SourceType, string>> = {
-  cassandra:  'Keyspace',
-  clickhouse: 'Database',
-}
-
-const DB_DATABASE_PLACEHOLDER: Partial<Record<SourceType, string>> = {
-  cassandra:  'my_keyspace',
-  clickhouse: 'default',
-  oracle:     'ORCL',
-}
-
-const STEP_KEYS: Record<SourceType, string[]> = {
-  blank:         ['source', 'details'],
-  rest:          ['source', 'details', 'importSpec', 'toolsOverview', 'authentication'],
-  graphql:       ['source', 'details', 'schema',     'authentication'],
-  grpc:          ['source', 'details', 'connection',  'authentication'],
-  postgresql:    ['source', 'details', 'connection'],
-  mysql:         ['source', 'details', 'connection'],
-  mariadb:       ['source', 'details', 'connection'],
-  mssql:         ['source', 'details', 'connection'],
-  oracle:        ['source', 'details', 'connection'],
-  cockroachdb:   ['source', 'details', 'connection'],
-  clickhouse:    ['source', 'details', 'connection'],
-  mongodb:       ['source', 'details', 'connection'],
-  redis:         ['source', 'details', 'connection'],
-  cassandra:     ['source', 'details', 'connection'],
-  firestore:     ['source', 'details', 'connection'],
-  dynamodb:      ['source', 'details', 'connection'],
-  elasticsearch: ['source', 'details', 'connection'],
-  snowflake:     ['source', 'details', 'connection'],
-}
-
-const DEFAULT_STEP_KEYS = ['source', 'details']
-
-// ─── Other constants ──────────────────────────────────────────────────────────
-
-const METHOD_COLOR: Record<string, string> = {
-  GET: '#61affe', POST: '#49cc90', PUT: '#fca130', PATCH: '#50e3c2', DELETE: '#f93e3e',
-}
-
-type AuthType = 'none' | 'bearer' | 'api-key' | 'basic' | 'oauth2-client' | 'custom'
-const AUTH_TYPE_LABELS: Record<AuthType, string> = {
-  none: 'None (public API)',
-  bearer: 'Bearer Token',
-  'api-key': 'API Key',
-  basic: 'Basic Auth (username/password)',
-  'oauth2-client': 'OAuth2 Client Credentials',
-  custom: 'Custom headers',
-}
-
-interface LocalTool {
-  id: string
-  name: string
-  originalName?: string
-  description?: string
-  method: string
-  path: string
-  enabled: boolean
-  fromSpec: boolean
-  outputSchema?: Record<string, unknown>
-}
-interface SpecMeta {
-  name: string; version?: string; description?: string; resolvedBaseUrl: string
-}
-interface AiProviderOption {
-  id: string
-  name: string
-  provider: string
-  model: string
-  isActive: boolean
-  isDefault?: boolean
-}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 

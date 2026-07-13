@@ -6,6 +6,8 @@ import {
 import { IconChevronDown, IconChevronUp, IconX } from '@tabler/icons-react'
 import { useTranslation } from 'react-i18next'
 import type { ChainInputSource, ChainStep, GeneratedTool } from '../../types'
+import type { StepBuilderProps } from './stepBuilderProps.interface'
+
 
 export function StepBuilder({
   step,
@@ -17,17 +19,7 @@ export function StepBuilder({
   onRemove,
   onMoveUp,
   onMoveDown,
-}: {
-  step: ChainStep
-  index: number
-  total: number
-  tools: GeneratedTool[]
-  previousSteps: ChainStep[]
-  onChange: (s: ChainStep) => void
-  onRemove: () => void
-  onMoveUp: () => void
-  onMoveDown: () => void
-}) {
+}: StepBuilderProps) {
   const { t } = useTranslation(['serverDetail', 'common'])
   const tool = tools.find((t) => t.name === step.toolName)
   const params = Object.keys(tool?.inputSchema?.properties ?? {})

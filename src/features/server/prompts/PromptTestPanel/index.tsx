@@ -6,22 +6,11 @@ import {
 import { IconPlayerPlay } from '@tabler/icons-react'
 import api from '../../../../api'
 import type { GlobalPrompt } from '../../types'
+import { parseMcpResponse } from '../../../../utils/mcpResponse'
+import type { PromptTestPanelProps } from './promptTestPanelProps.interface'
 
-function parseMcpResponse(data: unknown): any {
-  if (typeof data === 'object' && data !== null) return data
-  if (typeof data === 'string') {
-    const match = data.match(/^data:\s*(.+)$/m)
-    if (match) { try { return JSON.parse(match[1]) } catch { /* fall through */ } }
-    try { return JSON.parse(data) } catch { /* fall through */ }
-  }
-  return {}
-}
 
-export function PromptTestPanel({ prompt, projectId, anyApiKey }: {
-  prompt: GlobalPrompt
-  projectId: string
-  anyApiKey?: string
-}) {
+export function PromptTestPanel({ prompt, projectId, anyApiKey }: PromptTestPanelProps) {
   const { t } = useTranslation(['serverDetail', 'common'])
   const argNames = [...new Set([...prompt.content.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]))]
   const [open, setOpen] = useState(false)

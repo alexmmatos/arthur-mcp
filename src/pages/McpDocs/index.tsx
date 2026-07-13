@@ -38,77 +38,30 @@ import {
 } from '@tabler/icons-react'
 import api from '../../api'
 import { parseMcpResponse } from '../../utils/mcpResponse'
+import type { JsonSchema } from './jsonSchema.interface'
+import type { ParameterMapping } from './parameterMapping.interface'
+import type { EndpointRef } from './endpointRef.interface'
+import type { GeneratedTool } from './generatedTool.interface'
+import type { DocsResource } from './docsResource.interface'
+import type { DocsProject } from './docsProject.interface'
+import type { GlobalPrompt } from './globalPrompt.interface'
+import type { TypeBadgeProps } from './typeBadgeProps.interface'
+import type { FieldInputProps } from './fieldInputProps.interface'
+import type { ToolCardProps } from './toolCardProps.interface'
+import type { ResourceCardProps } from './resourceCardProps.interface'
+import type { PromptCardProps } from './promptCardProps.interface'
+import type { McpDocsContentProps } from './mcpDocsContentProps.interface'
+import { METHOD_BG } from './constants/methodBg.constant'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 
-interface JsonSchema {
-  type?: string
-  properties?: Record<string, JsonSchema>
-  required?: string[]
-  description?: string
-  enum?: unknown[]
-  default?: unknown
-  items?: JsonSchema
-}
 
-interface ParameterMapping {
-  toolParamName: string
-  source: 'path' | 'query' | 'header' | 'body'
-  originalName: string
-  required: boolean
-}
-
-interface EndpointRef {
-  method: string
-  path: string
-  baseUrl: string
-  contentType?: string
-  parameterMap: ParameterMapping[]
-}
-
-export interface GeneratedTool {
-  name: string
-  description?: string
-  inputSchema: JsonSchema
-  endpointRef: EndpointRef
-  enabled?: boolean
-}
-
-export interface DocsResource {
-  id: string
-  name: string
-  uri: string
-  description?: string
-  mimeType?: string
-  enabled?: boolean
-}
-
-export interface DocsProject {
-  _id: string
-  name: string
-  baseUrl: string
-  description?: string
-  version?: string
-  status: string
-  tools: GeneratedTool[]
-  mcpApiKey?: string
-  resources?: DocsResource[]
-  prompts?: Array<{ promptId: string; enabled?: boolean }>
-}
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const METHOD_BG: Record<string, string> = {
-  GET: 'rgba(97,175,254,0.12)',
-  POST: 'rgba(73,204,144,0.12)',
-  PUT: 'rgba(252,161,48,0.12)',
-  PATCH: 'rgba(80,227,194,0.12)',
-  DELETE: 'rgba(249,62,62,0.12)',
-}
+export type { GeneratedTool } from './generatedTool.interface'
+export type { DocsResource } from './docsResource.interface'
+export type { DocsProject } from './docsProject.interface'
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function TypeBadge({ type }: { type?: string }) {
+function TypeBadge({ type }: TypeBadgeProps) {
   return (
     <Box component="span" sx={{
       display: 'inline-block', px: 0.8, py: 0.15, borderRadius: '3px',
@@ -119,9 +72,7 @@ function TypeBadge({ type }: { type?: string }) {
   )
 }
 
-function FieldInput({ name, schema, value, required, onChange }: {
-  name: string; schema: JsonSchema; value: string; required: boolean; onChange: (v: string) => void
-}) {
+function FieldInput({ name, schema, value, required, onChange }: FieldInputProps) {
   const label = `${name}${required ? ' *' : ''}`
   if (schema.enum && schema.enum.length > 0) {
     return (
@@ -153,7 +104,7 @@ function FieldInput({ name, schema, value, required, onChange }: {
 
 // ─── Tool card ────────────────────────────────────────────────────────────────
 
-function ToolCard({ tool, projectId, mcpApiKey }: { tool: GeneratedTool; projectId: string; mcpApiKey?: string }) {
+function ToolCard({ tool, projectId, mcpApiKey }: ToolCardProps) {
   const { t } = useTranslation('servers')
   const [tryMode, setTryMode] = useState(false)
   const [formValues, setFormValues] = useState<Record<string, string>>({})
@@ -333,7 +284,7 @@ function ToolCard({ tool, projectId, mcpApiKey }: { tool: GeneratedTool; project
 
 // ─── Resource card ────────────────────────────────────────────────────────────
 
-function ResourceCard({ resource, projectId, mcpApiKey }: { resource: DocsResource; projectId: string; mcpApiKey?: string }) {
+function ResourceCard({ resource, projectId, mcpApiKey }: ResourceCardProps) {
   const { t } = useTranslation('servers')
   const [tryMode, setTryMode] = useState(false)
   const [executing, setExecuting] = useState(false)
@@ -455,7 +406,7 @@ function ResourceCard({ resource, projectId, mcpApiKey }: { resource: DocsResour
 
 // ─── Prompt card ──────────────────────────────────────────────────────────────
 
-function PromptCard({ prompt, projectId, mcpApiKey }: { prompt: GlobalPrompt; projectId: string; mcpApiKey?: string }) {
+function PromptCard({ prompt, projectId, mcpApiKey }: PromptCardProps) {
   const { t } = useTranslation('servers')
   const args = [...new Set([...prompt.content.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]))]
 
@@ -628,17 +579,7 @@ function PromptCard({ prompt, projectId, mcpApiKey }: { prompt: GlobalPrompt; pr
   )
 }
 
-// ─── McpDocsContent (reusable as a tab or standalone page) ──────────────
-
-interface GlobalPrompt {
-  id: string
-  name: string
-  description?: string
-  content: string
-  tags: string[]
-}
-
-export function McpDocsContent({ project: server, projectId }: { project: DocsProject; projectId: string }) {
+export function McpDocsContent({ project: server, projectId }: McpDocsContentProps) {
   const { t } = useTranslation('servers')
   const [search, setSearch] = useState('')
   const [urlCopied, setUrlCopied] = useState(false)

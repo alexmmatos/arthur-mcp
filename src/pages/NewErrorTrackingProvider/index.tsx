@@ -27,18 +27,11 @@ import {
 } from '@tabler/icons-react'
 import api from '../../api'
 import { Permission, useAuth } from '../../context/AuthContext'
+import type { ErrorTrackingProviderRecord } from './errorTrackingProviderRecord.interface'
+import type { ErrorTrackingProviderForm } from './errorTrackingProviderForm.interface'
+import { SENTRY_COLOR } from './constants/sentryColor.constant'
 
-const SENTRY_COLOR = '#362d59'
 
-interface ErrorTrackingProviderRecord { id: string }
-
-interface ErrorTrackingProviderForm {
-  name: string
-  description: string
-  dsn: string
-  projectName: string
-  environment: string
-}
 
 export default function NewErrorTrackingProvider() {
   const navigate = useNavigate()

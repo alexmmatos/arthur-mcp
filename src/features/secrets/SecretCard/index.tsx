@@ -17,14 +17,10 @@ import api from '../../../api'
 import { Permission, useAuth } from '../../../context/AuthContext'
 import { BaseListCard, type BaseListCardAction } from '../../../components'
 import type { Secret } from '../types'
+import type { SecretCardProps } from './secretCardProps.interface'
 
-export function SecretCard({ secret, onEdit, onDelete, onCopy, copied }: {
-  secret: Secret
-  onEdit: (secret: Secret) => void
-  onDelete: (secret: Secret) => void
-  onCopy: (secret: Secret) => Promise<void>
-  copied: boolean
-}) {
+
+export function SecretCard({ secret, onEdit, onDelete, onCopy, copied }: SecretCardProps) {
   const { t } = useTranslation('secrets')
   const [revealed, setRevealed] = useState(false)
   const [value, setValue] = useState<string | null>(null)

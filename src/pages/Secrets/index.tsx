@@ -20,8 +20,8 @@ import api from '../../api'
 import { Permission, useAuth } from '../../context/AuthContext'
 import { AppSnackbar, ConfirmDialog } from '../../components'
 import { SecretCard, type Secret } from '../../features/secrets'
-import { useListPageLogic } from '../../hooks/useListPageLogic'
-import { useCopyToClipboard } from '../../hooks/useCopyToClipboard'
+import { useListPageLogic } from '../../hooks/useListPageLogic.hook'
+import { useCopyToClipboard } from '../../hooks/useCopyToClipboard.hook'
 
 // ─── Page ──────────────────────────────────────────────────────────────────────
 

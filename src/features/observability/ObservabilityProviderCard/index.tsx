@@ -4,22 +4,12 @@ import { useTranslation } from 'react-i18next'
 import { Permission, useAuth } from '../../../context/AuthContext'
 import { BaseListCard, type BaseListCardAction } from '../../../components'
 import type { ObservabilityProvider } from '../types'
+import type { ObservabilityProviderCardProps } from './observabilityProviderCardProps.interface'
+import { PROVIDER_COLORS } from './constants/providerColors.constant'
+export { PROVIDER_COLORS } from './constants/providerColors.constant'
 
-export const PROVIDER_COLORS: Record<string, string> = {
-  grafana: '#f46800',
-  prometheus: '#e6522c',
-  datadog: '#632ca6',
-  newrelic: '#00ac69',
-  elastic: '#00bfb3',
-  loki: '#f0a500',
-  custom: '#6b7280',
-}
 
-export function ObservabilityProviderCard({ provider, onEdit, onDelete }: {
-  provider: ObservabilityProvider
-  onEdit: (provider: ObservabilityProvider) => void
-  onDelete: (provider: ObservabilityProvider) => void
-}) {
+export function ObservabilityProviderCard({ provider, onEdit, onDelete }: ObservabilityProviderCardProps) {
   const { t } = useTranslation('observability')
   const { can } = useAuth()
 

@@ -20,21 +20,12 @@ import { useTranslation } from 'react-i18next'
 import api from '../../../../api'
 import { SaveIndicator } from '../../../../components'
 import type { SaveStatus, TenantParam, TenantParamType } from '../../types'
+import type { TenantConfigPanelProps } from './tenantConfigPanelProps.interface'
+import { TENANT_PARAM_TYPES } from './constants/tenantParamTypes.constant'
 
-const TENANT_PARAM_TYPES: { value: TenantParamType; label: string }[] = [
-  { value: 'string', label: 'String' },
-  { value: 'integer', label: 'Integer' },
-  { value: 'number', label: 'Number (float)' },
-  { value: 'boolean', label: 'Boolean' },
-  { value: 'uuid', label: 'UUID' },
-  { value: 'hash', label: 'Hash' },
-]
 
-export function TenantConfigPanel({ projectId, initialConfig, toolParamSuggestions }: {
-  projectId: string
-  initialConfig?: { enabled: boolean; params: TenantParam[] }
-  toolParamSuggestions: string[]
-}) {
+
+export function TenantConfigPanel({ projectId, initialConfig, toolParamSuggestions }: TenantConfigPanelProps) {
   const { t } = useTranslation('serverDetail')
   const [enabled, setEnabled] = useState(initialConfig?.enabled ?? false)
   const [params, setParams] = useState<TenantParam[]>(initialConfig?.params ?? [])

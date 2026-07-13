@@ -14,13 +14,10 @@ import api from '../../../../api'
 import { ConfirmDialog } from '../../../../components'
 import type { GlobalPrompt, McpPrompt } from '../../types'
 import { PromptTestPanel } from '../PromptTestPanel'
+import type { PromptsTabProps } from './promptsTabProps.interface'
 
-export function PromptsTab({ projectId, initialPrompts, onChange, anyApiKey }: {
-  projectId: string
-  initialPrompts: McpPrompt[]
-  onChange: (prompts: McpPrompt[]) => void
-  anyApiKey?: string
-}) {
+
+export function PromptsTab({ projectId, initialPrompts, onChange, anyApiKey }: PromptsTabProps) {
   const { t } = useTranslation('serverDetail')
   const navigate = useNavigate()
   const { can } = useAuth()

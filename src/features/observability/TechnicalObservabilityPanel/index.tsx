@@ -31,109 +31,32 @@ import {
 import { useTranslation } from 'react-i18next'
 import api from '../../../api'
 import {
-  ENVIRONMENT_CONTROLS,
   defaultEnvironmentValues,
   formatEnvironmentValue,
   mergeEnvironmentValues,
   serializeEnvironmentValues,
-} from '../environment-controls'
-
-type EndpointStatus = 'checking' | 'ok' | 'error'
-
-interface EndpointCheck {
-  path: string
-  labelKey: string
-  status: EndpointStatus
-  latencyMs?: number
-  statusCode?: number
-  detail?: string
-}
-
-interface MetricSummary {
-  httpRequests: number
-  httpErrors: number
-  mcpToolCalls: number
-  mcpToolErrors: number
-  externalHttpCalls: number
-  memoryBytes?: number
-  eventLoopLagSeconds?: number
-  uptimeSeconds?: number
-}
-
-interface SettingsResponse {
-  observabilityEnvironment?: Record<string, string>
-}
-
-const ENDPOINTS: Array<Pick<EndpointCheck, 'path' | 'labelKey'>> = [
-  { path: '/health', labelKey: 'runtime.health' },
-  { path: '/ready', labelKey: 'runtime.ready' },
-  { path: '/live', labelKey: 'runtime.live' },
-  { path: '/metrics', labelKey: 'runtime.metrics' },
-]
-
-const SIGNALS = [
-  { icon: IconChartHistogram, key: 'metrics', color: 'success.main' },
-  { icon: IconActivity, key: 'correlation', color: 'warning.main' },
-] as const
+} from '../utils'
+import { ENVIRONMENT_CONTROLS } from '../environmentControls.constant'
+import type { EndpointStatus } from './endpointStatus.type'
+import type { EndpointCheck } from './endpointCheck.interface'
+import type { MetricSummary } from './metricSummary.interface'
+import type { SettingsResponse } from './settingsResponse.interface'
+import { metricSum } from './utils/metricSum.util'
+import { metricValue } from './utils/metricValue.util'
+import { formatCompact } from './utils/formatCompact.util'
+import { formatBytes } from './utils/formatBytes.util'
+import { formatDuration } from './utils/formatDuration.util'
+import { parseMetricSummary } from './utils/parseMetricSummary.util'
+import type { StatusChipProps } from './statusChipProps.interface'
+import type { SectionTitleProps } from './sectionTitleProps.interface'
+import type { EndpointRowProps } from './endpointRowProps.interface'
+import type { CopyButtonProps } from './copyButtonProps.interface'
+import { ENDPOINTS } from './constants/endpoints.constant'
+import { SIGNALS } from './constants/signals.constant'
 
 
-function metricSum(metrics: string, name: string): number {
-  return metrics
-    .split('\n')
-    .filter((line) => line.startsWith(name) && !line.startsWith(`${name}_bucket`))
-    .reduce((sum, line) => {
-      const parts = line.trim().split(/\s+/)
-      const value = Number(parts[parts.length - 1])
-      return Number.isFinite(value) ? sum + value : sum
-    }, 0)
-}
 
-function metricValue(metrics: string, name: string): number | undefined {
-  const line = metrics.split('\n').find((entry) => entry.startsWith(name))
-  if (!line) return undefined
-  const parts = line.trim().split(/\s+/)
-  const value = Number(parts[parts.length - 1])
-  return Number.isFinite(value) ? value : undefined
-}
-
-function formatCompact(value: number): string {
-  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 1, notation: 'compact' }).format(value)
-}
-
-function formatBytes(bytes?: number): string {
-  if (bytes === undefined) return 'n/a'
-  const units = ['B', 'KB', 'MB', 'GB']
-  let value = bytes
-  let idx = 0
-  while (value >= 1024 && idx < units.length - 1) {
-    value /= 1024
-    idx += 1
-  }
-  return `${value.toFixed(value >= 10 || idx === 0 ? 0 : 1)} ${units[idx]}`
-}
-
-function formatDuration(seconds?: number): string {
-  if (seconds === undefined) return 'n/a'
-  if (seconds < 1) return `${Math.round(seconds * 1000)} ms`
-  if (seconds < 60) return `${seconds.toFixed(1)} s`
-  if (seconds < 3600) return `${Math.floor(seconds / 60)} min`
-  return `${Math.floor(seconds / 3600)} h`
-}
-
-function parseMetricSummary(metrics: string): MetricSummary {
-  return {
-    httpRequests: metricSum(metrics, 'http_requests_total'),
-    httpErrors: metricSum(metrics, 'http_requests_errors_total'),
-    mcpToolCalls: metricSum(metrics, 'mcp_tool_calls_total'),
-    mcpToolErrors: metricSum(metrics, 'mcp_tool_errors_total'),
-    externalHttpCalls: metricSum(metrics, 'mcp_external_http_requests_total'),
-    memoryBytes: metricValue(metrics, 'process_resident_memory_bytes'),
-    eventLoopLagSeconds: metricValue(metrics, 'nodejs_eventloop_lag_seconds'),
-    uptimeSeconds: metricValue(metrics, 'process_uptime_seconds'),
-  }
-}
-
-function StatusChip({ status }: { status: EndpointStatus }) {
+function StatusChip({ status }: StatusChipProps) {
   const { t } = useTranslation(['observability', 'common'])
   if (status === 'checking') {
     return <Chip size="small" label={t('observability:status.checking')} />
@@ -149,11 +72,7 @@ function StatusChip({ status }: { status: EndpointStatus }) {
   )
 }
 
-function SectionTitle({ icon: Icon, title, action }: {
-  icon: ElementType
-  title: string
-  action?: ReactNode
-}) {
+function SectionTitle({ icon: Icon, title, action }: SectionTitleProps) {
   return (
     <Box display="flex" alignItems="center" gap={1} mb={1.5}>
       <Box sx={{ color: 'text.secondary', display: 'flex' }}><Icon size={18} /></Box>
@@ -164,7 +83,7 @@ function SectionTitle({ icon: Icon, title, action }: {
   )
 }
 
-function EndpointRow({ endpoint }: { endpoint: EndpointCheck }) {
+function EndpointRow({ endpoint }: EndpointRowProps) {
   const { t } = useTranslation('observability')
   return (
     <Box
@@ -186,7 +105,7 @@ function EndpointRow({ endpoint }: { endpoint: EndpointCheck }) {
   )
 }
 
-function CopyButton({ value, label }: { value: string; label: string }) {
+function CopyButton({ value, label }: CopyButtonProps) {
   const { t } = useTranslation('common')
   const [copied, setCopied] = useState(false)
 

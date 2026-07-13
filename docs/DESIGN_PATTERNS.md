@@ -319,7 +319,7 @@ Examples:
 - `src/features/prompts/`
 - `src/features/secrets/`
 - `src/features/settings/`
-- Feature barrels such as `src/features/server/index.tsx` and `src/features/secrets/index.tsx`
+- Feature barrels such as `src/features/server/index.ts` and `src/features/secrets/index.ts`
 
 Rules:
 
@@ -338,13 +338,43 @@ src/features/<feature>/
   components/
   hooks/
   api/
-  types.ts
-  constants.ts
-  utils.ts
-  index.tsx
+  types/
+    entityName.interface.ts
+    stateName.type.ts
+    index.ts
+  constants/
+    constantName.constant.ts
+  utils/
+    actionName.util.ts
+  index.ts
 ```
 
 Use only the folders a feature needs; small features can stay flat.
+
+### Frontend File Responsibilities
+
+Pattern: every frontend module has one explicit kind and owner.
+
+Examples:
+
+- Enum: `src/context/auth/permission.enum.ts`
+- Interface: `src/context/auth/userPermissions.interface.ts`
+- Role decision: `src/context/auth/utils/userPermissionRole.role.ts`
+- Hook: `src/hooks/useDetailPageNav.hook.ts`
+- Utility: `src/utils/mcpResponse/parseMcpResponse.util.ts`
+- Constant: `src/features/server/constants/methodColor.constant.ts`
+- Component props: `src/components/organisms/BaseListCard/baseListCardProps.interface.ts`
+
+Rules:
+
+- Store every named interface, enum, type alias, class, entity, and component props contract in its own lower-camel `name.kind.ts` file.
+- Do not add catch-all `types.ts`, `utils.ts`, `constants.ts`, `helpers.ts`, `format.ts`, `validation.ts`, or `*-utils.ts` files.
+- Keep `.tsx` modules for React rendering. Top-level functions in component modules must return React UI.
+- Closure-based handlers that coordinate component-local state may stay inside the component function. Reusable stateful coordination belongs in a `.hook.ts`; stateless decisions and transformations belong in a focused utility.
+- Keep one public utility responsibility per file. Prefer semantic suffixes such as `.role.ts`, `.permission.ts`, `.parser.ts`, `.formatter.ts`, `.validator.ts`, `.mapper.ts`, `.builder.ts`, `.factory.ts`, or `.util.ts`.
+- Keep utilities with their owning feature. Promote them to `src/utils/` only when they are genuinely cross-feature.
+- Store constants in focused `.constant.ts` files. Large static datasets may remain dedicated data modules after their contracts and builders have been extracted.
+- Run `npm run check:frontend-structure` directly when auditing structure. It also runs automatically as part of `npm run type-check`.
 
 ### Atomic Design
 
@@ -369,20 +399,21 @@ Rules:
 
 ### Barrel Exports
 
-Pattern: `index.tsx` files define controlled public APIs for React feature and shared component groups.
+Pattern: `index.ts` files define controlled public APIs; `index.tsx` is reserved for files that render JSX.
 
 Examples:
 
-- `src/components/index.tsx`
-- `src/components/atoms/index.tsx`
-- `src/features/server/index.tsx`
-- `src/features/server/settings/index.tsx`
-- `src/features/prompts/index.tsx`
-- `src/features/secrets/index.tsx`
+- `src/components/index.ts`
+- `src/components/atoms/index.ts`
+- `src/features/server/index.ts`
+- `src/features/server/settings/index.ts`
+- `src/features/prompts/index.ts`
+- `src/features/secrets/index.ts`
 
 Rules:
 
-- Use `index.tsx` barrels at feature or shared component boundaries when they make imports clearer.
+- Use `index.ts` barrels at feature or shared component boundaries when they make imports clearer.
+- Use `ComponentName/index.tsx` only when the entry point contains a React component or other JSX rendering.
 - Export only stable public components, hooks, types, constants, and helpers.
 - Prefer named exports and explicit type exports over broad `export *`.
 - Avoid barrels in tiny folders with one file unless the folder is expected to grow.
@@ -395,15 +426,15 @@ Pattern: `ServerDetail` should act as the server detail route orchestrator, whil
 
 Examples:
 
-- `src/features/server/settings/RateLimitPanel.tsx`
-- `src/features/server/types.ts`
-- `src/components/SaveIndicator.tsx`
+- `src/features/server/settings/RateLimitPanel/index.tsx`
+- `src/features/server/types/project.interface.ts`
+- `src/components/atoms/SaveIndicator/index.tsx`
 
 Rules:
 
-- Keep page-level tab selection, project loading, navigation, and cross-tab state in `src/pages/ServerDetail.tsx`.
+- Keep page-level tab selection, project loading, navigation, and cross-tab state in `src/pages/ServerDetail/index.tsx`.
 - Move self-contained panels, dialogs, accordions, and tab bodies into `src/features/server/<area>/`.
-- Share feature-local types through `src/features/server/types.ts` only when more than one server feature module needs them.
+- Store each server contract under `src/features/server/types/name.kind.ts`; expose stable shared contracts through `src/features/server/types/index.ts`.
 - Put cross-feature UI widgets in `src/components/` only when they are not specific to server detail.
 - Preserve current behavior while extracting modules; avoid combining extraction with product changes.
 
@@ -594,19 +625,21 @@ Rules:
 - Store color mode in `localStorage`.
 - Avoid hardcoded colors unless they are part of an existing theme convention or a narrowly scoped visual token.
 
-### Detail Pages and Large Local Types
+### Detail Pages And Page-Owned Contracts
 
-Pattern: complex pages define local TypeScript interfaces close to the workflow they support.
+Pattern: page-only contracts stay close to their route but never inside the `.tsx` page module.
 
-Example:
+Examples:
 
-- `src/pages/ServerDetail.tsx`
+- `src/pages/SharePage/shareInfo.interface.ts`
+- `src/pages/Profile/rolePermissions.interface.ts`
 
 Rules:
 
-- Keep local interfaces near the page until they are reused.
-- Extract shared API/domain types only when multiple pages or components need them.
-- Keep frontend types aligned with backend records and `docs/ENTITIES.md`.
+- Store each page-owned contract in its own `name.kind.ts` file beside the page.
+- Move a contract into its feature only when the feature genuinely owns it or multiple consumers share it.
+- Keep frontend contracts aligned with backend records and `docs/ENTITIES.md`.
+- Do not create a page-local `types.ts` aggregation file.
 
 ### Form and Validation Pattern
 
@@ -641,6 +674,7 @@ Rules:
 - Test route/page behavior when user-visible interactions change.
 - Test API client behavior when interceptors change.
 - Prefer user-facing queries in React Testing Library tests.
+- Run `npm run check:frontend-structure` through `npm run type-check` to reject inline contracts, non-rendering top-level component helpers, JSX-free `index.tsx` barrels, and forbidden catch-all modules.
 
 ## Change Checklist
 

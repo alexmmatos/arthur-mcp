@@ -7,13 +7,9 @@ import { useTranslation } from 'react-i18next'
 import api from '../../../../api'
 import { HelpButton, SaveIndicator } from '../../../../components'
 import type { ResponseConfig, ResponseLimitPanelProps, SaveStatus } from '../../types'
+import { DEFAULTS } from './constants/defaults.constant'
 
-const DEFAULTS: Required<Omit<ResponseConfig, 'enabled'>> = {
-  maxResponseLen: 100000,
-  maxDepth: 5,
-  arraySlice: 20,
-  errorTruncateLen: 2000,
-}
+
 
 export function ResponseLimitPanel({ projectId, initialConfig, onChange }: ResponseLimitPanelProps) {
   const { t } = useTranslation('serverDetail')

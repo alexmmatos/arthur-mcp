@@ -2,8 +2,10 @@ import { Box, CircularProgress, Typography } from '@mui/material'
 import { IconCheck } from '@tabler/icons-react'
 import { useTranslation } from 'react-i18next'
 import type { SaveStatus } from '../../../features/server/types'
+import type { SaveIndicatorProps } from './saveIndicatorProps.interface'
 
-export function SaveIndicator({ status, error }: { status: SaveStatus; error?: string }) {
+
+export function SaveIndicator({ status, error }: SaveIndicatorProps) {
   const { t } = useTranslation('common')
   if (status === 'idle') return null
   if (status === 'saving') return (

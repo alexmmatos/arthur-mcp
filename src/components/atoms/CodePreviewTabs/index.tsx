@@ -2,12 +2,10 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { Box, Tab, Tabs } from '@mui/material'
 import { useTranslation } from 'react-i18next'
+import type { CodePreviewTabsProps } from './codePreviewTabsProps.interface'
 
-export function CodePreviewTabs({ codeContent, previewContent, tabSx }: {
-  codeContent: ReactNode
-  previewContent: ReactNode
-  tabSx?: object
-}) {
+
+export function CodePreviewTabs({ codeContent, previewContent, tabSx }: CodePreviewTabsProps) {
   const { t } = useTranslation('common')
   const [tab, setTab] = useState(0)
   return (

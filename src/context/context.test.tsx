@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AuthProvider, Permission, can, useAuth, type Me } from './AuthContext'
-import { ALL_PERMISSIONS_OFF, READ_ONLY_FALLBACK, ROLE_PERMISSION_FALLBACKS } from './permissionPresets'
+import { ALL_PERMISSIONS_OFF, READ_ONLY_FALLBACK, ROLE_PERMISSION_FALLBACKS } from './auth'
 import { ServerNavProvider, useServerNav } from './ServerNavContext'
 import { ColorModeProvider, ColorMode, useColorMode } from '../theme/ColorModeContext'
 

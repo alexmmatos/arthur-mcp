@@ -7,8 +7,11 @@ import {
 import { IconPlus, IconX } from '@tabler/icons-react'
 import type { ChainStep, GeneratedTool, JsonSchema, ToolChain } from '../../types'
 import { StepBuilder } from '../StepBuilder'
+import { newStepId } from './utils/newStepId.util'
+import type { ChainDialogProps } from './chainDialogProps.interface'
 
-function newStepId() { return `step_${Math.random().toString(36).slice(2, 10)}` }
+
+
 
 export function ChainDialog({
   open,
@@ -16,13 +19,7 @@ export function ChainDialog({
   tools,
   onClose,
   onSaved,
-}: {
-  open: boolean
-  editTarget: ToolChain | null
-  tools: GeneratedTool[]
-  onClose: () => void
-  onSaved: (chain: ToolChain) => void
-}) {
+}: ChainDialogProps) {
   const { t } = useTranslation(['serverDetail', 'common'])
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')

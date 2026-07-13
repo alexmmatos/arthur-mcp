@@ -13,28 +13,15 @@ import { useAuth, Permission } from '../../../../context/AuthContext'
 import api from '../../../../api'
 import type { GeneratedTool } from '../../types'
 import { METHOD_COLOR, METHOD_BG, SOURCE_CHIP_COLOR } from '../../constants'
-import { buildCurl, buildMcpCurl } from '../curl-utils'
+import { buildCurl, buildMcpCurl } from '../utils'
 import { FieldInput } from '../../resources/DynamicResourceDialog'
 import { ToolCommentsSection } from '../ToolCommentsSection'
 import { InlineEdit } from '../../settings/InlineEdit'
+import { parseMcpResponse } from '../../../../utils/mcpResponse'
+import type { ToolAccordionProps } from './toolAccordionProps.interface'
 
-function parseMcpResponse(data: unknown): any {
-  if (typeof data === 'object' && data !== null) return data
-  if (typeof data === 'string') {
-    const match = data.match(/^data:\s*(.+)$/m)
-    if (match) { try { return JSON.parse(match[1]) } catch { /* fall through */ } }
-    try { return JSON.parse(data) } catch { /* fall through */ }
-  }
-  return {}
-}
 
-export function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged, onEditEndpoint }: {
-  tool: GeneratedTool
-  projectId: string
-  anyApiKey?: string
-  onToolChanged: (oldName: string, newTool: GeneratedTool) => void
-  onEditEndpoint: (tool: GeneratedTool) => void
-}) {
+export function ToolAccordion({ tool: initialTool, projectId, anyApiKey, onToolChanged, onEditEndpoint }: ToolAccordionProps) {
   const { t } = useTranslation('serverDetail')
   const [tool, setTool] = useState(initialTool)
   const [curlCopied, setCurlCopied] = useState(false)

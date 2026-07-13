@@ -3,6 +3,9 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { ServerNavProvider } from './context/ServerNavContext'
 import { Layout } from './components/templates'
+import type { RequireAuthProps } from './requireAuthProps.interface'
+import type { RequireSetupProps } from './requireSetupProps.interface'
+
 
 const Login = lazy(() => import('./pages/Login'))
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
@@ -31,12 +34,12 @@ const AiProviderDetail = lazy(() => import('./pages/AiProviderDetail'))
 const Observability = lazy(() => import('./pages/Observability'))
 const ErrorTracking = lazy(() => import('./pages/ErrorTracking'))
 
-function RequireAuth({ children }: { children: React.ReactNode }) {
+function RequireAuth({ children }: RequireAuthProps) {
   const token = localStorage.getItem('token')
   return token ? <>{children}</> : <Navigate to="/login" replace />
 }
 
-function RequireSetup({ children }: { children: React.ReactNode }) {
+function RequireSetup({ children }: RequireSetupProps) {
   const done = localStorage.getItem('setupComplete')
   return done ? <>{children}</> : <Navigate to="/setup" replace />
 }

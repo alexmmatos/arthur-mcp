@@ -19,22 +19,15 @@ import { useTranslation } from 'react-i18next'
 import api from '../../../../api'
 import { HelpButton, SaveIndicator } from '../../../../components'
 import type { GeneratedTool, SaveStatus } from '../../types'
+import type { RestrictionType } from './restrictionType.type'
+import type { ToolRestriction } from './toolRestriction.interface'
+import { newRestriction } from './utils/newRestriction.util'
+import type { ToolRestrictionsPanelProps } from './toolRestrictionsPanelProps.interface'
 
-type RestrictionType = 'blocked' | 'max_calls_per_session' | 'require_confirmation'
 
-interface ToolRestriction {
-  id: string
-  toolName: string
-  type: RestrictionType
-  limit: number
-  enabled: boolean
-}
 
-function newRestriction(): ToolRestriction {
-  return { id: crypto.randomUUID(), toolName: '', type: 'blocked', limit: 10, enabled: true }
-}
 
-export function ToolRestrictionsPanel({ projectId, tools }: { projectId: string; tools: GeneratedTool[] }) {
+export function ToolRestrictionsPanel({ projectId, tools }: ToolRestrictionsPanelProps) {
   const { t } = useTranslation('serverDetail')
   const [restrictions, setRestrictions] = useState<ToolRestriction[]>([])
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')

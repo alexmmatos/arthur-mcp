@@ -13,11 +13,10 @@ import { useTranslation } from 'react-i18next'
 import api from '../../../../api'
 import { SaveIndicator } from '../../../../components'
 import type { SaveStatus } from '../../types'
+import type { AlertConfigPanelProps } from './alertConfigPanelProps.interface'
 
-export function AlertConfigPanel({ projectId, initialConfig }: {
-  projectId: string
-  initialConfig?: { enabled: boolean; errorThresholdPct: number; notifyEmail: string }
-}) {
+
+export function AlertConfigPanel({ projectId, initialConfig }: AlertConfigPanelProps) {
   const { t } = useTranslation('serverDetail')
   const [enabled, setEnabled] = useState(initialConfig?.enabled ?? false)
   const [threshold, setThreshold] = useState(initialConfig?.errorThresholdPct ?? 20)

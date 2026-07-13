@@ -28,18 +28,18 @@ import { useTranslation } from 'react-i18next'
 import api from '../../../api'
 import { Permission, useAuth } from '../../../context/AuthContext'
 import {
-  ENVIRONMENT_CONTROLS,
   defaultEnvironmentValues,
   formatEnvironmentValue,
   mergeEnvironmentValues,
   serializeEnvironmentValues,
-} from '../environment-controls'
+} from '../utils'
+import { ENVIRONMENT_CONTROLS } from '../environmentControls.constant'
+import type { SettingsResponse } from './settingsResponse.interface'
+import type { CopyButtonProps } from './copyButtonProps.interface'
 
-interface SettingsResponse {
-  observabilityEnvironment?: Record<string, string>
-}
 
-function CopyButton({ value, label }: { value: string; label: string }) {
+
+function CopyButton({ value, label }: CopyButtonProps) {
   const { t } = useTranslation('common')
   const [copied, setCopied] = useState(false)
 

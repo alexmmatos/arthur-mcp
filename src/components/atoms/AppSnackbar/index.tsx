@@ -1,11 +1,7 @@
 import { Alert, Snackbar } from '@mui/material'
+import type { AppSnackbarProps } from './appSnackbarProps.interface'
+export type { AppSnackbarProps } from './appSnackbarProps.interface'
 
-export interface AppSnackbarProps {
-  open: boolean
-  message: string
-  severity?: 'success' | 'error' | 'warning' | 'info'
-  onClose: () => void
-}
 
 export default function AppSnackbar({
   open,

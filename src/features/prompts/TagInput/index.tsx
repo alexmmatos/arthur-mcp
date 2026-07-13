@@ -2,8 +2,10 @@ import { KeyboardEvent, useState } from 'react'
 import { Box, Chip, InputAdornment, TextField } from '@mui/material'
 import { IconTag, IconX } from '@tabler/icons-react'
 import { useTranslation } from 'react-i18next'
+import type { TagInputProps } from './tagInputProps.interface'
 
-export function TagInput({ tags, onChange }: { tags: string[]; onChange: (tags: string[]) => void }) {
+
+export function TagInput({ tags, onChange }: TagInputProps) {
   const { t } = useTranslation('prompts')
   const [inputValue, setInputValue] = useState('')
 

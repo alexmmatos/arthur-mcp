@@ -13,13 +13,10 @@ import { useAuth, Permission } from '../../../../context/AuthContext'
 import api from '../../../../api'
 import { HelpButton } from '../../../../components'
 import { backendUrl } from '../../../../config/urls'
+import type { McpEndpointBarProps } from './mcpEndpointBarProps.interface'
 
-export function McpEndpointBar({ projectId, hasKeys, shareSlug, onShareSlugChange }: {
-  projectId: string
-  hasKeys: boolean
-  shareSlug?: string | null
-  onShareSlugChange?: (shareSlug: string) => void
-}) {
+
+export function McpEndpointBar({ projectId, hasKeys, shareSlug, onShareSlugChange }: McpEndpointBarProps) {
   const { t } = useTranslation('serverDetail')
   const [copied, setCopied] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)

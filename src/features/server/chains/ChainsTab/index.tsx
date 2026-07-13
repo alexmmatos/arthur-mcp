@@ -9,13 +9,10 @@ import api from '../../../../api'
 import { ConfirmDialog } from '../../../../components'
 import type { GeneratedTool, ToolChain } from '../../types'
 import { ChainDialog } from '../ChainDialog'
+import type { ChainsTabProps } from './chainsTabProps.interface'
 
-export function ChainsTab({ projectId, initialChains, tools, onChange }: {
-  projectId: string
-  initialChains: ToolChain[]
-  tools: GeneratedTool[]
-  onChange: (chains: ToolChain[]) => void
-}) {
+
+export function ChainsTab({ projectId, initialChains, tools, onChange }: ChainsTabProps) {
   const { t } = useTranslation(['serverDetail', 'common'])
   const { can } = useAuth()
   const [chains, setChains] = useState<ToolChain[]>(initialChains)

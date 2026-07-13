@@ -4,21 +4,12 @@ import { useTranslation } from 'react-i18next'
 import { Permission, useAuth } from '../../../context/AuthContext'
 import { BaseListCard, type BaseListCardAction } from '../../../components'
 import type { ErrorTrackingProvider } from '../types'
+import type { ErrorTrackingProviderCardProps } from './errorTrackingProviderCardProps.interface'
+import { TOOL_COLORS } from './constants/toolColors.constant'
+export { TOOL_COLORS } from './constants/toolColors.constant'
 
-export const TOOL_COLORS: Record<string, string> = {
-  sentry: '#362d59',
-  rollbar: '#ff6600',
-  bugsnag: '#4949e7',
-  datadog_apm: '#632ca6',
-  newrelic_apm: '#00ac69',
-  custom: '#6b7280',
-}
 
-export function ErrorTrackingProviderCard({ provider, onEdit, onDelete }: {
-  provider: ErrorTrackingProvider
-  onEdit: (provider: ErrorTrackingProvider) => void
-  onDelete: (provider: ErrorTrackingProvider) => void
-}) {
+export function ErrorTrackingProviderCard({ provider, onEdit, onDelete }: ErrorTrackingProviderCardProps) {
   const { t } = useTranslation('errorTracking')
   const { can } = useAuth()
 

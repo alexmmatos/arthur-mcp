@@ -11,24 +11,18 @@ import {
 import { IconHttpConnect, IconPlus, IconTrash } from '@tabler/icons-react'
 import { useTranslation } from 'react-i18next'
 import { HelpButton } from '../../../components'
+import type { HeaderEntry } from './headerEntry.interface'
+import type { GlobalRequestHeadersPanelProps } from './globalRequestHeadersPanelProps.interface'
 
-export interface HeaderEntry {
-  id: string
-  name: string
-  value: string
-}
+export type { HeaderEntry } from './headerEntry.interface'
+
 
 export function GlobalRequestHeadersPanel({
   globalHeaders,
   onAdd,
   onRemove,
   onChange,
-}: {
-  globalHeaders: HeaderEntry[]
-  onAdd: () => void
-  onRemove: (id: string) => void
-  onChange: (id: string, field: 'name' | 'value', value: string) => void
-}) {
+}: GlobalRequestHeadersPanelProps) {
   const { t } = useTranslation('settings')
 
   return (

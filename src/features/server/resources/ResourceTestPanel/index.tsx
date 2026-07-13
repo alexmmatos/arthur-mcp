@@ -6,27 +6,14 @@ import {
 import { IconPlayerPlay } from '@tabler/icons-react'
 import api from '../../../../api'
 import type { McpResource } from '../../types'
+import { parseMcpResponse } from '../../../../utils/mcpResponse'
+import { isHtmlResponse } from './utils/isHtmlResponse.util'
+import type { ResourceTestPanelProps } from './resourceTestPanelProps.interface'
 
-function parseMcpResponse(data: unknown): any {
-  if (typeof data === 'object' && data !== null) return data
-  if (typeof data === 'string') {
-    const match = data.match(/^data:\s*(.+)$/m)
-    if (match) { try { return JSON.parse(match[1]) } catch { /* fall through */ } }
-    try { return JSON.parse(data) } catch { /* fall through */ }
-  }
-  return {}
-}
 
-function isHtmlResponse(text: string, mimeType?: string) {
-  if (mimeType?.toLowerCase().includes('html')) return true
-  return /<!doctype\s+html|<html[\s>]|<body[\s>]|<[a-z][\s\S]*>/i.test(text.trim())
-}
 
-export function ResourceTestPanel({ resource, projectId, anyApiKey }: {
-  resource: McpResource
-  projectId: string
-  anyApiKey?: string
-}) {
+
+export function ResourceTestPanel({ resource, projectId, anyApiKey }: ResourceTestPanelProps) {
   const { t } = useTranslation(['serverDetail', 'common'])
   const [open, setOpen] = useState(false)
   const [executing, setExecuting] = useState(false)

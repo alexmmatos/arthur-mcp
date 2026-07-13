@@ -6,6 +6,8 @@ import {
   Typography,
 } from '@mui/material'
 import { IconX } from '@tabler/icons-react'
+import type { BaseDialogLayoutProps } from './baseDialogLayoutProps.interface'
+
 
 export function BaseDialogLayout({
   open,
@@ -17,17 +19,7 @@ export function BaseDialogLayout({
   footer,
   anchor = 'right',
   width = 480,
-}: {
-  open: boolean
-  onClose: () => void
-  title: ReactNode
-  titleIcon?: ReactNode
-  description?: ReactNode
-  children: ReactNode
-  footer?: ReactNode
-  anchor?: 'left' | 'right'
-  width?: number
-}) {
+}: BaseDialogLayoutProps) {
   return (
     <Drawer
       anchor={anchor}

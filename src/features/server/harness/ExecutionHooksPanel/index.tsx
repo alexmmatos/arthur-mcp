@@ -20,29 +20,16 @@ import { useTranslation } from 'react-i18next'
 import api from '../../../../api'
 import { HelpButton, SaveIndicator } from '../../../../components'
 import type { SaveStatus } from '../../types'
+import type { HookPhase } from './hookPhase.type'
+import type { HookType } from './hookType.type'
+import type { ExecutionHook } from './executionHook.interface'
+import { newHook } from './utils/newHook.util'
+import type { ExecutionHooksPanelProps } from './executionHooksPanelProps.interface'
+import { PHASE_COLOR } from './constants/phaseColor.constant'
 
-type HookPhase = 'before' | 'after'
-type HookType = 'inject_header' | 'add_query_param' | 'log'
 
-interface ExecutionHook {
-  id: string
-  phase: HookPhase
-  type: HookType
-  key: string
-  value: string
-  enabled: boolean
-}
 
-const PHASE_COLOR: Record<HookPhase, 'primary' | 'secondary'> = {
-  before: 'primary',
-  after: 'secondary',
-}
-
-function newHook(): ExecutionHook {
-  return { id: crypto.randomUUID(), phase: 'before', type: 'inject_header', key: '', value: '', enabled: true }
-}
-
-export function ExecutionHooksPanel({ projectId }: { projectId: string }) {
+export function ExecutionHooksPanel({ projectId }: ExecutionHooksPanelProps) {
   const { t } = useTranslation('serverDetail')
   const [hooks, setHooks] = useState<ExecutionHook[]>([])
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')

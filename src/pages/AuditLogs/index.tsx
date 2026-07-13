@@ -21,30 +21,11 @@ import { IconRefresh, IconEye, IconEyeOff } from '@tabler/icons-react'
 import { useTranslation } from 'react-i18next'
 import api from '../../api'
 import { HelpButton } from '../../components'
+import type { AuditEntry } from './auditEntry.interface'
+import { ACTION_COLORS } from './constants/actionColors.constant'
+import { LIMIT } from './constants/limit.constant'
 
-interface AuditEntry {
-  _id: string
-  userId?: string
-  username: string
-  action: string
-  entity: string
-  entityId?: string
-  entityName?: string
-  details?: string
-  ip?: string
-  createdAt: string
-}
 
-const ACTION_COLORS: Record<string, 'error' | 'warning' | 'success' | 'default'> = {
-  create: 'success',
-  update: 'warning',
-  delete: 'error',
-  generate_key: 'default',
-  revoke_key: 'error',
-  login: 'default',
-}
-
-const LIMIT = 50
 
 export default function AuditLogs() {
   const { can, loading: authLoading } = useAuth()

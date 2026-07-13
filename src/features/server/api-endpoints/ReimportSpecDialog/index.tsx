@@ -8,13 +8,10 @@ import {
 import { useTranslation } from 'react-i18next'
 import api from '../../../../api'
 import { BaseDialogLayout } from '../../../../components'
+import type { ReimportSpecDialogProps } from './reimportSpecDialogProps.interface'
 
-export function ReimportSpecDialog({ projectId, open, onClose, onSuccess }: {
-  projectId: string
-  open: boolean
-  onClose: () => void
-  onSuccess: (result: { added: number; updated: number; baseUrl: string }) => void
-}) {
+
+export function ReimportSpecDialog({ projectId, open, onClose, onSuccess }: ReimportSpecDialogProps) {
   const { t } = useTranslation('serverDetail')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)

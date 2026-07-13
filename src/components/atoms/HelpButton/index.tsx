@@ -12,11 +12,8 @@ import {
 } from '@mui/material'
 import HelpIcon from '@mui/icons-material/Help'
 import { useTranslation } from 'react-i18next'
+import type { HelpButtonProps } from './helpButtonProps.interface'
 
-interface HelpButtonProps {
-  title: string
-  children: React.ReactNode
-}
 
 export default function HelpButton({ title, children }: HelpButtonProps) {
   const [open, setOpen] = useState(false)

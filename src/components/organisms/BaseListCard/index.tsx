@@ -6,26 +6,11 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material'
+import type { BaseListCardAction } from './baseListCardAction.interface'
+import type { BaseListCardProps } from './baseListCardProps.interface'
+export type { BaseListCardAction } from './baseListCardAction.interface'
+export type { BaseListCardProps } from './baseListCardProps.interface'
 
-export interface BaseListCardAction {
-  icon: ReactNode
-  tooltip: string
-  onClick: (e: React.MouseEvent) => void
-  color?: 'default' | 'success' | 'error' | 'inherit'
-  disabled?: boolean
-}
-
-export interface BaseListCardProps {
-  icon: ReactNode
-  title: string
-  description?: string
-  content?: ReactNode // e.g., tags, status chips, revealed secret, etc.
-  footer?: ReactNode // e.g., metadata line, updated date
-  actions: BaseListCardAction[]
-  onClick?: () => void
-  disabled?: boolean
-  opacity?: number // 0-1, for disabled/paused state
-}
 
 /**
  * Reusable card component for list views (Prompts, Secrets, Servers).

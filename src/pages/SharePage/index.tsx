@@ -22,60 +22,32 @@ import { normalizeMcpUrl, oauthTokenUrl, absoluteUrl } from '../../utils/mcpUrl'
 import { shellSingleQuote, buildCurlCommand } from '../../utils/curl'
 import { formatJson, isEmptyObject } from '../../utils/format'
 import { coerceParameterValue } from '../../utils/mcpParameters'
+import type { ShareTool } from './shareTool.interface'
+import type { ShareToolParameter } from './shareToolParameter.interface'
+import type { ShareResource } from './shareResource.interface'
+import type { SharePrompt } from './sharePrompt.interface'
+import type { ShareInfo } from './shareInfo.interface'
+import type { AuthMode } from './authMode.type'
+import type { OperationTone } from './operationTone.type'
+import type { CopyBoxProps } from './copyBoxProps.interface'
+import type { EndpointBoxProps } from './endpointBoxProps.interface'
+import type { CodeBlockProps } from './codeBlockProps.interface'
+import type { CopyableCodeBlockProps } from './copyableCodeBlockProps.interface'
+import type { FieldRowProps } from './fieldRowProps.interface'
+import type { EmptyLineProps } from './emptyLineProps.interface'
+import type { SchemaBlockProps } from './schemaBlockProps.interface'
+import type { SimulatorPanelProps } from './simulatorPanelProps.interface'
+import type { ParameterListProps } from './parameterListProps.interface'
+import type { DocAccordionProps } from './docAccordionProps.interface'
+import type { SwaggerTagSectionProps } from './swaggerTagSectionProps.interface'
+import type { AuthorizeDialogProps } from './authorizeDialogProps.interface'
+import { operationStyles } from './constants/operationStyles.constant'
 
-interface ShareTool {
-  name: string
-  description?: string
-  parameters: ShareToolParameter[]
-  outputSchema?: Record<string, unknown>
-  comments?: Array<{ text: string; author: string; createdAt: string }>
-}
 
-interface ShareToolParameter {
-  name: string
-  type?: string
-  description?: string
-  required: boolean
-  enum?: unknown[]
-}
 
-interface ShareResource {
-  id: string
-  name: string
-  uri: string
-  description?: string
-  mimeType?: string
-  outputSchema?: Record<string, unknown>
-}
 
-interface SharePrompt {
-  promptId: string
-  name?: string
-  description?: string
-  arguments: string[]
-  content?: string
-}
 
-interface ShareInfo {
-  name: string
-  description?: string
-  version?: string
-  status: string
-  mcpUrl: string
-  shareSlug?: string | null
-  hasKey: boolean
-  hasOAuthClient?: boolean
-  toolCount: number
-  resourceCount: number
-  promptCount: number
-  tools: ShareTool[]
-  resources: ShareResource[]
-  prompts: SharePrompt[]
-}
-
-type AuthMode = 'apiKey' | 'oauthClientCredentials'
-
-function CopyBox({ value, label }: { value: string; label: string }) {
+function CopyBox({ value, label }: CopyBoxProps) {
   const { t } = useTranslation('servers')
   const [copied, setCopied] = useState(false)
   return (
@@ -90,7 +62,7 @@ function CopyBox({ value, label }: { value: string; label: string }) {
   )
 }
 
-function EndpointBox({ value, label }: { value: string; label: string }) {
+function EndpointBox({ value, label }: EndpointBoxProps) {
   const { t } = useTranslation('servers')
   const [copied, setCopied] = useState(false)
 
@@ -133,7 +105,7 @@ function EndpointBox({ value, label }: { value: string; label: string }) {
   )
 }
 
-function CodeBlock({ value }: { value: string }) {
+function CodeBlock({ value }: CodeBlockProps) {
   return (
     <Box sx={{ bgcolor: '#111827', borderRadius: 1, px: 1.5, py: 1.25, overflowX: 'auto' }}>
       <Typography component="pre" fontFamily="monospace" fontSize="0.76rem" color="#e5e7eb" m={0} sx={{ whiteSpace: 'pre-wrap' }}>
@@ -143,7 +115,7 @@ function CodeBlock({ value }: { value: string }) {
   )
 }
 
-function CopyableCodeBlock({ value, label }: { value: string; label: string }) {
+function CopyableCodeBlock({ value, label }: CopyableCodeBlockProps) {
   const { t } = useTranslation('servers')
   const [copied, setCopied] = useState(false)
 
@@ -163,7 +135,7 @@ function CopyableCodeBlock({ value, label }: { value: string; label: string }) {
   )
 }
 
-function FieldRow({ label, value }: { label: string; value?: ReactNode }) {
+function FieldRow({ label, value }: FieldRowProps) {
   if (value === undefined || value === null || value === '') return null
   return (
     <Box>
@@ -173,11 +145,11 @@ function FieldRow({ label, value }: { label: string; value?: ReactNode }) {
   )
 }
 
-function EmptyLine({ text }: { text: string }) {
+function EmptyLine({ text }: EmptyLineProps) {
   return <Typography variant="body2" color="text.secondary">{text}</Typography>
 }
 
-function SchemaBlock({ title, schema, emptyText }: { title: string; schema?: Record<string, unknown>; emptyText: string }) {
+function SchemaBlock({ title, schema, emptyText }: SchemaBlockProps) {
   return (
     <Box>
       <Typography variant="caption" color="text.secondary" fontWeight={700} display="block" mb={0.75}>{title}</Typography>
@@ -193,14 +165,7 @@ function SimulatorPanel({
   buildPayload,
   fields = [],
   mcpUrl,
-}: {
-  authKey: string
-  authMode: AuthMode
-  authRequired: boolean
-  buildPayload: (values: Record<string, string>) => Record<string, unknown>
-  fields?: ShareToolParameter[]
-  mcpUrl: string
-}) {
+}: SimulatorPanelProps) {
   const { t } = useTranslation('servers')
   const [tryMode, setTryMode] = useState(false)
   const [values, setValues] = useState<Record<string, string>>({})
@@ -331,7 +296,7 @@ function SimulatorPanel({
   )
 }
 
-function ParameterList({ parameters }: { parameters: ShareToolParameter[] }) {
+function ParameterList({ parameters }: ParameterListProps) {
   const { t } = useTranslation('servers')
 
   if (parameters.length === 0) return <EmptyLine text={t('share.noParameters')} />
@@ -359,25 +324,7 @@ function ParameterList({ parameters }: { parameters: ShareToolParameter[] }) {
   )
 }
 
-type OperationTone = 'tool' | 'resource' | 'prompt' | 'setupClaude' | 'setupCursor' | 'setupGeneral' | 'general'
-
-const operationStyles: Record<OperationTone, { label: string; color: string; bg: string }> = {
-  tool: { label: 'TOOL', color: '#61affe', bg: 'rgba(97, 175, 254, 0.1)' },
-  resource: { label: 'RESOURCE', color: '#9012fe', bg: 'rgba(144, 18, 254, 0.09)' },
-  prompt: { label: 'PROMPT', color: '#fca130', bg: 'rgba(252, 161, 48, 0.12)' },
-  setupClaude: { label: 'CLAUDE', color: '#9012fe', bg: 'rgba(144, 18, 254, 0.09)' },
-  setupCursor: { label: 'CURSOR', color: '#61affe', bg: 'rgba(97, 175, 254, 0.1)' },
-  setupGeneral: { label: 'GENERAL', color: '#49cc90', bg: 'rgba(73, 204, 144, 0.1)' },
-  general: { label: 'GENERAL', color: '#49cc90', bg: 'rgba(73, 204, 144, 0.1)' },
-}
-
-function DocAccordion({ title, subtitle, chips, tone = 'tool', children }: {
-  title: string
-  subtitle?: string
-  chips?: React.ReactNode
-  tone?: OperationTone
-  children: ReactNode
-}) {
+function DocAccordion({ title, subtitle, chips, tone = 'tool', children }: DocAccordionProps) {
   const styles = operationStyles[tone]
 
   return (
@@ -424,7 +371,7 @@ function DocAccordion({ title, subtitle, chips, tone = 'tool', children }: {
   )
 }
 
-function SwaggerTagSection({ title, children }: { title: string; children: ReactNode }) {
+function SwaggerTagSection({ title, children }: SwaggerTagSectionProps) {
   return (
     <Box>
       <Box sx={{ borderBottom: '1px solid', borderColor: 'divider', mb: 1.25, pb: 0.75 }}>
@@ -446,18 +393,7 @@ function AuthorizeDialog({
   onClose,
   onModeChange,
   open,
-}: {
-  authKey: string
-  authMode: AuthMode
-  hasApiKey: boolean
-  hasOAuthClient: boolean
-  mcpUrl: string
-  onAuthorize: (value: string, mode: AuthMode) => void
-  onClear: () => void
-  onClose: () => void
-  onModeChange: (mode: AuthMode) => void
-  open: boolean
-}) {
+}: AuthorizeDialogProps) {
   const { t } = useTranslation('servers')
   const [draft, setDraft] = useState(authKey)
   const [draftMode, setDraftMode] = useState<AuthMode>(authMode)

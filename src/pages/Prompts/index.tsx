@@ -23,8 +23,8 @@ import api from '../../api'
 import { useAuth, Permission } from '../../context/AuthContext'
 import { AppSnackbar, ConfirmDialog } from '../../components'
 import { PromptCard, TagInput, type Prompt } from '../../features/prompts'
-import { useListPageLogic } from '../../hooks/useListPageLogic'
-import { useCopyToClipboard } from '../../hooks/useCopyToClipboard'
+import { useListPageLogic } from '../../hooks/useListPageLogic.hook'
+import { useCopyToClipboard } from '../../hooks/useCopyToClipboard.hook'
 
 // ─── Page ──────────────────────────────────────────────────────────────────────
 

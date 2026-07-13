@@ -17,7 +17,7 @@ import api from '../../api'
 import { Permission, useAuth } from '../../context/AuthContext'
 import { AppSnackbar, ConfirmDialog } from '../../components'
 import { AiProviderCard, type AiProvider } from '../../features/aiProviders'
-import { useListPageLogic } from '../../hooks/useListPageLogic'
+import { useListPageLogic } from '../../hooks/useListPageLogic.hook'
 
 export default function AiProviders() {
   const { t } = useTranslation(['aiProviders', 'common'])

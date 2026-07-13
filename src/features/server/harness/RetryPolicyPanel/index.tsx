@@ -17,26 +17,14 @@ import { useTranslation } from 'react-i18next'
 import api from '../../../../api'
 import { HelpButton, SaveIndicator } from '../../../../components'
 import type { SaveStatus } from '../../types'
+import type { RetryPolicy } from './retryPolicy.interface'
+import type { RetryPolicyPanelProps } from './retryPolicyPanelProps.interface'
+import { RETRY_CODES } from './constants/retryCodes.constant'
+import { DEFAULT } from './constants/default.constant'
 
-const RETRY_CODES = [429, 500, 502, 503, 504]
 
-interface RetryPolicy {
-  enabled: boolean
-  maxRetries: number
-  backoffStrategy: 'fixed' | 'exponential' | 'linear'
-  initialDelayMs: number
-  retryOnCodes: number[]
-}
 
-const DEFAULT: RetryPolicy = {
-  enabled: false,
-  maxRetries: 3,
-  backoffStrategy: 'exponential',
-  initialDelayMs: 500,
-  retryOnCodes: [429, 500, 502, 503, 504],
-}
-
-export function RetryPolicyPanel({ projectId }: { projectId: string }) {
+export function RetryPolicyPanel({ projectId }: RetryPolicyPanelProps) {
   const { t } = useTranslation('serverDetail')
   const [policy, setPolicy] = useState<RetryPolicy>(DEFAULT)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')

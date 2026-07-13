@@ -19,25 +19,15 @@ import { useTranslation } from 'react-i18next'
 import api from '../../../../api'
 import { HelpButton, SaveIndicator } from '../../../../components'
 import type { GeneratedTool, SaveStatus } from '../../types'
+import type { ConstraintType } from './constraintType.type'
+import type { InputConstraint } from './inputConstraint.interface'
+import { newConstraint } from './utils/newConstraint.util'
+import type { InputConstraintsPanelProps } from './inputConstraintsPanelProps.interface'
+import { needsValue } from './constants/needsValue.constant'
 
-type ConstraintType = 'required' | 'block_value' | 'max_length' | 'allowed_values' | 'regex'
 
-interface InputConstraint {
-  id: string
-  toolName: string
-  paramName: string
-  type: ConstraintType
-  value: string
-  enabled: boolean
-}
 
-const needsValue: ConstraintType[] = ['block_value', 'max_length', 'allowed_values', 'regex']
-
-function newConstraint(): InputConstraint {
-  return { id: crypto.randomUUID(), toolName: '*', paramName: '', type: 'required', value: '', enabled: true }
-}
-
-export function InputConstraintsPanel({ projectId, tools }: { projectId: string; tools: GeneratedTool[] }) {
+export function InputConstraintsPanel({ projectId, tools }: InputConstraintsPanelProps) {
   const { t } = useTranslation('serverDetail')
   const [constraints, setConstraints] = useState<InputConstraint[]>([])
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')

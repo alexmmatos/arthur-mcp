@@ -12,8 +12,29 @@ The shared context protocol now includes Claude Code specialist agents, backend 
 
 Frontend duplication optimization is progressing through a phased extraction plan. Phases 1-7 are complete: `BaseListCard`, `useListPageLogic`, `useCopyToClipboard`, `BaseDialogLayout`, `useDetailPageNav`, shared feature types, and `useAsyncFeedback` are in place, with the most repetitive drawer, detail-nav, snackbar, and page-local entity shapes now centralized. Frontend specialists are now explicitly prepared to use Feature-Driven Architecture, Atomic Design, and controlled barrel exports. `docs/FRONTEND_ARCHITECTURE_PLAN.md` defines the incremental migration plan; its first implementation slice is complete with feature/shared `index.tsx` barrels and Atomic Design component folders.
 
+`docs/FRONTEND_FILE_ORGANIZATION_PLAN.md` is now fully implemented. Production contracts and component props are isolated in 249 `name.kind.ts` files, top-level non-rendering helpers and hooks have left React modules, shared/feature utilities have one responsibility per file, constants are focused, and pure barrels use `index.ts`. Authentication/permissions is the reference slice. `npm run type-check` now begins with an AST structural gate so the convention cannot silently regress.
+
 ## Latest Changes
 
+- Completed all phases of `docs/FRONTEND_FILE_ORGANIZATION_PLAN.md` without changing UI behavior, routes, API contracts, copy, or permissions:
+  - Extracted every production interface, enum, type alias, class, page contract, and component props shape into an individual lower-camel `name.kind.ts` module.
+  - Reorganized auth into isolated contracts, constants, context, hook, and permission/role decisions while preserving the existing `AuthContext.tsx` public facade and all fallback behavior.
+  - Replaced generic feature `types.ts` files with individual contracts and controlled `types/index.ts` exports.
+  - Split shared and feature utilities by action, including MCP parsing, formatting, validation, URLs, source classification, endpoint builders, observability environment serialization, template builders, schema extraction, factories, and role decisions.
+  - Consolidated four duplicate MCP response parsers into the shared parser.
+  - Moved top-level React-module constants to focused `.constant.ts` files and hooks to `.hook.ts` files; closure-based state handlers remain within their owning component.
+  - Renamed 20 JSX-free component/feature barrels from `index.tsx` to `index.ts`.
+  - Added `scripts/check-frontend-structure.mjs` and `npm run check:frontend-structure`; `npm run type-check` now runs the structural gate before TypeScript.
+  - Updated `AGENTS.md`, `docs/DESIGN_PATTERNS.md`, both frontend architecture plans, the organization plan, and the roadmap. `docs/FLOWS.md`, locales, entities, backend code, and permissions were unaffected because behavior did not change.
+  - Stale gitlinks under `.claude/worktrees` still make plain `git status` fail; use `git status --ignore-submodules=all` in this workspace. No Git metadata or user-owned work was changed.
+- Added `docs/FRONTEND_FILE_ORGANIZATION_PLAN.md` after a read-only frontend audit using the requested React, frontend, software engineering, and software architecture perspectives:
+  - Recorded 85 named declarations embedded in 38 production `.tsx` files, 41 declarations in generic `types.ts` files, and 20 JSX-free `index.tsx` barrels.
+  - Defined isolated contract naming such as `permission.enum.ts` and `userPermissions.interface.ts`.
+  - Defined focused utility naming and ownership, including `utils/userPermissionRole.role.ts` for role decisions.
+  - Documented the React exception for closure-based inline handlers while prohibiting top-level non-rendering helpers in component files.
+  - Added dependency-aware migration phases, validation, rollback, risks, enforcement, acceptance criteria, and an explicit no-permission-change decision.
+  - Added the phased work to `docs/ROADMAP.md`; no source files, tests, permissions, routes, copy, or behavior changed.
+  - `git status --short` could not run because the repository worktree metadata references a removed `/home/alexandre/Documents/projects/mcp-convert/mcp/.git/worktrees/...` path. No automatic Git metadata repair was attempted.
 - Added HTML preview support to the authenticated Resource execute panel:
   - `ResourceTestPanel` now detects HTML responses from resource execution by MIME type or content shape.
   - HTML responses render in a sandboxed iframe preview block while the raw response remains visible below.
@@ -374,6 +395,8 @@ Frontend duplication optimization is progressing through a phased extraction pla
 
 ## Validation
 
+- Frontend file organization implementation: `npm run type-check` passed with the new AST structural gate; `npm test` passed with 12 files and 88 tests; `npm run build` passed with the existing non-failing `@tabler/icons-react` large-barrel warning. Focused auth, endpoint utility, observability environment, and template tests also passed during migration.
+- Documentation-only frontend organization planning: the new plan exists, roadmap/handoff references resolve, an AST audit confirmed the recorded declaration counts, and the Markdown trailing-whitespace check passed. Application type-check/tests/build were not run because no application code changed.
 - `npm run type-check` passed after adding Vercel URL configuration and `VITE_API_URL` support.
 - `npm run build` passed after adding root `vercel.json`; Vite reported non-failing warnings about the large `@tabler/icons-react` barrel and chunk size.
 - Not run for the README rewrite because it only changed documentation.
@@ -473,7 +496,7 @@ Frontend duplication optimization is progressing through a phased extraction pla
 
 ## Recommended Next Step
 
-Deploy to a Render free instance and verify `/health`, `/ready`, `/live`, `/metrics`, structured logs, and cold-start behavior, then continue `docs/FRONTEND_ARCHITECTURE_PLAN.md` with Phase 2.
+Review and commit the frontend file organization refactor separately from the pre-existing backend/deploy/database/website changes. Continue using `git status --ignore-submodules=all` until the stale `.claude/worktrees` gitlinks are cleaned up intentionally. After that, resume the remaining frontend architecture page-thinning and i18n roadmap items.
 
 ## Points Of Attention
 

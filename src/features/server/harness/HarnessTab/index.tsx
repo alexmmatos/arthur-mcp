@@ -6,13 +6,8 @@ import { RateLimitPanel } from '../../settings/RateLimitPanel'
 import { RetryPolicyPanel } from '../RetryPolicyPanel'
 import { TimeoutPanel } from '../TimeoutPanel'
 import { ExecutionHooksPanel } from '../ExecutionHooksPanel'
+import type { HarnessTabProps } from './harnessTabProps.interface'
 
-interface HarnessTabProps {
-  projectId: string
-  tools: GeneratedTool[]
-  initialRateLimit?: { enabled: boolean; requestsPerMinute: number }
-  onRateLimitChange: (rl: { enabled: boolean; requestsPerMinute: number }) => void
-}
 
 export function HarnessTab({ projectId, tools, initialRateLimit, onRateLimitChange }: HarnessTabProps) {
   const { t } = useTranslation('serverDetail')

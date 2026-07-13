@@ -12,17 +12,9 @@ import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import { useTranslation } from 'react-i18next'
+import type { ConfirmDialogProps } from './confirmDialogProps.interface'
+export type { ConfirmDialogProps } from './confirmDialogProps.interface'
 
-export interface ConfirmDialogProps {
-  open: boolean
-  title: string
-  message: string
-  confirmLabel?: string
-  confirmColor?: 'error' | 'warning' | 'primary'
-  onConfirm: () => void
-  onClose: () => void
-  loading?: boolean
-}
 
 const ICON_MAP = {
   error: <ErrorOutlineIcon sx={{ fontSize: 48, color: '#d93025' }} />,

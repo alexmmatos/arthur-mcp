@@ -32,17 +32,9 @@ import api from '../../api'
 import { Permission, useAuth } from '../../context/AuthContext'
 import { useColorMode } from '../../theme/ColorModeContext'
 import { TagInput } from '../../features/prompts'
+import type { PromptForm } from './promptForm.interface'
+import type { PromptRecord } from './promptRecord.interface'
 
-interface PromptForm {
-  name: string
-  description: string
-  content: string
-  tags: string[]
-}
-
-interface PromptRecord {
-  id: string
-}
 
 export default function NewPrompt() {
   const navigate = useNavigate()

@@ -11,16 +11,10 @@ import { METHOD_COLOR } from '../../constants'
 import { StatCard } from '../../activity/ProjectLogs'
 import { EndpointAccordion } from '../EndpointAccordion'
 import { ToolDialog } from '../ToolDialog'
+import type { ApiEndpointsTabProps } from './apiEndpointsTabProps.interface'
 
-export function ApiEndpointsTab({ tools, projectId, projectBaseUrl, anyApiKey, onToolAdded, onToolChanged, onToolDeleted }: {
-  tools: GeneratedTool[]
-  projectId: string
-  projectBaseUrl: string
-  anyApiKey?: string
-  onToolAdded: (tool: GeneratedTool) => void
-  onToolChanged: (oldName: string, newTool: GeneratedTool) => void
-  onToolDeleted: (toolName: string) => void
-}) {
+
+export function ApiEndpointsTab({ tools, projectId, projectBaseUrl, anyApiKey, onToolAdded, onToolChanged, onToolDeleted }: ApiEndpointsTabProps) {
   const { t } = useTranslation('serverDetail')
   const { can } = useAuth()
   const [search, setSearch] = useState('')

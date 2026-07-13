@@ -28,42 +28,21 @@ import {
 import { useTranslation } from 'react-i18next'
 import { useAuth, Permission } from '../../context/AuthContext'
 import api from '../../api'
-import { useDetailPageNav } from '../../hooks/useDetailPageNav'
+import { useDetailPageNav } from '../../hooks/useDetailPageNav.hook'
 import type { AiProvider, AiProviderType } from '../../features/aiProviders'
 import { SecretAutocomplete, useSecrets } from '../../features/secrets'
 import Swal from 'sweetalert2'
+import type { OverviewTabProps } from './overviewTabProps.interface'
+import type { SettingsTabProps } from './settingsTabProps.interface'
+import { PROVIDER_TYPES } from './constants/providerTypes.constant'
+import { MODEL_OPTIONS } from './constants/modelOptions.constant'
+import { PROVIDER_COLORS } from './constants/providerColors.constant'
 
-const PROVIDER_TYPES: AiProviderType[] = ['openai', 'anthropic', 'google', 'mistral', 'groq', 'cohere', 'azure-openai', 'ollama', 'custom']
 
-const MODEL_OPTIONS: Record<string, string[]> = {
-  openai: ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini', 'gpt-4.1'],
-  anthropic: ['claude-3-5-haiku-latest', 'claude-3-5-sonnet-latest', 'claude-3-7-sonnet-latest'],
-  google: ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash'],
-  mistral: ['mistral-small-latest', 'mistral-large-latest', 'codestral-latest'],
-  groq: ['llama-3.1-8b-instant', 'llama-3.3-70b-versatile', 'mixtral-8x7b-32768'],
-  cohere: ['command-r', 'command-r-plus'],
-  'azure-openai': ['gpt-4o-mini', 'gpt-4o'],
-  ollama: ['llama3.2', 'llama3.1', 'mistral', 'qwen2.5'],
-  custom: ['gpt-4o-mini', 'llama-3.1-8b-instant'],
-}
-
-const PROVIDER_COLORS: Record<string, string> = {
-  openai: '#10a37f',
-  anthropic: '#d97559',
-  google: '#1a73e8',
-  gemini: '#1a73e8',
-  mistral: '#ff6b35',
-  groq: '#f55036',
-  cohere: '#39594d',
-  'azure-openai': '#0078d4',
-  azure: '#0078d4',
-  ollama: '#111827',
-  custom: '#7c3aed',
-}
 
 // ─── Tab 0 — Overview ─────────────────────────────────────────────────────────
 
-function OverviewTab({ provider, onUpdated }: { provider: AiProvider; onUpdated: (p: AiProvider) => void }) {
+function OverviewTab({ provider, onUpdated }: OverviewTabProps) {
   const { t } = useTranslation(['aiProviders', 'common'])
   const { can } = useAuth()
   const [testing, setTesting] = useState(false)
@@ -193,7 +172,7 @@ function OverviewTab({ provider, onUpdated }: { provider: AiProvider; onUpdated:
 
 // ─── Tab 1 — Settings ────────────────────────────────────────────────────────
 
-function SettingsTab({ provider, onUpdated }: { provider: AiProvider; onUpdated: (p: AiProvider) => void }) {
+function SettingsTab({ provider, onUpdated }: SettingsTabProps) {
   const { t } = useTranslation(['aiProviders', 'common'])
   const navigate = useNavigate()
   const { can } = useAuth()
