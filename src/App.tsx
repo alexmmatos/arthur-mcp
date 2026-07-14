@@ -1,40 +1,45 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { AuthProvider } from './context/AuthContext'
-import { ServerNavProvider } from './context/ServerNavContext'
+import { AuthProvider } from './context/auth'
+import { ServerNavProvider } from './context'
 import { Layout } from './components/templates'
-import Login from './pages/Login'
-import ForgotPassword from './pages/ForgotPassword'
-import ResetPassword from './pages/ResetPassword'
-import Servers from './pages/Servers'
-import NewServer from './pages/NewServer'
-import ServerDetail from './pages/ServerDetail'
-import McpDocs from './pages/McpDocs'
-import Profile from './pages/Profile'
-import Dashboard from './pages/Dashboard'
-import Settings from './pages/Settings'
-import AuditLogs from './pages/AuditLogs'
-import SetupWizard from './pages/SetupWizard'
-import SharePage from './pages/SharePage'
-import Templates from './pages/Templates'
-import Prompts from './pages/Prompts'
-import NewPrompt from './pages/NewPrompt'
-import PromptDetail from './pages/PromptDetail'
-import PromptTemplates from './pages/PromptTemplates'
-import Secrets from './pages/Secrets'
-import NewSecret from './pages/NewSecret'
-import SecretDetail from './pages/SecretDetail'
-import AiProviders from './pages/AiProviders'
-import NewAiProvider from './pages/NewAiProvider'
-import AiProviderDetail from './pages/AiProviderDetail'
-import Observability from './pages/Observability'
-import ErrorTracking from './pages/ErrorTracking'
+import type { RequireAuthProps } from './requireAuthProps.interface'
+import type { RequireSetupProps } from './requireSetupProps.interface'
 
-function RequireAuth({ children }: { children: React.ReactNode }) {
+
+const Login = lazy(() => import('./pages/Login'))
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
+const ResetPassword = lazy(() => import('./pages/ResetPassword'))
+const Servers = lazy(() => import('./pages/Servers'))
+const NewServer = lazy(() => import('./pages/NewServer'))
+const ServerDetail = lazy(() => import('./pages/ServerDetail'))
+const McpDocs = lazy(() => import('./pages/McpDocs'))
+const Profile = lazy(() => import('./pages/Profile'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Settings = lazy(() => import('./pages/Settings'))
+const AuditLogs = lazy(() => import('./pages/AuditLogs'))
+const SetupWizard = lazy(() => import('./pages/SetupWizard'))
+const SharePage = lazy(() => import('./pages/SharePage'))
+const Templates = lazy(() => import('./pages/Templates'))
+const Prompts = lazy(() => import('./pages/Prompts'))
+const NewPrompt = lazy(() => import('./pages/NewPrompt'))
+const PromptDetail = lazy(() => import('./pages/PromptDetail'))
+const PromptTemplates = lazy(() => import('./pages/PromptTemplates'))
+const Secrets = lazy(() => import('./pages/Secrets'))
+const NewSecret = lazy(() => import('./pages/NewSecret'))
+const SecretDetail = lazy(() => import('./pages/SecretDetail'))
+const AiProviders = lazy(() => import('./pages/AiProviders'))
+const NewAiProvider = lazy(() => import('./pages/NewAiProvider'))
+const AiProviderDetail = lazy(() => import('./pages/AiProviderDetail'))
+const Observability = lazy(() => import('./pages/Observability'))
+const ErrorTracking = lazy(() => import('./pages/ErrorTracking'))
+
+function RequireAuth({ children }: RequireAuthProps) {
   const token = localStorage.getItem('token')
   return token ? <>{children}</> : <Navigate to="/login" replace />
 }
 
-function RequireSetup({ children }: { children: React.ReactNode }) {
+function RequireSetup({ children }: RequireSetupProps) {
   const done = localStorage.getItem('setupComplete')
   return done ? <>{children}</> : <Navigate to="/setup" replace />
 }
@@ -44,6 +49,7 @@ export default function App() {
     <AuthProvider>
     <ServerNavProvider>
     <BrowserRouter>
+    <Suspense fallback={null}>
       <Routes>
         {/* Public routes */}
         <Route path="/login" element={<Login />} />
@@ -95,6 +101,7 @@ export default function App() {
           </RequireAuth>
         } />
       </Routes>
+    </Suspense>
     </BrowserRouter>
     </ServerNavProvider>
     </AuthProvider>

@@ -12,6 +12,41 @@ This file should be updated when task state changes. It does not replace issues 
 
 ## In Progress
 
+- [ ] Verify all generated API integration manuals against current official sources, prioritizing famous unaudited APIs while consolidating results in `APIs.json` order:
+  - [x] Add a structured official-source evidence overlay and validation script.
+  - [x] Complete the contiguous review for entries `0001` through `0232`.
+  - [x] Emit all 162 currently documented entries as individual YouTube-shaped candidates under `APIs/final-apis/`.
+  - [x] Add `APIs/audited.md` with the ordered Yes/No suitability decision for every reviewed entry.
+  - [x] Add `APIs/process.md` as the self-contained continuation prompt for other AI assistants.
+  - [x] Add a parallel worker protocol with atomic per-entry claims, isolated result files, stale-claim recovery, and coordinator-only consolidation.
+  - [x] Change worker selection to prioritize globally prominent, broadly adopted unaudited APIs, with a dedicated continuity lane and source-order tie-breaking.
+  - [ ] Keep the contiguous consolidation lane moving from entry `0233` while popularity-first workers audit the highest-priority remaining providers; 38 out-of-order results are currently staged, including GitHub, GitLab, Stripe, Google Maps, Google Workspace APIs, Airtable, Notion, Coinbase, and Wikipedia.
+  - [ ] Run credentialed smoke tests only when provider credentials are intentionally supplied.
+  - [x] Convert reviewed candidates into production catalog templates: added `scripts/publish-api-templates.mjs`, which copied 158 net-new documented candidates from `api_repository/final-apis/` into `public/catalogs/api/` (227 API templates total, up from 69), skipping one duplicate (`open-library`, already published as `openlibrary`). `npm run check:template-catalogs` and `npm run type-check` both pass.
+  - Note: the staging tree (`APIs/`, `APIs.json`) has been relocated to `api_repository/` by ongoing parallel audit sessions; further publish runs should read from that path (already reflected in `scripts/publish-api-templates.mjs`).
+- [x] Apply the static frontend template catalog plan (`docs/FRONTEND_TEMPLATE_CATALOG_PERSISTENCE_PLAN.md`):
+  - [x] **Phase 0:** Record counts, source size, consumers, search behavior, and summary/detail field requirements.
+  - [x] **Phase 1:** Convert 69 API and 90 prompt templates into searchable indexes plus 159 individual static detail files.
+  - [x] **Phase 2:** Add isolated summary contracts, cached fetch loaders, React catalog hooks, and normalized token search.
+  - [x] **Phase 3:** Migrate both galleries and template-derived server visuals without changing create/apply behavior.
+  - [x] **Phase 4:** Remove embedded catalog/category constants and obsolete template parameter builders.
+  - [x] **Phase 5:** Add catalog integrity validation, translated loading/error/retry states, tests, and documentation.
+- [x] Apply the frontend export and folder convention plan (`docs/FRONTEND_EXPORT_AND_FOLDER_CONVENTION_PLAN.md`):
+  - [x] **Phase 0:** Regenerated the directory/export/import inventory and captured the passing frontend baseline.
+  - [x] **Phase 1:** Replaced the `AuthContext.tsx` compatibility facade with a single-export `AuthProvider.tsx` and `auth/index.ts` public API.
+  - [x] **Phase 2:** Split the remaining named multi-export context, hook, theme, and data modules.
+  - [x] **Phase 3:** Replaced all 87 component/page `index.tsx` implementations with named `.tsx` files plus `index.ts` barrels and `index.css`.
+  - [x] **Phase 4:** Added `index.ts` and `index.css` to every remaining directory below `src/`.
+  - [x] **Phase 5:** Normalized public imports and preserved separate lazy chunks for large template datasets.
+  - [x] **Phase 6:** Enforced the convention permanently and synchronized architecture/agent documentation.
+- [x] Apply the frontend file organization plan (`docs/FRONTEND_FILE_ORGANIZATION_PLAN.md`):
+  - [x] **Phase 0:** Validated Git state while ignoring stale `.claude/worktrees` gitlinks, captured the frontend baseline, and generated the declaration/helper/import inventory.
+  - [x] **Phase 1:** Used authentication and permissions as the reference slice for isolated contracts, focused role/permission utilities, hooks, and the React provider.
+  - [x] **Phase 2:** Split shared contracts and mixed global utilities by responsibility.
+  - [x] **Phase 3:** Migrated leaf features (`prompts`, `secrets`, AI providers, error tracking, observability, and shared components).
+  - [x] **Phase 4:** Split server contracts and utilities by dependency and feature sub-area.
+  - [x] **Phase 5:** Migrated page-local contracts, component props, hooks, constants, and utilities, including `NewServer`.
+  - [x] **Phase 6:** Renamed JSX-free barrels, removed compatibility catch-alls, and added automated AST-based structural enforcement.
 - [ ] Audit permission coverage for newly added feature domains and integrations:
   - [x] Verify frontend permissions for AI providers are present in backend `RolePermissions`, backend built-in role presets, frontend fallback presets, and AI Provider UI gates, including `ai_providers_execute` for test/generation actions.
   - [ ] Verify frontend permissions for error tracking are present in backend `RolePermissions` and backend built-in role presets.
@@ -45,6 +80,10 @@ This file should be updated when task state changes. It does not replace issues 
 
 ## Done
 
+- [x] Fixed `SQLITE_ERROR: no such column` API startup crashes caused by an already-applied migration (`1700000000000-InitialTypeormSchema.ts`) having been edited in place to rename columns to snake_case: added migration `1700000000001-RenameCamelCaseColumnsToSnakeCase.ts` (idempotent, per-table rename) plus a passing test. See `docs/HANDOFF.md` for details and the "never edit an already-applied migration" lesson.
+- [x] Generated template-oriented API integration research from `APIs.json`: `APIs/MANUAL.md` indexes all 1,608 entries and `APIs/entries/` contains one numbered workspace per API, with source links, authentication interpretation, endpoint evidence, tool/parameter worksheets, response/operations checks, and a JSON candidate shaped like `public/catalogs/api/zendesk.json`. Empty `Auth` values are treated as no authentication; documentation URLs are never silently promoted to runtime endpoints; 37 identifier matches are marked for review against existing templates.
+- [x] Enforced single-export named frontend modules, `index.ts`-only aggregation, named React implementations, and `index.ts`/`index.css` coverage in all 185 source directories.
+- [x] Completed the frontend file organization migration: 249 isolated contract files, focused utility/hook/constant modules, pure `index.ts` barrels, and an enforced `check:frontend-structure` gate.
 - [x] Audited frontend hardcoded user-facing terms that bypass i18n and documented findings/remediation priorities in `docs/FRONTEND_I18N_HARDCODED_AUDIT_2026-07-01.md`.
 - [x] Added missing `serverDetail` and `errorTracking` locale keys introduced by the recent i18n sweep in EN/PT-BR and stabilized translated UI references.
 - [x] Internationalized core `NewServer` connection/auth flows (GraphQL, gRPC, SQL/NoSQL/cloud connection blocks, auth forms, and import tab labels) using `servers:newServer.*` keys in EN/PT-BR.
@@ -136,12 +175,13 @@ This file should be updated when task state changes. It does not replace issues 
 - Use `docs/DESIGN_PATTERNS.md` as the reference for backend and frontend implementation patterns.
 - Sensitive values must use explicit reveal flows; metadata endpoints should not expose secret values.
 - User-facing copy should use i18n namespaces when the surrounding page has been migrated to translations.
-- Server templates in `API_TEMPLATES` are REST templates and must create servers with `source:rest`.
+- Built-in API catalog templates are REST templates and must create servers with `source:rest`.
 - Primary entity creation should use dedicated `new` routes with stepper/review flows, following `NewServer`.
 - The Portuguese document `docs/INTEGRATION_MODEL.pt-BR.md` is an explicit exception to the English documentation rule.
 - During the compatibility phase, user-facing UI should say `Operations` while legacy backend names may still use `DbQuery` and `/queries`.
 - Data-source operations should define schemas before being exposed as MCP Tools or Resources; Tools inherit operation schemas when available.
 - All database schema changes and persisted data-shape changes must be delivered through migrations. TypeORM `synchronize` stays disabled for SQLite, PostgreSQL, and MySQL.
+- Built-in template catalogs use versioned static JSON: one searchable summary index per catalog and one detail file per template. The frontend loads indexes by lazy route and details on selection, with in-memory request caching. Do not use SQLite or IndexedDB for this read-only 159-record catalog; existing `templates_use` and `prompts_create` gates remain unchanged.
 - Technical observability endpoints are intentionally public operational surfaces, not user-facing product actions, and do not require role permissions.
 - The `/observability` app page is permission-gated with `observability_view`; provider create/edit/delete routes are not part of the current observability implementation and redirect to the runtime dashboard.
 
