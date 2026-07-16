@@ -8,6 +8,7 @@ import { IconActivity } from '@tabler/icons-react'
 import { IconBug } from '@tabler/icons-react'
 import { IconSettings } from '@tabler/icons-react'
 import { IconClipboardList } from '@tabler/icons-react'
+import { IconApps } from '@tabler/icons-react'
 
 export const NAV_SECTIONS: NavSection[] = [
   {
@@ -20,6 +21,7 @@ export const NAV_SECTIONS: NavSection[] = [
     subheaderKey: 'section.main',
     items: [
       { titleKey: 'nav.servers', icon: IconFolder, path: '/', permission: 'servers_view' },
+      { titleKey: 'nav.apps', icon: IconApps, path: '/apps', permission: 'apps_view' },
       { titleKey: 'nav.prompts', icon: IconMessage2, path: '/prompts', permission: 'prompts_view' },
       { titleKey: 'nav.secrets', icon: IconLock, path: '/secrets', permission: 'secrets_view_names' },
       { titleKey: 'nav.aiProviders', icon: IconRobot, path: '/ai-providers', permission: 'ai_providers_view' },

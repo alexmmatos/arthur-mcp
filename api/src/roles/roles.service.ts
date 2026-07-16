@@ -19,6 +19,7 @@ const ALL_PERMISSIONS_OFF: RolePermissions = {
   observability_view: false, observability_create: false, observability_edit: false, observability_delete: false,
   error_tracking_view: false, error_tracking_create: false, error_tracking_edit: false, error_tracking_delete: false,
   ai_providers_view: false, ai_providers_create: false, ai_providers_edit: false, ai_providers_delete: false, ai_providers_execute: false,
+  apps_view: false, apps_create: false, apps_edit: false, apps_delete: false,
 };
 
 @Injectable()

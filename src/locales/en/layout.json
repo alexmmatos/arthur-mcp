@@ -2,6 +2,7 @@
   "nav": {
     "dashboard": "Dashboard",
     "servers": "Servers",
+    "apps": "Apps",
     "prompts": "Prompts",
     "secrets": "Secrets",
     "settings": "Settings",

@@ -20,6 +20,7 @@ const BUILTIN: Record<string, PermMap> = {
     audit_view: true, audit_export: false, templates_use: true,
     error_tracking_view: true, error_tracking_create: true, error_tracking_edit: true, error_tracking_delete: true,
     ai_providers_view: true, ai_providers_create: true, ai_providers_edit: true, ai_providers_delete: true,
+    apps_view: true, apps_create: true, apps_edit: true, apps_delete: true,
   },
   editor: {
     servers_view: true, servers_create: false, servers_edit_settings: false, servers_delete: false,
@@ -34,6 +35,7 @@ const BUILTIN: Record<string, PermMap> = {
     audit_view: false, audit_export: false, templates_use: true,
     error_tracking_view: true, error_tracking_create: true, error_tracking_edit: true, error_tracking_delete: false,
     ai_providers_view: true, ai_providers_create: true, ai_providers_edit: true, ai_providers_delete: false,
+    apps_view: true, apps_create: true, apps_edit: true, apps_delete: false,
   },
   viewer: {
     servers_view: true, servers_create: false, servers_edit_settings: false, servers_delete: false,
@@ -48,6 +50,7 @@ const BUILTIN: Record<string, PermMap> = {
     audit_view: false, audit_export: false, templates_use: false,
     error_tracking_view: true, error_tracking_create: false, error_tracking_edit: false, error_tracking_delete: false,
     ai_providers_view: true, ai_providers_create: false, ai_providers_edit: false, ai_providers_delete: false,
+    apps_view: true, apps_create: false, apps_edit: false, apps_delete: false,
   },
 };
 

@@ -16,6 +16,14 @@ This file should be updated when task state changes. It does not replace issues 
 
 ## In Progress
 
+- [ ] Implement first-class MCP Apps according to `docs/MCP_APPS_PLAN.md`:
+  - [x] Phase 0: define the product scope, source/Tool domain boundary, declarative View model, protocol behavior, permissions, routes, risks, and acceptance criteria.
+  - [ ] Phase 1: persistence, migration, repository, CRUD, permissions, and backend tests.
+  - [ ] Phase 2: dynamic MCP metadata, `ui://` resources, structured results, generated runtime, cache invalidation, and protocol tests.
+  - [ ] Phase 3: Apps menu/list foundation, routes, i18n, permissions, states, and frontend tests.
+  - [ ] Phase 4: source -> Tool -> View -> review creation wizard.
+  - [ ] Phase 5: App detail/edit/activate/delete flow.
+  - [ ] Phase 6: documentation, full validation, and manual compatible-host verification.
 - [ ] Verify all generated API integration manuals against current official sources, prioritizing famous unaudited APIs while consolidating results in `APIs.json` order:
   - [x] Add a structured official-source evidence overlay and validation script.
   - [x] Complete the contiguous review for entries `0001` through `0232`.

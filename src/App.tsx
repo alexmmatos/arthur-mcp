@@ -33,6 +33,9 @@ const NewAiProvider = lazy(() => import('./pages/NewAiProvider'))
 const AiProviderDetail = lazy(() => import('./pages/AiProviderDetail'))
 const Observability = lazy(() => import('./pages/Observability'))
 const ErrorTracking = lazy(() => import('./pages/ErrorTracking'))
+const Apps = lazy(() => import('./pages/Apps'))
+const NewApp = lazy(() => import('./pages/NewApp'))
+const AppDetail = lazy(() => import('./pages/AppDetail'))
 
 function RequireAuth({ children }: RequireAuthProps) {
   const token = localStorage.getItem('token')
@@ -75,6 +78,9 @@ export default function App() {
                   <Route path="/servers/new" element={<NewServer />} />
                   <Route path="/servers/:id" element={<ServerDetail />} />
                   <Route path="/servers/:id/docs" element={<McpDocs />} />
+                  <Route path="/apps" element={<Apps />} />
+                  <Route path="/apps/new" element={<NewApp />} />
+                  <Route path="/apps/:id" element={<AppDetail />} />
 <Route path="/profile" element={<Profile />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/settings" element={<Settings />} />

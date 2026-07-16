@@ -18,14 +18,33 @@ import { ExecutionLogsService } from '../execution-logs/execution-logs.service';
 import { ErrorTrackingService } from '../error-tracking/error-tracking.service';
 import { MetricsService } from '../observability/metrics/metrics.service';
 import { TracingService } from '../observability/tracing/tracing.service';
-import { PROJECT_REPO, PROMPT_REPO, SECRET_REPO, SETTINGS_REPO } from '../database/database.tokens';
+import { MCP_APP_REPO, PROJECT_REPO, PROMPT_REPO, SECRET_REPO, SETTINGS_REPO } from '../database/database.tokens';
 import { ISwaggerProjectRepository } from '../swagger/swagger-project.repository';
 import type { IPromptRepository, PromptRecord } from '../prompts/prompt.repository';
 import type { ISecretRepository } from '../secrets/secret.repository';
 import type { ISettingsRepository } from '../settings/settings.repository';
+import type { IMcpAppRepository, McpAppRecord } from '../mcp-apps/mcp-app.repository';
+import { renderMcpAppView } from '../mcp-apps/mcp-app-view.renderer';
 
 function tryParseJson(body: string): unknown {
   try { return JSON.parse(body); } catch { return body; }
+}
+
+function appResourceUri(appId: string): string {
+  return `ui://arthur/apps/${appId}/view.html`;
+}
+
+function toStructuredContent(result: McpToolResult): Record<string, unknown> | undefined {
+  const rawText = result.content?.find((entry) => entry.type === 'text')?.text;
+  if (!rawText) return undefined;
+  try {
+    const parsed = JSON.parse(rawText) as unknown;
+    if (Array.isArray(parsed)) return { items: parsed };
+    if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>;
+    return { value: parsed };
+  } catch {
+    return { value: rawText };
+  }
 }
 
 interface TenantParamDef {
@@ -47,6 +66,7 @@ interface CachedProject {
   tenantConfig: { enabled: boolean; params: TenantParamDef[] };
   globalRequestHeaders: Record<string, string>;
   responseConfig: ResponseMapperConfig;
+  apps: McpAppRecord[];
   expiresAt: number;
 }
 
@@ -105,6 +125,7 @@ export class DynamicMcpService {
     @Inject(PROMPT_REPO) private readonly promptRepo: IPromptRepository,
     @Inject(SECRET_REPO) private readonly secretRepo: ISecretRepository,
     @Inject(SETTINGS_REPO) private readonly settingsRepo: ISettingsRepository,
+    @Inject(MCP_APP_REPO) private readonly appRepo: IMcpAppRepository,
     private readonly executionLogs: ExecutionLogsService,
     private readonly errorTracking: ErrorTrackingService,
     private readonly metrics: MetricsService,
@@ -135,6 +156,7 @@ export class DynamicMcpService {
     const secretsMap = new Map(allSecrets.map((s) => [s.name, s.value]));
 
     const settings = await this.settingsRepo.getGlobal();
+    const apps = (await this.appRepo.findByServerId(canonicalServerId)).filter((app) => app.isActive);
     const globalRequestHeaders = Object.fromEntries(
       (settings.globalRequestHeaders ?? []).filter((h) => h.name).map((h) => [h.name, h.value]),
     );
@@ -151,6 +173,7 @@ export class DynamicMcpService {
       tenantConfig: (server as any).tenantConfig ?? { enabled: false, params: [] },
       globalRequestHeaders,
       responseConfig: (server as any).responseConfig ?? { enabled: false },
+      apps,
       expiresAt: Date.now() + this.CACHE_TTL_MS,
     };
     this.projectCache.set(canonicalServerId, entry);
@@ -186,7 +209,7 @@ export class DynamicMcpService {
 
   async createMcpServer(serverId: string, queryParams: Record<string, string> = {}): Promise<Server> {
     const project = await this.getProjectData(serverId);
-    const { tools: allTools, chains: allChains, auth: rawAuth, name, version, resources, prompts, secrets, tenantConfig, globalRequestHeaders, responseConfig } = project;
+    const { tools: allTools, chains: allChains, auth: rawAuth, name, version, resources, prompts, secrets, tenantConfig, globalRequestHeaders, responseConfig, apps } = project;
     serverId = project.serverId;
     const auth = resolveSecretRefs(rawAuth, secrets);
 
@@ -215,6 +238,7 @@ export class DynamicMcpService {
     const enabledChains: ToolChain[] = allChains.filter((c) => c.enabled !== false);
     const chainMap = new Map(enabledChains.map((c) => [c.name, c]));
     const enabledResources = resources.filter((r) => r.enabled !== false);
+    const appByToolName = new Map(apps.map((app) => [app.toolName, app]));
 
     this.logger.log(`MCP server para "${name}": ${tools.length} tools (${allTools.length} total, ${allTools.filter(t => t.enabled === false).length} disabled)`);
 
@@ -240,6 +264,7 @@ export class DynamicMcpService {
           const method = (t.endpointRef?.method ?? 'GET').toUpperCase();
           const readOnly = method === 'GET' || method === 'HEAD';
           const destructive = method === 'DELETE';
+          const app = appByToolName.get(t.name);
 
           // Strip tenant-injected params from the schema exposed to the AI
           const tenantKeysForTool = new Set(
@@ -269,6 +294,12 @@ export class DynamicMcpService {
               destructiveHint: destructive,
               openWorldHint: true,
             },
+            ...(app ? {
+              _meta: {
+                ui: { resourceUri: appResourceUri(app.id), visibility: ['model', 'app'] },
+                'ui/resourceUri': appResourceUri(app.id),
+              },
+            } : {}),
           };
         }),
         ...enabledChains.map((c) => ({
@@ -292,6 +323,7 @@ export class DynamicMcpService {
       const args = (req.params.arguments ?? {}) as Record<string, unknown>;
       const toolName = req.params.name;
       const tool = toolMap.get(toolName);
+      const app = appByToolName.get(toolName);
       const t0 = Date.now();
 
       this.logger.log(`CallTool → "${toolName}" | args: ${JSON.stringify(args)}`);
@@ -377,7 +409,7 @@ export class DynamicMcpService {
         const httpRes = await this.executeObservedRequest(httpReq);
         this.logger.log(`← HTTP ${httpRes.status} ${httpRes.statusText}`);
         // If the tool has an HTML output template, render with Handlebars instead of raw JSON
-        if (tool.outputTemplate && !httpRes.body.trim().startsWith('<')) {
+        if (tool.outputTemplate && !app && !httpRes.body.trim().startsWith('<')) {
           try {
             const parsed = JSON.parse(httpRes.body);
             const ctx = Array.isArray(parsed) ? { items: parsed } : parsed;
@@ -399,15 +431,11 @@ export class DynamicMcpService {
         }
         this.recordToolMetric(toolName, durationMs, result.isError ? 'error' : 'ok', 'mcp', result.isError);
 
-        // If the tool declares an outputSchema, also populate structuredContent
-        if (tool.outputSchema && !result.isError) {
-          const rawText = (result as any).content?.[0]?.text;
-          if (rawText) {
-            try {
-              const parsed = JSON.parse(rawText);
-              return { ...result, structuredContent: parsed };
-            } catch { /* non-JSON response — structuredContent omitted */ }
-          }
+        // App-backed tools always expose structured data when possible. Regular tools
+        // retain the existing outputSchema-driven behavior.
+        if ((app || tool.outputSchema) && !result.isError) {
+          const structuredContent = toStructuredContent(result);
+          if (structuredContent) return { ...result, structuredContent };
         }
 
         return result;
@@ -427,16 +455,37 @@ export class DynamicMcpService {
     });
 
     server.setRequestHandler(ListResourcesRequestSchema, async () => ({
-      resources: enabledResources.map((r) => ({
-        uri: r.uri,
-        name: r.name,
-        ...(r.description ? { description: r.description } : {}),
-        ...(r.mimeType ? { mimeType: r.mimeType } : {}),
-      })),
+      resources: [
+        ...enabledResources.map((r) => ({
+          uri: r.uri,
+          name: r.name,
+          ...(r.description ? { description: r.description } : {}),
+          ...(r.mimeType ? { mimeType: r.mimeType } : {}),
+        })),
+        ...apps.map((app) => ({
+          uri: appResourceUri(app.id),
+          name: app.name,
+          ...(app.description ? { description: app.description } : {}),
+          mimeType: 'text/html;profile=mcp-app',
+          _meta: { ui: { prefersBorder: true } },
+        })),
+      ],
     }));
 
     server.setRequestHandler(ReadResourceRequestSchema, async (req) => {
       const uri = req.params.uri;
+      const app = apps.find((candidate) => appResourceUri(candidate.id) === uri);
+      if (app) {
+        this.metrics.recordMcpResource({ resourceName: app.name, status: 'ok' });
+        return {
+          contents: [{
+            uri,
+            mimeType: 'text/html;profile=mcp-app',
+            text: renderMcpAppView(app),
+            _meta: { ui: { prefersBorder: true } },
+          }],
+        } as any;
+      }
       const raw = enabledResources.find((r) => r.uri === uri);
       if (!raw) {
         this.metrics.recordMcpResource({ resourceName: uri, status: 'not_found', isError: true });

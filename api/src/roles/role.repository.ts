@@ -15,6 +15,7 @@ export interface RolePermissions {
   observability_view: boolean; observability_create: boolean; observability_edit: boolean; observability_delete: boolean;
   error_tracking_view: boolean; error_tracking_create: boolean; error_tracking_edit: boolean; error_tracking_delete: boolean;
   ai_providers_view: boolean; ai_providers_create: boolean; ai_providers_edit: boolean; ai_providers_delete: boolean; ai_providers_execute: boolean;
+  apps_view: boolean; apps_create: boolean; apps_edit: boolean; apps_delete: boolean;
 }
 
 export interface RoleRecord {

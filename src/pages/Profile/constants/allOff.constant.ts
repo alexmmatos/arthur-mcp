@@ -3,6 +3,7 @@ import type { RolePermissions } from '../rolePermissions.interface'
 export const ALL_OFF: RolePermissions = {
   servers_view: false, servers_create: false, servers_edit_settings: false, servers_delete: false,
   servers_toggle_active: false, servers_share: false,
+  apps_view: false, apps_create: false, apps_edit: false, apps_delete: false,
   tools_view: false, tools_create: false, tools_edit: false, tools_delete: false, tools_test: false, endpoints_create: false,
   resources_view: false, resources_create: false, resources_edit: false, resources_delete: false,
   prompts_view: false, prompts_create: false, prompts_edit: false, prompts_delete: false,

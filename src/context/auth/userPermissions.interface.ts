@@ -5,6 +5,10 @@ export interface UserPermissions {
   servers_delete: boolean
   servers_toggle_active: boolean
   servers_share: boolean
+  apps_view: boolean
+  apps_create: boolean
+  apps_edit: boolean
+  apps_delete: boolean
   tools_view: boolean
   tools_create: boolean
   tools_edit: boolean

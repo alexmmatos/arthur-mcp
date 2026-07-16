@@ -21,6 +21,7 @@ import { SecretsModule } from './secrets/secrets.module';
 import { RolesModule } from './roles/roles.module';
 import { ErrorTrackingModule } from './error-tracking/error-tracking.module';
 import { AiProvidersModule } from './ai-providers/ai-providers.module';
+import { McpAppsModule } from './mcp-apps/mcp-apps.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { AiProvidersModule } from './ai-providers/ai-providers.module';
     RolesModule,
     ErrorTrackingModule,
     AiProvidersModule,
+    McpAppsModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: McpExceptionFilter },

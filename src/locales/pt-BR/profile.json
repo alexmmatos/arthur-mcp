@@ -169,7 +169,11 @@
     "ai_providers_create": "Criar provedores de IA",
     "ai_providers_edit": "Editar provedores de IA",
     "ai_providers_delete": "Excluir provedores de IA",
-    "ai_providers_execute": "Usar provedores de IA para geração e testes"
+    "ai_providers_execute": "Usar provedores de IA para geração e testes",
+    "apps_view": "Visualizar MCP Apps",
+    "apps_create": "Criar MCP Apps",
+    "apps_edit": "Editar MCP Apps",
+    "apps_delete": "Excluir MCP Apps"
   },
   "builtinRoles": {
     "admin": "Acesso completo a tudo.",

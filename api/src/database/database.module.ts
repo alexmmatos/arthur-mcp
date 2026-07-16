@@ -6,6 +6,7 @@ import { parseDatabaseUri } from './database-uri';
 import { InitialTypeormSchema1700000000000 } from './migrations/1700000000000-InitialTypeormSchema';
 import { RenameCamelCaseColumnsToSnakeCase1700000000001 } from './migrations/1700000000001-RenameCamelCaseColumnsToSnakeCase';
 import { AddOAuthConfigToSwaggerProjects1700000000002 } from './migrations/1700000000002-AddOAuthConfigToSwaggerProjects';
+import { CreateMcpApps1700000000003 } from './migrations/1700000000003-CreateMcpApps';
 
 import { UserEntity } from '../users/user.entity';
 import { SwaggerProjectEntity } from '../swagger/swagger-project.entity';
@@ -16,6 +17,7 @@ import { SecretEntity } from '../secrets/secret.entity';
 import { RoleEntity } from '../roles/role.entity';
 import { ErrorTrackingProviderEntity } from '../error-tracking/error-tracking-provider.entity';
 import { AiProviderEntity } from '../ai-providers/ai-provider.entity';
+import { McpAppEntity } from '../mcp-apps/mcp-app.entity';
 
 import { TypeOrmUserRepository } from '../users/repositories/typeorm-user.repository';
 import { TypeOrmSwaggerProjectRepository } from '../swagger/repositories/typeorm-swagger-project.repository';
@@ -26,8 +28,9 @@ import { TypeOrmSecretRepository } from '../secrets/repositories/typeorm-secret.
 import { TypeOrmRoleRepository } from '../roles/repositories/typeorm-role.repository';
 import { TypeOrmErrorTrackingProviderRepository } from '../error-tracking/repositories/typeorm-error-tracking-provider.repository';
 import { TypeOrmAiProviderRepository } from '../ai-providers/repositories/typeorm-ai-provider.repository';
+import { TypeOrmMcpAppRepository } from '../mcp-apps/repositories/typeorm-mcp-app.repository';
 
-import { USER_REPO, PROJECT_REPO, SETTINGS_REPO, PASSWORD_RESET_REPO, PROMPT_REPO, SECRET_REPO, ROLE_REPO, ERROR_TRACKING_PROVIDER_REPO, AI_PROVIDER_REPO } from './database.tokens';
+import { USER_REPO, PROJECT_REPO, SETTINGS_REPO, PASSWORD_RESET_REPO, PROMPT_REPO, SECRET_REPO, ROLE_REPO, ERROR_TRACKING_PROVIDER_REPO, AI_PROVIDER_REPO, MCP_APP_REPO } from './database.tokens';
 
 const TYPEORM_ENTITIES = [
   UserEntity,
@@ -39,12 +42,14 @@ const TYPEORM_ENTITIES = [
   RoleEntity,
   ErrorTrackingProviderEntity,
   AiProviderEntity,
+  McpAppEntity,
 ];
 
 const TYPEORM_MIGRATIONS = [
   InitialTypeormSchema1700000000000,
   RenameCamelCaseColumnsToSnakeCase1700000000001,
   AddOAuthConfigToSwaggerProjects1700000000002,
+  CreateMcpApps1700000000003,
 ];
 
 function buildTypeOrmOptions(): DataSourceOptions {
@@ -106,6 +111,7 @@ export class DatabaseModule {
         TypeOrmRoleRepository,
         TypeOrmErrorTrackingProviderRepository,
         TypeOrmAiProviderRepository,
+        TypeOrmMcpAppRepository,
         { provide: USER_REPO, useExisting: TypeOrmUserRepository },
         { provide: PROJECT_REPO, useExisting: TypeOrmSwaggerProjectRepository },
         { provide: SETTINGS_REPO, useExisting: TypeOrmSettingsRepository },
@@ -115,8 +121,9 @@ export class DatabaseModule {
         { provide: ROLE_REPO, useExisting: TypeOrmRoleRepository },
         { provide: ERROR_TRACKING_PROVIDER_REPO, useExisting: TypeOrmErrorTrackingProviderRepository },
         { provide: AI_PROVIDER_REPO, useExisting: TypeOrmAiProviderRepository },
+        { provide: MCP_APP_REPO, useExisting: TypeOrmMcpAppRepository },
       ],
-      exports: [USER_REPO, PROJECT_REPO, SETTINGS_REPO, PASSWORD_RESET_REPO, PROMPT_REPO, SECRET_REPO, ROLE_REPO, ERROR_TRACKING_PROVIDER_REPO, AI_PROVIDER_REPO],
+      exports: [USER_REPO, PROJECT_REPO, SETTINGS_REPO, PASSWORD_RESET_REPO, PROMPT_REPO, SECRET_REPO, ROLE_REPO, ERROR_TRACKING_PROVIDER_REPO, AI_PROVIDER_REPO, MCP_APP_REPO],
     };
   }
 }

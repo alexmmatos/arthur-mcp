@@ -5,6 +5,7 @@ export const PERMISSION_GROUPS: {
   keys: (keyof RolePermissions)[]
 }[] = [
   { label: 'Servers',      keys: ['servers_view', 'servers_create', 'servers_edit_settings', 'servers_delete', 'servers_toggle_active', 'servers_share'] },
+  { label: 'Apps',         keys: ['apps_view', 'apps_create', 'apps_edit', 'apps_delete'] },
   { label: 'Tools',        keys: ['tools_view', 'tools_create', 'tools_edit', 'tools_delete', 'tools_test', 'endpoints_create'] },
   { label: 'Resources',    keys: ['resources_view', 'resources_create', 'resources_edit', 'resources_delete'] },
   { label: 'Prompts',      keys: ['prompts_view', 'prompts_create', 'prompts_edit', 'prompts_delete'] },

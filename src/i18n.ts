@@ -16,6 +16,7 @@ import enProfile from './locales/en/profile.json'
 import enAiProviders from './locales/en/aiProviders.json'
 import enObservability from './locales/en/observability.json'
 import enErrorTracking from './locales/en/errorTracking.json'
+import enApps from './locales/en/apps.json'
 
 import ptCommon from './locales/pt-BR/common.json'
 import ptLayout from './locales/pt-BR/layout.json'
@@ -31,6 +32,7 @@ import ptProfile from './locales/pt-BR/profile.json'
 import ptAiProviders from './locales/pt-BR/aiProviders.json'
 import ptObservability from './locales/pt-BR/observability.json'
 import ptErrorTracking from './locales/pt-BR/errorTracking.json'
+import ptApps from './locales/pt-BR/apps.json'
 
 i18next
   .use(LanguageDetector)
@@ -52,6 +54,7 @@ i18next
         aiProviders: enAiProviders,
         observability: enObservability,
         errorTracking: enErrorTracking,
+        apps: enApps,
       },
       'pt-BR': {
         common: ptCommon,
@@ -68,6 +71,7 @@ i18next
         aiProviders: ptAiProviders,
         observability: ptObservability,
         errorTracking: ptErrorTracking,
+        apps: ptApps,
       },
     },
     defaultNS: 'common',
