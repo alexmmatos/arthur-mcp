@@ -108,7 +108,7 @@ export function OutputFilteringPanel({ projectId, tools }: OutputFilteringPanelP
       ) : (
         <Box mb={2}>
           {filters.map((f) => (
-            <Box key={f.id} display="flex" gap={1} alignItems="flex-start" mb={1.5} sx={{ opacity: f.enabled ? 1 : 0.5 }}>
+            <Box key={f.id} display="flex" gap={1} alignItems="flex-start" mb={1.5} flexWrap="wrap" sx={{ opacity: f.enabled ? 1 : 0.5 }}>
               <FormControl size="small" sx={{ flex: 1.5, minWidth: 120 }}>
                 <InputLabel>{t('logs.tool')}</InputLabel>
                 <Select label={t('logs.tool')} value={f.toolName} onChange={(e) => update(f.id, { toolName: e.target.value })}>

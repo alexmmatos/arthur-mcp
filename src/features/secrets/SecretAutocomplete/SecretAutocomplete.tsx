@@ -12,6 +12,7 @@ import api from '../../../api'
 import type { SecretEntry } from './secretEntry.interface'
 import { useSecrets } from './hooks/useSecrets.hook'
 import type { SecretAutocompleteProps } from './secretAutocompleteProps.interface'
+import './index.css'
 
 
 export default function SecretAutocomplete({ value, onChange, label, secrets, loadingSecrets, disabled }: SecretAutocompleteProps) {
@@ -40,7 +41,7 @@ export default function SecretAutocomplete({ value, onChange, label, secrets, lo
         return (
           <Box component="li" {...props} key={option}>
             <Box display="flex" alignItems="center" gap={1}>
-              <IconShieldLock size={14} style={{ opacity: 0.6, flexShrink: 0 }} />
+              <IconShieldLock size={14} className="secret-autocomplete-option-icon" />
               <Box>
                 <Typography fontSize="0.82rem" fontFamily="monospace" fontWeight={600}>{name}</Typography>
                 {secret?.description && (
@@ -60,7 +61,7 @@ export default function SecretAutocomplete({ value, onChange, label, secrets, lo
             ...params.InputProps,
             startAdornment: selectedName ? (
               <InputAdornment position="start">
-                <IconShieldLock size={14} style={{ opacity: 0.7 }} />
+                <IconShieldLock size={14} className="secret-autocomplete-selected-icon" />
               </InputAdornment>
             ) : undefined,
             endAdornment: (

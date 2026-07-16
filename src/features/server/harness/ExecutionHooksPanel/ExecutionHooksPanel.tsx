@@ -119,7 +119,7 @@ export function ExecutionHooksPanel({ projectId }: ExecutionHooksPanelProps) {
             <Box
               key={hook.id}
               display="flex" gap={1} alignItems="flex-start" mb={1.5}
-              sx={{ opacity: hook.enabled ? 1 : 0.5 }}
+              sx={{ opacity: hook.enabled ? 1 : 0.5, flexWrap: 'wrap' }}
             >
               <FormControl size="small" sx={{ width: 100 }}>
                 <InputLabel>{t('label.phase')}</InputLabel>

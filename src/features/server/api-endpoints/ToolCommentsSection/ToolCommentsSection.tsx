@@ -9,6 +9,7 @@ import { useAuth, Permission } from '../../../../context/auth'
 import api from '../../../../api'
 import type { ToolComment } from '../../types'
 import type { ToolCommentsSectionProps } from './toolCommentsSectionProps.interface'
+import './index.css'
 
 
 export function ToolCommentsSection({ projectId, toolName, initialComments }: ToolCommentsSectionProps) {
@@ -43,7 +44,7 @@ export function ToolCommentsSection({ projectId, toolName, initialComments }: To
         <Typography variant="caption" color="text.secondary" fontWeight={600}>
           Notes ({comments.length})
         </Typography>
-        <IconChevronDown size={14} style={{ color: 'var(--mui-palette-text-disabled, #bdbdbd)', transform: open ? 'rotate(180deg)' : 'none', transition: '0.2s' }} />
+        <IconChevronDown size={14} className={open ? 'tool-comments-section-chevron tool-comments-section-chevron-open' : 'tool-comments-section-chevron'} />
       </Box>
 
       {open && (

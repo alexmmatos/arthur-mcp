@@ -471,3 +471,15 @@ Risk to preserve:
 - `effectiveArgs` (post-injection) must be used for both the HTTP request and the `requestPayload` log, not the raw `args`.
 - OAuth2 tokens are cached and renewed transparently; do not expose them in logs.
 - Error responses from the upstream API are mapped to MCP `isError: true` content, not thrown as exceptions.
+
+## Mobile / Responsive Behavior (cross-cutting)
+
+The frontend was originally desktop-first and has received a mobile-first retrofit pass. These conventions apply app-wide and must be preserved when changing UI:
+
+- The sidebar collapses to a temporary drawer below the `md` breakpoint, with a hamburger toggle in the top bar. Page bodies must never scroll horizontally at 360px.
+- Wide content (tables, logs, code, JSON, long URLs/keys) scrolls inside its own `overflow-x: auto` container; tables hide secondary columns at `xs` (`display: { xs: 'none', md: 'table-cell' }`) keeping name/status/primary action visible.
+- List-card actions (`BaseListCard`) are hover-revealed on desktop but always visible below `md`, because hover does not exist on touch devices.
+- Form dialogs go `fullScreen` below `sm`; side drawers use `width: { xs: '100%', sm: 560 }`.
+- Multi-step steppers (`NewServer`, `SetupWizard`) switch to vertical orientation below `sm`.
+- Search fields are full-width at `xs`; header/chip rows wrap; danger-zone rows stack at `xs`; URL inputs use `type="url"` for the correct mobile keyboard.
+- Permission-gated states (hidden/disabled/restricted) survive responsive adaptation — they are never removed to save space.

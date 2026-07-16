@@ -14,6 +14,7 @@ import api from '../../../../api'
 import { HelpButton } from '../../../../components'
 import { backendUrl } from '../../../../config/urls'
 import type { McpEndpointBarProps } from './mcpEndpointBarProps.interface'
+import './index.css'
 
 
 export function McpEndpointBar({ projectId, hasKeys, shareSlug, onShareSlugChange }: McpEndpointBarProps) {
@@ -89,7 +90,7 @@ export function McpEndpointBar({ projectId, hasKeys, shareSlug, onShareSlugChang
   return (
     <Paper variant="outlined" sx={{ p: 2.5, mb: 2 }}>
       <Box display="flex" alignItems="center" gap={1} mb={1.5}>
-        <IconWorld size={18} style={{ color: '#5D87FF' }} />
+        <IconWorld size={18} className="mcp-endpoint-bar-icon" />
         <Typography variant="subtitle1" fontWeight={700} flexGrow={1}>{t('heading.connectionUrl')}</Typography>
         {can(Permission.ServersShare) && <Tooltip title={t('action.shareWithClient')}>
           <Button size="small" variant="outlined" startIcon={<IconShare size={18} />} onClick={handleShareOpen}>
@@ -167,7 +168,7 @@ export function McpEndpointBar({ projectId, hasKeys, shareSlug, onShareSlugChang
       <Drawer anchor="right" open={shareOpen} onClose={() => setShareOpen(false)}
         PaperProps={{ sx: { width: { xs: '100vw', sm: 480 }, display: 'flex', flexDirection: 'column' } }}>
         <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0 }}>
-          <IconShare size={18} style={{ color: '#5D87FF' }} />
+          <IconShare size={18} className="mcp-endpoint-bar-icon" />
           <Typography variant="h6" fontWeight={700} flexGrow={1}>{t('connect.shareDrawerTitle')}</Typography>
           <IconButton size="small" onClick={() => setShareOpen(false)}><IconX size={18} /></IconButton>
         </Box>

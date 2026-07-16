@@ -399,6 +399,18 @@ Rules:
 - Keep atoms domain-neutral. If a component knows about servers, prompts, secrets, operations, or MCP details, it usually belongs in a feature.
 - Store React components as `ComponentName/ComponentName.tsx`, expose them through `ComponentName/index.ts`, and keep the folder stylesheet at `ComponentName/index.css`.
 
+### Styling
+
+Pattern: MUI components are styled with the `sx` prop; non-MUI elements are styled with classes in the component directory's `index.css`. The raw `style={{ ... }}` JSX attribute is forbidden.
+
+Rules:
+
+- MUI components take `sx` (theme-aware, responsive breakpoints); never convert `sx` usage to CSS files.
+- Non-MUI elements (Tabler icons, iframes, plain HTML tags) get a class in the component directory's `index.css`, imported by the component with `import './index.css'` — per-directory `index.css` files are inert until imported.
+- These stylesheets are global CSS, not CSS modules: prefix class names with the component name in kebab-case (e.g. `.mcp-endpoint-bar-icon`).
+- State-dependent styling is a class toggle (`className={open ? 'x-chevron x-chevron-open' : 'x-chevron'}`), never a computed `style` object.
+- The only allowed `style` attribute usage is a value genuinely unknowable at build time (e.g. a dimension computed from data).
+
 ### Barrel Exports
 
 Pattern: `index.ts` files are the only export aggregators. React implementations use matching named `.tsx` files; `index.tsx` is forbidden.

@@ -126,7 +126,7 @@ export function TimeoutPanel({ projectId, tools }: TimeoutPanelProps) {
             {t('label.perToolOverrides')}
           </Typography>
           {config.overrides.map((override, idx) => (
-            <Box key={idx} display="flex" gap={1} alignItems="center" mb={1}>
+            <Box key={idx} display="flex" gap={1} alignItems="center" mb={1} flexWrap="wrap">
               <FormControl size="small" sx={{ flex: 2 }}>
                 <InputLabel>{t('logs.tool')}</InputLabel>
                 <Select

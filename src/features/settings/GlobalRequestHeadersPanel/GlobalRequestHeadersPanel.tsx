@@ -43,7 +43,7 @@ export function GlobalRequestHeadersPanel({
       ) : (
         <Box display="flex" flexDirection="column" gap={1} mb={1.5}>
           {globalHeaders.map((header) => (
-            <Box key={header.id} display="flex" alignItems="center" gap={1}>
+            <Box key={header.id} display="flex" alignItems="center" gap={1} flexWrap="wrap">
               <TextField
                 size="small" placeholder={t('headers.placeholderName')} value={header.name}
                 onChange={(e) => onChange(header.id, 'name', e.target.value)}
@@ -51,7 +51,7 @@ export function GlobalRequestHeadersPanel({
                   startAdornment: <InputAdornment position="start">{null}</InputAdornment>,
                   sx: { fontFamily: 'monospace', fontSize: '0.82rem' },
                 }}
-                sx={{ width: 220, flexShrink: 0 }}
+                sx={{ width: { xs: '100%', sm: 220 }, flexShrink: 0 }}
               />
               <TextField
                 size="small" fullWidth placeholder={t('headers.placeholderValue')} value={header.value}

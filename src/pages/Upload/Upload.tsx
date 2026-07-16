@@ -85,7 +85,7 @@ export default function Upload() {
   }
 
   return (
-    <Box p={3} maxWidth={640} mx="auto">
+    <Box p={{ xs: 2, sm: 3 }} maxWidth={640} mx="auto">
       <Box display="flex" alignItems="center" gap={1} mb={3}>
         <Typography variant="h5" fontWeight="bold">{t('upload.pageTitle')}</Typography>
         <HelpButton title={t('upload.pageTitle')}>
@@ -124,7 +124,7 @@ export default function Upload() {
         onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
         sx={{
-          p: 6,
+          p: { xs: 3, sm: 6 },
           textAlign: 'center',
           cursor: 'pointer',
           border: '2px dashed',

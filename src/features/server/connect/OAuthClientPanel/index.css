@@ -1,0 +1,8 @@
+.oauth-client-panel-status-icon {
+  opacity: 0.38;
+}
+
+.oauth-client-panel-status-icon-active {
+  color: #5D87FF;
+  opacity: 1;
+}

@@ -271,7 +271,7 @@ export default function ErrorTracking() {
         {lastTestResult && (
           <Box
             sx={{
-              display: 'flex', alignItems: 'center', gap: 1,
+              display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1,
               p: 1.5, mb: 2.5, borderRadius: 1,
               border: '1px solid', borderColor: 'divider',
               bgcolor: 'action.hover',
@@ -384,7 +384,7 @@ export default function ErrorTracking() {
 
       {/* Action row — outside Paper, same as Settings page */}
       {canEdit && (
-        <Box display="flex" justifyContent="flex-end" gap={1} mt={1} mb={3}>
+        <Box display="flex" flexWrap="wrap" justifyContent="flex-end" gap={1} mt={1} mb={3}>
           {isConnected && (
             <Button
               variant="outlined" size="small" color="inherit"
@@ -462,7 +462,13 @@ export default function ErrorTracking() {
           <Typography variant="subtitle1" fontWeight={700} color="error.main" gutterBottom>
             {t('label.dangerZone')}
           </Typography>
-          <Box display="flex" alignItems="center" justifyContent="space-between" gap={2}>
+          <Box
+            display="flex"
+            flexDirection={{ xs: 'column', sm: 'row' }}
+            alignItems={{ xs: 'stretch', sm: 'center' }}
+            justifyContent="space-between"
+            gap={2}
+          >
             <Box>
               <Typography variant="body2" fontWeight={600}>{t('action.disconnectSentry')}</Typography>
               <Typography variant="body2" color="text.secondary">{t('hint.deleteWarning')}</Typography>

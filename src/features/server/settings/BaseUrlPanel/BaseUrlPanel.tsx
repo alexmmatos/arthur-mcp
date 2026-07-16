@@ -8,6 +8,7 @@ import { useAuth, Permission } from '../../../../context/auth'
 import api from '../../../../api'
 import { HelpButton } from '../../../../components'
 import type { BaseUrlPanelProps } from './baseUrlPanelProps.interface'
+import './index.css'
 
 
 export function BaseUrlPanel({ projectId, initialValue, onChange }: BaseUrlPanelProps) {
@@ -91,7 +92,7 @@ export function BaseUrlPanel({ projectId, initialValue, onChange }: BaseUrlPanel
               fontFamily="monospace" fontSize="0.85rem" color="text.secondary"
               sx={{ wordBreak: 'break-all', flexGrow: 1 }}
             >
-              {initialValue || <span style={{ fontStyle: 'italic', opacity: 0.5 }}>No base URL set</span>}
+              {initialValue || <span className="base-url-panel-empty">No base URL set</span>}
             </Typography>
             {can(Permission.ServersEditSettings) && (
               <Tooltip title="Edit Base URL">

@@ -101,7 +101,7 @@ export function ToolRestrictionsPanel({ projectId, tools }: ToolRestrictionsPane
       ) : (
         <Box mb={2}>
           {restrictions.map((r) => (
-            <Box key={r.id} display="flex" gap={1} alignItems="center" mb={1.5} sx={{ opacity: r.enabled ? 1 : 0.5 }}>
+            <Box key={r.id} display="flex" gap={1} alignItems="center" mb={1.5} flexWrap="wrap" sx={{ opacity: r.enabled ? 1 : 0.5 }}>
               <FormControl size="small" sx={{ flex: 2, minWidth: 140 }}>
                 <InputLabel>{t('logs.tool')}</InputLabel>
                 <Select label={t('logs.tool')} value={r.toolName} onChange={(e) => update(r.id, { toolName: e.target.value })}>

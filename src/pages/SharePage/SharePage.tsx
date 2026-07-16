@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import {
   Accordion, AccordionDetails, AccordionSummary, Alert, Box, Chip, CircularProgress, CssBaseline,
   Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Paper, Stack, TextField, Tooltip, Typography,
+  useMediaQuery, useTheme,
 } from '@mui/material'
 import { ThemeProvider } from '@mui/material/styles'
 import { baselightTheme } from '../../theme'
@@ -395,6 +396,8 @@ function AuthorizeDialog({
   open,
 }: AuthorizeDialogProps) {
   const { t } = useTranslation('servers')
+  const theme = useTheme()
+  const fullScreen = useMediaQuery(theme.breakpoints.down('sm'))
   const [draft, setDraft] = useState(authKey)
   const [draftMode, setDraftMode] = useState<AuthMode>(authMode)
   const [clientId, setClientId] = useState('')
@@ -445,7 +448,7 @@ function AuthorizeDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth fullScreen={fullScreen}>
       <DialogTitle sx={{ fontWeight: 700 }}>{t('share.authorizeTitle')}</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2}>

@@ -9,6 +9,7 @@ Arthur MCP is a full-stack application for managing MCP servers/projects, import
 ## Stack
 
 - Frontend: React 18, TypeScript, Vite, Material UI, React Router, Axios, react-i18next/i18next, Vitest.
+- The current frontend design is desktop-first, not mobile-first; responsive/mobile adaptation is pending work tracked in `docs/ROADMAP.md`. New UI should not make this worse, and mobile work goes through the `mobile-first-expert` specialist.
 - Backend: NestJS, TypeScript, TypeORM, local SQLite, Mongo/Mongoose in parts of the domain, JWT/Passport, Jest.
 - Local runtime: frontend at the repository root and API in `api/`.
 - Deploy/infra: `Dockerfile`, `docker-compose.yml`, `nginx.conf`, and `render.yaml`.
@@ -140,6 +141,7 @@ Known specialists:
 - `docker-expert`: Dockerfiles, multi-stage builds, minimal images, container security, and production container best practices.
 - `frontend-test-engineer`: frontend Vitest and React Testing Library tests for React pages, feature components, hooks, API client behavior, routing, permissions, i18n, forms, and user-visible flows.
 - `gof-expert`: Gang of Four design pattern selection, naming, refactoring, and misuse review.
+- `mobile-first-expert`: responsive/mobile-first layouts, small-screen adaptation of pages and components, touch targets, breakpoint behavior, and mobile usability fixes.
 - `nestjs-expert`: NestJS backend modules, controllers, services, DTOs, guards, interceptors, persistence, authentication, and Jest tests.
 - `oss-scout`: open source tool/library discovery, maturity review, comparisons, and project health research.
 - `product-owner`: user stories, acceptance criteria, backlog prioritization, MVP scope, requirements, and product documentation.

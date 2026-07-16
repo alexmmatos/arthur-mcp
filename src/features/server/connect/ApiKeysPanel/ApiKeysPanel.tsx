@@ -14,6 +14,7 @@ import { ConfirmDialog } from '../../../../components'
 import { HelpButton } from '../../../../components'
 import type { McpApiKeyEntry } from '../../types'
 import type { ApiKeysPanelProps } from './apiKeysPanelProps.interface'
+import './index.css'
 
 
 export function ApiKeysPanel({ projectId, initialKeys, onChange }: ApiKeysPanelProps) {
@@ -88,8 +89,8 @@ export function ApiKeysPanel({ projectId, initialKeys, onChange }: ApiKeysPanelP
     <Paper variant="outlined" sx={{ p: 2.5, mb: 3 }}>
       <Box display="flex" alignItems="center" gap={1} mb={keys.length > 0 ? 2 : 0}>
         {keys.length > 0
-          ? <IconLock size={18} style={{ color: '#13DEB9' }} />
-          : <IconLockOpen size={18} style={{ opacity: 0.38 }} />}
+          ? <IconLock size={18} className="api-keys-panel-status-icon-locked" />
+          : <IconLockOpen size={18} className="api-keys-panel-status-icon-unlocked" />}
         <Box display="flex" alignItems="center" gap={0.5} flexGrow={1}>
           <Typography variant="subtitle1" fontWeight={700}>{t('heading.accessKeys')}</Typography>
           <HelpButton title={t('heading.accessKeys')}>

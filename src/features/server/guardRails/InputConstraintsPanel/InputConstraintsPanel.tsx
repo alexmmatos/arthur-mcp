@@ -112,7 +112,7 @@ export function InputConstraintsPanel({ projectId, tools }: InputConstraintsPane
       ) : (
         <Box mb={2}>
           {constraints.map((c) => (
-            <Box key={c.id} display="flex" gap={1} alignItems="flex-start" mb={1.5} sx={{ opacity: c.enabled ? 1 : 0.5 }}>
+            <Box key={c.id} display="flex" gap={1} alignItems="flex-start" mb={1.5} flexWrap="wrap" sx={{ opacity: c.enabled ? 1 : 0.5 }}>
               <FormControl size="small" sx={{ flex: 2, minWidth: 120 }}>
                 <InputLabel>{t('logs.tool')}</InputLabel>
                 <Select label={t('logs.tool')} value={c.toolName} onChange={(e) => update(c.id, { toolName: e.target.value })}>

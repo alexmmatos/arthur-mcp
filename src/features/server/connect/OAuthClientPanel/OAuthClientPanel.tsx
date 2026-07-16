@@ -12,6 +12,7 @@ import api from '../../../../api'
 import { ConfirmDialog } from '../../../../components'
 import { HelpButton } from '../../../../components'
 import type { OAuthClientPanelProps } from './oauthClientPanelProps.interface'
+import './index.css'
 
 
 export function OAuthClientPanel({ projectId, initialClientId, initialClientSecret, serverBase, onChange }: OAuthClientPanelProps) {
@@ -73,7 +74,7 @@ export function OAuthClientPanel({ projectId, initialClientId, initialClientSecr
   return (
     <Paper variant="outlined" sx={{ p: 2.5, mb: 3 }}>
       <Box display="flex" alignItems="center" gap={1} mb={2}>
-        <IconKey size={18} style={{ color: hasCredentials ? '#5D87FF' : undefined, opacity: hasCredentials ? 1 : 0.38 }} />
+        <IconKey size={18} className={hasCredentials ? 'oauth-client-panel-status-icon oauth-client-panel-status-icon-active' : 'oauth-client-panel-status-icon'} />
         <Box display="flex" alignItems="center" gap={0.5} flexGrow={1}>
           <Typography variant="subtitle1" fontWeight={700}>{t('heading.oauthClient')}</Typography>
           <HelpButton title={t('heading.oauthClient')}>
@@ -168,14 +169,16 @@ export function OAuthClientPanel({ projectId, initialClientId, initialClientSecr
           <Typography variant="body2" color="text.disabled" mb={2}>{t('label.noOAuthClient')}</Typography>
           {can(Permission.ServersEditSettings) && (
             <Box display="flex" flexDirection="column" gap={1.5}>
-              <Box display="flex" gap={1}>
+              <Box display="flex" gap={1} flexWrap="wrap">
                 <TextField size="small" fullWidth label={t('label.clientId')} value={clientId}
                   onChange={(e) => setClientId(e.target.value)}
                   inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
+                  sx={{ minWidth: 200, flex: 1 }}
                 />
                 <TextField size="small" fullWidth label={t('label.clientSecret')} value={clientSecret}
                   onChange={(e) => setClientSecret(e.target.value)}
                   inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
+                  sx={{ minWidth: 200, flex: 1 }}
                 />
               </Box>
               <Box display="flex" gap={1}>

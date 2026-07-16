@@ -9,6 +9,9 @@ This file should be updated when task state changes. It does not replace issues 
 - [ ] Keep `docs/HANDOFF.md` updated at the end of each Codex or Claude Code session.
 - [ ] Enforce the documentation gate for every code or configuration change.
 - [ ] Add formal TypeORM migration generation/run commands for local development and CI.
+- [ ] Adapt the desktop-first frontend to mobile-first responsive behavior — use the `mobile-first-expert` specialist:
+  - [x] Retrofit pass across all pages and shared components: shell drawer verified, `BaseListCard` touch-visible actions, table scroll containers + hidden secondary columns at `xs`, wrapping panel field rows, vertical steppers below `sm`, fullscreen form dialogs below `sm`, full-width search fields, breaking long text. `npm run type-check` and `npm test` (91/91) pass.
+  - [ ] Manual QA at real small viewports (~360px) across main journeys; fix anything the static pass missed.
 
 ## In Progress
 
@@ -22,7 +25,7 @@ This file should be updated when task state changes. It does not replace issues 
   - [x] Change worker selection to prioritize globally prominent, broadly adopted unaudited APIs, with a dedicated continuity lane and source-order tie-breaking.
   - [ ] Keep the contiguous consolidation lane moving from entry `0233` while popularity-first workers audit the highest-priority remaining providers; 38 out-of-order results are currently staged, including GitHub, GitLab, Stripe, Google Maps, Google Workspace APIs, Airtable, Notion, Coinbase, and Wikipedia.
   - [ ] Run credentialed smoke tests only when provider credentials are intentionally supplied.
-  - [x] Convert reviewed candidates into production catalog templates: added `scripts/publish-api-templates.mjs`, which copied 158 net-new documented candidates from `api_repository/final-apis/` into `public/catalogs/api/` (227 API templates total, up from 69), skipping one duplicate (`open-library`, already published as `openlibrary`). `npm run check:template-catalogs` and `npm run type-check` both pass.
+  - [x] Convert reviewed candidates into production catalog templates: added `scripts/publish-api-templates.mjs`, which copied 158 net-new documented candidates from `api_repository/final-apis/` into `public/catalogs/api/` (227 API templates total, up from 69), skipping one duplicate (`open-library`, already published as `openlibrary`). A separately requested DataJud template plus Sharetribe Marketplace and Integration templates now bring the production catalog to 230 API templates. `npm run check:template-catalogs` and `npm run type-check` both pass.
   - Note: the staging tree (`APIs/`, `APIs.json`) has been relocated to `api_repository/` by ongoing parallel audit sessions; further publish runs should read from that path (already reflected in `scripts/publish-api-templates.mjs`).
 - [x] Apply the static frontend template catalog plan (`docs/FRONTEND_TEMPLATE_CATALOG_PERSISTENCE_PLAN.md`):
   - [x] **Phase 0:** Record counts, source size, consumers, search behavior, and summary/detail field requirements.
@@ -80,6 +83,7 @@ This file should be updated when task state changes. It does not replace issues 
 
 ## Done
 
+- [x] Added a production DataJud API template based on the official CNJ documentation, with Authorization API key setup, one explicit Query DSL search tool for each of the 91 documented court endpoints, and a general description covering the field glossary, three official MCP-adapted query examples, and the Elasticsearch Query DSL versus GraphQL distinction.
 - [x] Fixed `SQLITE_ERROR: no such column` API startup crashes caused by an already-applied migration (`1700000000000-InitialTypeormSchema.ts`) having been edited in place to rename columns to snake_case: added migration `1700000000001-RenameCamelCaseColumnsToSnakeCase.ts` (idempotent, per-table rename) plus a passing test. See `docs/HANDOFF.md` for details and the "never edit an already-applied migration" lesson.
 - [x] Generated template-oriented API integration research from `APIs.json`: `APIs/MANUAL.md` indexes all 1,608 entries and `APIs/entries/` contains one numbered workspace per API, with source links, authentication interpretation, endpoint evidence, tool/parameter worksheets, response/operations checks, and a JSON candidate shaped like `public/catalogs/api/zendesk.json`. Empty `Auth` values are treated as no authentication; documentation URLs are never silently promoted to runtime endpoints; 37 identifier matches are marked for review against existing templates.
 - [x] Enforced single-export named frontend modules, `index.ts`-only aggregation, named React implementations, and `index.ts`/`index.css` coverage in all 185 source directories.

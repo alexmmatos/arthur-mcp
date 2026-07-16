@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   AppBar,
@@ -55,6 +55,7 @@ import type { Status } from './status.type'
 import type { LayoutProps } from './layoutProps.interface'
 import { SIDEBAR_WIDTH } from './constants/sidebarWidth.constant'
 import { NAV_SECTIONS } from './constants/navSections.constant'
+import './index.css'
 
 
 
@@ -292,7 +293,8 @@ export default function Layout({ children }: LayoutProps) {
   const mdUp = useMediaQuery(theme.breakpoints.up('md'))
   const [mobileOpen, setMobileOpen] = useState(false)
   const [status, setStatus] = useState<Status>('checking')
-  const [profileAnchor, setProfileAnchor] = useState<null | HTMLElement>(null)
+  const profileButtonRef = useRef<HTMLButtonElement>(null)
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [username, setUsername] = useState('')
   const navigate = useNavigate()
   const { mode, toggle } = useColorMode()
@@ -436,7 +438,7 @@ export default function Layout({ children }: LayoutProps) {
             {/* Dark mode toggle */}
             <Tooltip title={mode === ColorMode.Dark ? t('theme.lightMode') : t('theme.darkMode')}>
               <Box display="flex" alignItems="center" gap={0.5} mr={0.5}>
-                <IconSun size={15} style={{ opacity: mode === ColorMode.Light ? 1 : 0.4 }} />
+                <IconSun size={15} className={mode === ColorMode.Light ? 'layout-theme-icon layout-theme-icon-active' : 'layout-theme-icon'} />
                 <Switch
                   size="small"
                   checked={mode === ColorMode.Dark}
@@ -447,16 +449,20 @@ export default function Layout({ children }: LayoutProps) {
                     '& .MuiSwitch-track': { bgcolor: mode === ColorMode.Dark ? '#5f6368 !important' : undefined },
                   }}
                 />
-                <IconMoon size={15} style={{ opacity: mode === ColorMode.Dark ? 1 : 0.4 }} />
+                <IconMoon size={15} className={mode === ColorMode.Dark ? 'layout-theme-icon layout-theme-icon-active' : 'layout-theme-icon'} />
               </Box>
             </Tooltip>
 
             {/* Profile */}
             <Tooltip title={t('account.menu')}>
               <IconButton
+                ref={profileButtonRef}
                 size="small"
                 color="inherit"
-                onClick={(e) => setProfileAnchor(e.currentTarget)}
+                aria-controls={profileMenuOpen ? 'profile-menu' : undefined}
+                aria-haspopup="true"
+                aria-expanded={profileMenuOpen ? 'true' : undefined}
+                onClick={() => setProfileMenuOpen(true)}
                 sx={{ p: 0.5, ml: 0.5 }}
               >
                 <Avatar
@@ -474,19 +480,20 @@ export default function Layout({ children }: LayoutProps) {
             </Tooltip>
 
             <Menu
-              anchorEl={profileAnchor}
-              open={Boolean(profileAnchor)}
-              onClose={() => setProfileAnchor(null)}
+              id="profile-menu"
+              anchorEl={profileButtonRef.current}
+              open={profileMenuOpen}
+              onClose={() => setProfileMenuOpen(false)}
               anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
               transformOrigin={{ horizontal: 'right', vertical: 'top' }}
               PaperProps={{ sx: { width: 200, mt: 0.5 } }}
             >
-              <MenuItem onClick={() => { setProfileAnchor(null); navigate('/profile') }}>
+              <MenuItem onClick={() => { setProfileMenuOpen(false); navigate('/profile') }}>
                 <ListItemIcon><IconUser size={18} /></ListItemIcon>
                 <ListItemText>{t('account.myProfile')}</ListItemText>
               </MenuItem>
               <MenuItem
-                onClick={() => { setProfileAnchor(null); handleLogout() }}
+                onClick={() => { setProfileMenuOpen(false); handleLogout() }}
                 sx={{ color: 'error.main' }}
               >
                 <ListItemIcon sx={{ color: 'error.main' }}><IconLogout size={18} /></ListItemIcon>
