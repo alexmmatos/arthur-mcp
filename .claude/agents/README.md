@@ -23,6 +23,7 @@ This directory contains specialist agent definitions for Claude Code. Keep this 
 | `docker-expert` | `.claude/agents/docker-expert.md` | Writing, reviewing, or debugging Dockerfiles, multi-stage builds, image size, container security, and production image practices. |
 | `frontend-test-engineer` | `.claude/agents/frontend-test-engineer.md` | Writing, reviewing, debugging, and improving frontend tests for React pages, feature components, hooks, API client behavior, routing, permissions, i18n, forms, and user-visible flows with Vitest and React Testing Library. |
 | `gof-expert` | `.claude/agents/gof-expert.md` | Choosing, reviewing, naming, or refactoring toward Gang of Four design patterns without over-engineering. |
+| `mobile-first-expert` | `.claude/agents/mobile-first-expert.md` | Creating or reviewing responsive/mobile-first layouts, adapting pages and components for small screens, touch targets, breakpoint behavior, and mobile usability fixes. |
 | `nestjs-expert` | `.claude/agents/nestjs-expert.md` | Creating, reviewing, or refactoring NestJS modules, controllers, services, DTOs, guards, interceptors, persistence, authentication, and tests. |
 | `oss-scout` | `.claude/agents/opensource-expert.md` | Researching, comparing, or choosing open source libraries, frameworks, and tools using current project health signals. |
 | `product-owner` | `.claude/agents/project-owner.md` | Writing user stories, acceptance criteria, product specs, backlog prioritization, MVP scope, and requirements documentation. |
@@ -48,6 +49,7 @@ This directory contains specialist agent definitions for Claude Code. Keep this 
 - React/TypeScript frontend implementation, Feature-Driven Architecture, Atomic Design, barrel exports, hooks, forms, routes, state, or API integration: `react-frontend-engineer`.
 - Frontend implementation, visual polish, shared UI composition, Atomic Design, or openclaw component review: `ui-expert`.
 - Flow quality before shipping a user-facing feature, including journey fit across pages, features, and shared UI: `ux-analyst`.
+- Responsive/mobile-first layout, small-screen adaptation, touch targets, or breakpoint behavior: `mobile-first-expert`.
 - Backend API/module work: `nestjs-expert`.
 - Gang of Four design pattern choice, naming, or misuse review: `gof-expert`.
 - SOLID responsibility, interface, substitutability, or dependency direction review: `solid-expert`.

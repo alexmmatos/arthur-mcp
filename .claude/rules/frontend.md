@@ -23,6 +23,12 @@ Full pattern catalog: `docs/DESIGN_PATTERNS.md` (Frontend Patterns section).
 - Configurable domain terms (server, tool, resource, prompt, chain, secret) go through `useTerm()`, not hardcoded labels.
 - Global theme/palette/typography changes belong in `src/theme/`; avoid hardcoded colors outside existing theme tokens.
 
+## Styling
+
+- Never use the raw `style={{ ... }}` attribute in JSX. MUI components take `sx`; non-MUI elements (Tabler icons, iframes, plain HTML tags) get a class in the component directory's `index.css`, imported by the component (`import './index.css'`).
+- Prefix `index.css` class names with the component name in kebab-case (e.g. `.mcp-endpoint-bar-icon`) — these stylesheets are global, not CSS modules.
+- State-dependent styling uses a class toggle (`className={open ? 'x-chevron x-chevron-open' : 'x-chevron'}`), never a computed `style` object. The only allowed `style` usage is a value genuinely unknowable at build time (e.g. a size computed from data).
+
 ## Permissions (non-negotiable)
 
 - Gate every UI action with `can(Permission.X)` from `AuthContext`. Frontend checks are never the only security layer — backend guards remain authoritative.
