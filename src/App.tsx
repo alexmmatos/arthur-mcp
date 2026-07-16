@@ -1,8 +1,10 @@
 import { lazy, Suspense } from 'react'
+import { Box, CircularProgress } from '@mui/material'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './context/auth'
 import { ServerNavProvider } from './context'
 import { Layout } from './components/templates'
+import Profile from './pages/Profile'
 import type { RequireAuthProps } from './requireAuthProps.interface'
 import type { RequireSetupProps } from './requireSetupProps.interface'
 
@@ -14,7 +16,6 @@ const Servers = lazy(() => import('./pages/Servers'))
 const NewServer = lazy(() => import('./pages/NewServer'))
 const ServerDetail = lazy(() => import('./pages/ServerDetail'))
 const McpDocs = lazy(() => import('./pages/McpDocs'))
-const Profile = lazy(() => import('./pages/Profile'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Settings = lazy(() => import('./pages/Settings'))
 const AuditLogs = lazy(() => import('./pages/AuditLogs'))
@@ -49,7 +50,11 @@ export default function App() {
     <AuthProvider>
     <ServerNavProvider>
     <BrowserRouter>
-    <Suspense fallback={null}>
+    <Suspense fallback={
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
+        <CircularProgress />
+      </Box>
+    }>
       <Routes>
         {/* Public routes */}
         <Route path="/login" element={<Login />} />
@@ -75,7 +80,7 @@ export default function App() {
                   <Route path="/servers/new" element={<NewServer />} />
                   <Route path="/servers/:id" element={<ServerDetail />} />
                   <Route path="/servers/:id/docs" element={<McpDocs />} />
-<Route path="/profile" element={<Profile />} />
+                  <Route path="/profile" element={<Profile />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/audit-logs" element={<AuditLogs />} />

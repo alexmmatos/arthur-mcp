@@ -53,14 +53,11 @@ import type { NavItem } from './navItem.type'
 import type { NavSection } from './navSection.type'
 import type { Status } from './status.type'
 import type { LayoutProps } from './layoutProps.interface'
+import type { SidebarContentProps } from './sidebarContentProps.interface'
+import { COLLAPSED_SIDEBAR_WIDTH } from './constants/collapsedSidebarWidth.constant'
 import { SIDEBAR_WIDTH } from './constants/sidebarWidth.constant'
 import { NAV_SECTIONS } from './constants/navSections.constant'
 import './index.css'
-
-const COLLAPSED_SIDEBAR_WIDTH = 64
-
-
-
 
 const AppBarStyled = styled(AppBar)(({ theme }) => ({
   boxShadow: 'none',
@@ -79,7 +76,7 @@ const ToolbarStyled = styled(Toolbar)(({ theme }) => ({
   paddingRight: '12px',
 }))
 
-function SidebarContent({ onToggle, collapsed = false }: { onToggle: () => void; collapsed?: boolean }) {
+function SidebarContent({ onToggle, collapsed = false }: SidebarContentProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const theme = useTheme()
