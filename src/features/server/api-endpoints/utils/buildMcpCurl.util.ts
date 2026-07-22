@@ -5,7 +5,7 @@ export function buildMcpCurl(tool: GeneratedTool, projectId: string, hasKeys: bo
   const properties = tool.inputSchema.properties ?? {}
   const args = Object.fromEntries(Object.entries(properties).map(([key, value]) => [key, `<${value.type ?? 'string'}>`]))
   const body = JSON.stringify(
-    { jsonrpc: '2.0', method: 'tools/call', id: 1, params: { name: tool.name, arguments: args } },
+    { jsonrpc: '2.0', method: 'tools/call', params: { name: tool.name, arguments: args } },
     null,
     2,
   )

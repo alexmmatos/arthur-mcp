@@ -30,7 +30,7 @@ export function ResourceTestPanel({ resource, projectId, anyApiKey }: ResourceTe
     try {
       const res = await api.post(
         `/mcp/server/${projectId}`,
-        { jsonrpc: '2.0', method: 'resources/read', id: Date.now(), params: { uri: resource.uri } },
+        { jsonrpc: '2.0', method: 'resources/read', params: { uri: resource.uri } },
         { headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', ...(anyApiKey ? { auth: anyApiKey } : {}) } },
       )
       const rpc = parseMcpResponse(res.data)
