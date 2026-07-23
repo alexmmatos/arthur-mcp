@@ -4,6 +4,7 @@ This file should be updated when task state changes. It does not replace issues 
 
 ## Now
 
+- [x] Fixed AI clients (Claude, ChatGPT) wrongly believing OAuth was required when adding an MCP server that had OAuth disabled: removed the unscoped `/.well-known/oauth-authorization-server` discovery endpoint, which unconditionally advertised OAuth support (with unresolved `{serverId}` placeholders) for every server on the instance regardless of its actual `oauthConfig`. The correctly per-server-scoped `/.well-known/oauth-protected-resource/api/mcp/server/:serverId` and `/.well-known/oauth-authorization-server/oauth/server/:serverId` endpoints remain the only discovery surfaces.
 - [x] Expand all 31 contextual question-mark help dialogs into localized mini-guides with purpose, usage, success checks, and troubleshooting; make the shared dialog accessible, scrollable, and responsive.
 - [x] Link contextual help dialogs out to the matching arthurmcp.io documentation page(s) (`HelpButton`'s `docsRefs` prop, a list of `{ en, ptBR }` pairs) across ~20 help surfaces, under a "Documentation" label, one link per ref labeled with its own slug; locale-aware, linking the English or pt-BR page based on `i18n.language`. Multiple refs where more than one page is genuinely relevant (a how-to guide plus its concept page(s)); left unset where no page matches.
 - [ ] Confirm the current product goal and record details that still exist only in conversation.

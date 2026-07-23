@@ -52,7 +52,6 @@ async function bootstrap() {
       { path: 'mcp-docs',                           method: RequestMethod.ALL },
       { path: 'mcp-docs/*',                         method: RequestMethod.ALL },
       { path: 'oauth/*',                                method: RequestMethod.ALL },
-      { path: '.well-known/oauth-authorization-server', method: RequestMethod.ALL },
       { path: '.well-known/oauth-authorization-server/*', method: RequestMethod.ALL },
       { path: '.well-known/oauth-protected-resource/*', method: RequestMethod.ALL },
     ],
